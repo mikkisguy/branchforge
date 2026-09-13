@@ -208,7 +208,7 @@ export async function listLabels(
     })
     .from(labels)
     .innerJoin(projectFiles, eq(labels.projectFileId, projectFiles.id))
-    .where(and(...whereConditions))
+    .where(and(...whereConditions, isNull(projectFiles.deletedAt)))
     .orderBy(asc(labels.sequenceOrder), asc(labels.labelNumber));
 
   return result.map((row) => mapToPublicLabel(row));
@@ -240,6 +240,7 @@ export async function getLabel(
     .where(
       and(
         eq(labels.id, labelId),
+        isNull(projectFiles.deletedAt),
         isNull(labels.deletedAt), // Exclude soft-deleted labels
         or(eq(projects.userId, userId), eq(projectUsers.userId, userId))
       )

@@ -43,7 +43,7 @@ Export your project as a Ren'Py-compatible ZIP:
 3. Choose what to include
 4. Download the ZIP file
 
-The ZIP contains RPY files ready to drop into a Ren'Py project.
+The ZIP contains RPY files ready to drop into a Ren'Py project, including any `.rpy` files you created in BranchForge before exporting.
 
 ## GitLab Sync
 
@@ -66,6 +66,13 @@ Push your changes back to GitLab:
 1. Commit your changes in BranchForge
 2. Click "Push to GitLab"
 3. Review the changes and confirm
+
+The sync dialog lists pending file creations, moves, and deletions separately
+from ordinary content changes. You can cancel a creation, undo a rename, or
+restore a deleted GitLab file before pushing. **Discard all** restores the
+remote file structure in one operation. Pulling is paused only while one of
+these structural changes is pending; ordinary autosaved edits do not block a
+pull.
 
 ### Conflict Detection
 

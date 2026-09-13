@@ -130,7 +130,7 @@ export function WorkspacePanelView({
   }
 
   const panelClassName = cn(
-    "bg-panel",
+    "flex flex-col bg-panel",
     innerBorderClass,
     "border-border",
     panel.isOverlay
@@ -145,7 +145,7 @@ export function WorkspacePanelView({
       id={id}
       aria-labelledby={labelledBy}
       aria-label={labelledBy ? undefined : config.label}
-      className={cn(panelClassName, panel.isOverlay && "flex flex-col")}
+      className={panelClassName}
       style={{ width: panel.width }}
     >
       {panel.isOverlay ? (

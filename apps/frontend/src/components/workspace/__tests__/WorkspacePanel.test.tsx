@@ -150,9 +150,15 @@ describe("WorkspacePanel", () => {
     installBreakpointMatchMedia({ wide: true, medium: true, narrow: true });
     renderPanel();
 
-    expect(
-      screen.getByRole("complementary", { name: "Navigator" })
-    ).toBeInTheDocument();
+    const panel = screen.getByRole("complementary", { name: "Navigator" });
+
+    expect(panel).toBeInTheDocument();
+    expect(panel).toHaveClass("flex", "flex-col", "h-full");
+    expect(screen.getByText("Panel content").parentElement).toHaveClass(
+      "min-h-0",
+      "flex-1",
+      "overflow-hidden"
+    );
   });
 
   it("overlay panel is complementary aside with close control", () => {

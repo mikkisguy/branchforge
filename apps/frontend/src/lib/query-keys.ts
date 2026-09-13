@@ -62,6 +62,8 @@ export const gitlabKeys = {
     ["gitlab", "operations", projectId] as const,
   operation: (operationId: string) =>
     ["gitlab", "operations", operationId] as const,
+  pendingChanges: (projectId: string) =>
+    ["gitlab", "pending-changes", projectId] as const,
 } as const;
 
 // ============================================================================
@@ -77,6 +79,8 @@ export const projectFilesKeys = {
     ["projectFiles", projectId, "detail", fileId] as const,
   content: (projectId: string, filePath: string, source: SourceOrigin) =>
     ["projectFiles", projectId, "content", filePath, source] as const,
+  deleteImpact: (projectId: string, fileId: string) =>
+    ["projectFiles", projectId, "delete-impact", fileId] as const,
 } as const;
 
 // ============================================================================

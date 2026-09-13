@@ -3,6 +3,10 @@ import { WorkspaceFocusReporter } from "@/components/workspace/WorkspaceFocusRep
 import { ScriptModeEmptyState } from "./components/ScriptModeEmptyState";
 import { ScriptModeDialogs } from "./components/ScriptModeDialogs";
 import { useScriptMode } from "./components/useScriptMode";
+import { CreateFileDialog } from "@/components/ide-shared/CreateFileDialog";
+import { RenameFileDialog } from "@/components/ide-shared/RenameFileDialog";
+import { DeleteFileDialog } from "@/components/ide-shared/DeleteFileDialog";
+import { useProject } from "@/hooks/useProject";
 
 interface ScriptModeProps {
   projectId?: string;
@@ -17,6 +21,8 @@ export function ScriptMode({
   onOpenSettings,
   onFocusModeChange,
 }: ScriptModeProps) {
+  const { currentProject } = useProject();
+  const canCreateFile = currentProject?.visibility === "OWNER";
   const {
     isLoadingLabels,
     isLoadingFiles,
@@ -59,7 +65,61 @@ export function ScriptMode({
     onGeneratedFileSelect,
     isGeneratedPreview,
     generatedFileName,
+    showCreateFileDialog,
+    handleOpenCreateFileDialog,
+    handleCreateFileDialogOpenChange,
+    handleCreateFile,
+    isCreatingFile,
+    createFileError,
+    resetCreateFileError,
+    foldersToExpand,
+    fileActions,
+    fileRowActions,
   } = useScriptMode({ projectId });
+
+  const createFileDialog =
+    projectId && canCreateFile ? (
+      <CreateFileDialog
+        open={showCreateFileDialog}
+        onOpenChange={handleCreateFileDialogOpenChange}
+        onCreate={handleCreateFile}
+        isCreating={isCreatingFile}
+        onDismissServerError={resetCreateFileError}
+        serverError={createFileError?.message ?? null}
+      />
+    ) : null;
+
+  const pendingFileAction = fileActions.pendingAction;
+  const fileActionDialogs = pendingFileAction ? (
+    pendingFileAction.kind === "rename" ? (
+      <RenameFileDialog
+        open
+        onOpenChange={(open) => {
+          if (!open) fileActions.closeDialog();
+        }}
+        currentFilePath={pendingFileAction.file.filePath}
+        onRename={fileActions.confirmRename}
+        isRenaming={fileActions.isRenaming}
+        serverError={fileActions.renameError?.message ?? null}
+      />
+    ) : (
+      <DeleteFileDialog
+        open
+        onOpenChange={(open) => {
+          if (!open) fileActions.closeDialog();
+        }}
+        projectId={projectId ?? ""}
+        file={{
+          id: pendingFileAction.file.id,
+          filePath: pendingFileAction.file.filePath,
+        }}
+        canForce={pendingFileAction.forceAllowed}
+        onDelete={fileActions.confirmDelete}
+        isDeleting={fileActions.isDeleting}
+        serverError={fileActions.deleteError?.message ?? null}
+      />
+    )
+  ) : null;
 
   if (isLoadingLabels || isLoadingFiles) {
     return (
@@ -90,7 +150,9 @@ export function ScriptMode({
           showZipImportDialog={showZipImportDialog}
           onShowZipImportDialogChange={setShowZipImportDialog}
           onOpenSettings={onOpenSettings}
+          onNewFile={canCreateFile ? handleOpenCreateFileDialog : undefined}
         />
+        {createFileDialog}
       </div>
     );
   }
@@ -113,6 +175,7 @@ export function ScriptMode({
           activeFileContent={activeFileContent}
           scrollToLine={scrollToLine}
           initialExpandedFolders={initialExpandedFolders}
+          foldersToExpand={foldersToExpand}
           tabItems={tabItems}
           projectCharacters={projectCharacters}
           focusModeState={focusModeState}
@@ -124,6 +187,7 @@ export function ScriptMode({
           onCloseTab={handleCloseFileTab}
           onContentChange={handleContentChange}
           onRefreshFiles={refreshFiles}
+          onNewFile={canCreateFile ? handleOpenCreateFileDialog : undefined}
           canUndo={canUndo}
           canRedo={canRedo}
           onUndo={onUndo}
@@ -140,6 +204,7 @@ export function ScriptMode({
           onGeneratedFileSelect={onGeneratedFileSelect}
           isGeneratedPreview={isGeneratedPreview}
           generatedFileName={generatedFileName}
+          fileActions={fileRowActions}
         />
       </div>
 
@@ -153,6 +218,8 @@ export function ScriptMode({
         showZipImportDialog={showZipImportDialog}
         onZipImportDialogChange={setShowZipImportDialog}
       />
+      {createFileDialog}
+      {fileActionDialogs}
     </div>
   );
 }

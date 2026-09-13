@@ -29,6 +29,13 @@ The database includes these core tables:
 - **variables**: Boolean flags
 - **route_configs**: Route definitions
 - **project_files**: Imported RPY files
+- **project_file_pending_operations**: One collapsed pending GitLab structural
+  change per file (`CREATE`, `RENAME`, or `DELETE`)
+
+`project_files` retains the current local path, last synced remote path and
+per-file remote revision/content baseline, a last-pushed local content hash,
+and an optional deletion tombstone. Active paths are unique case-insensitively
+within a project; the legacy source/path key remains for GitLab import upserts.
 
 ## Full Schema Reference
 

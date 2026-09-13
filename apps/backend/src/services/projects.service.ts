@@ -9,6 +9,7 @@ import {
   projects,
   projectUsers,
   projectFiles,
+  projectFilePendingOperations,
   labels,
   labelLines,
 } from "../db/schema/index.js";
@@ -28,7 +29,10 @@ import {
 } from "../middleware/error-handler.middleware.js";
 import { z } from "zod";
 import { createProjectSchema } from "../lib/validation.js";
-import { isValidSourceOrigin } from "@branchforge/shared";
+import {
+  isValidSourceOrigin,
+  canonicalizeRpyFilePath,
+} from "@branchforge/shared";
 import {
   requireProjectAccess,
   requireProjectOwnership,
@@ -36,7 +40,9 @@ import {
 import { syncLabelsFromFile } from "./labels.service.js";
 import type { SyncLabelsResult } from "./labels.service.js";
 import { calculateContentHash } from "../lib/hash.js";
+import { isUniqueConstraintViolation } from "../lib/db.js";
 import { parseRPYFileWithLabels } from "./rpy-parser.service.js";
+import { assertCaseInsensitiveUnique } from "./project-files-operations.service.js";
 
 /**
  * Project row type from database queries (with optional role for shared projects)
@@ -426,13 +432,18 @@ export async function getProjectFiles(
 
   const db = getDb();
 
-  // Build where conditions
+  // Build where conditions. Tombstoned (deleted) files are excluded from
+  // normal listings.
   const whereConditions = source
     ? and(
         eq(projectFiles.projectId, projectId),
-        eq(projectFiles.source, source)
+        eq(projectFiles.source, source),
+        isNull(projectFiles.deletedAt)
       )
-    : eq(projectFiles.projectId, projectId);
+    : and(
+        eq(projectFiles.projectId, projectId),
+        isNull(projectFiles.deletedAt)
+      );
 
   // Get all project files
   const files = await db.select().from(projectFiles).where(whereConditions);
@@ -479,6 +490,107 @@ export async function getProjectFiles(
 }
 
 /**
+ * Create a new empty STORY file in a project.
+ *
+ * Case-insensitive uniqueness is enforced here ACROSS every source for this
+ * project, over ACTIVE (non-tombstoned) files only. Concurrent creates are
+ * serialized with FOR UPDATE on the project row. The database keeps the
+ * legacy exact `(project_id, source, file_path)` unique for import upserts,
+ * plus a partial `(project_id, lower(file_path))` unique over active rows.
+ *
+ * For GitLab projects, the create is recorded as a pending CREATE
+ * structural operation in the same transaction (ZIP remains ordinary
+ * hard-local state with no structural rows).
+ */
+export async function createProjectFile(
+  projectId: string,
+  userId: string,
+  filePath: string
+): Promise<FileWithLabels> {
+  await requireProjectOwnership(projectId, userId);
+
+  const canonical = canonicalizeRpyFilePath(filePath);
+  if (!canonical.ok) {
+    throw new ValidationError(canonical.message);
+  }
+
+  const canonicalPath = canonical.filePath;
+  const content = "";
+  const contentHash = calculateContentHash(content);
+  const db = getDb();
+
+  try {
+    return await db.transaction(async (tx) => {
+      const [project] = await tx
+        .select({ id: projects.id, source: projects.source })
+        .from(projects)
+        .where(eq(projects.id, projectId))
+        .for("update")
+        .limit(1);
+
+      if (!project) {
+        throw new NotFoundError("Project");
+      }
+
+      await requireProjectOwnership(projectId, userId, tx);
+
+      await assertCaseInsensitiveUnique(tx, projectId, canonicalPath);
+
+      const [createdFile] = await tx
+        .insert(projectFiles)
+        .values({
+          projectId,
+          source: project.source,
+          filePath: canonicalPath,
+          fileType: "STORY",
+          content,
+          originalContent: null,
+          contentHash,
+        })
+        .returning();
+
+      if (!createdFile) {
+        throw new Error(
+          "Failed to create project file: database insert returned no rows"
+        );
+      }
+
+      // GitLab create records CREATE in the same transaction; the remote
+      // will receive an explicit create action on the next push.
+      if (project.source === "GITLAB") {
+        await tx.insert(projectFilePendingOperations).values({
+          projectId,
+          projectFileId: createdFile.id,
+          operation: "CREATE",
+          remoteBasePath: canonicalPath,
+          localPath: canonicalPath,
+        });
+      }
+
+      return {
+        ...createdFile,
+        labels: [],
+      };
+    });
+  } catch (error) {
+    if (
+      error instanceof NotFoundError ||
+      error instanceof ForbiddenError ||
+      error instanceof ValidationError ||
+      error instanceof ConflictError
+    ) {
+      throw error;
+    }
+
+    if (isUniqueConstraintViolation(error)) {
+      throw new ConflictError("A file with this path already exists");
+    }
+
+    throw error;
+  }
+}
+
+/**
  * Validate that a file exists and the user owns its project.
  * Returns the file row for use by subsequent operations.
  */
@@ -495,7 +607,14 @@ async function validateFileAccess(
     })
     .from(projectFiles)
     .innerJoin(projects, eq(projectFiles.projectId, projects.id))
-    .where(eq(projectFiles.id, fileId))
+    .where(
+      and(
+        eq(projectFiles.id, fileId),
+        // Stale/in-flight updates must never mutate a deleted (tombstoned)
+        // file.
+        isNull(projectFiles.deletedAt)
+      )
+    )
     .limit(1);
 
   if (!fileWithProject) {
@@ -530,7 +649,19 @@ async function applyFileUpdate(
   const newContentHash = calculateContentHash(content);
 
   const result = await db.transaction(async (tx) => {
-    // Defensive ownership verification at write time (TOCTOU safety net)
+    // Structural operations and autosaves share one lock order. Locking the
+    // project first serializes path/lifecycle changes before this autosave
+    // acquires its file and label locks.
+    await tx
+      .select({ id: projects.id })
+      .from(projects)
+      .where(and(eq(projects.id, file.projectId), eq(projects.userId, userId)))
+      .for("update")
+      .limit(1);
+
+    // Defensive ownership verification at write time (TOCTOU safety net).
+    // deletedAt IS NULL filter so a stale/in-flight autosave cannot
+    // revive or update a deleted file.
     const [lockedFile] = await tx
       .select({
         contentHash: projectFiles.contentHash,
@@ -538,13 +669,28 @@ async function applyFileUpdate(
       })
       .from(projectFiles)
       .innerJoin(projects, eq(projectFiles.projectId, projects.id))
-      .where(and(eq(projectFiles.id, fileId), eq(projects.userId, userId)))
+      .where(
+        and(
+          eq(projectFiles.id, fileId),
+          eq(projects.userId, userId),
+          isNull(projectFiles.deletedAt)
+        )
+      )
       .for("update")
       .limit(1);
 
     if (!lockedFile) {
       throw new NotFoundError("File");
     }
+
+    // Acquire existing labels after the file lock, in stable ID order. The
+    // label synchronizer runs in this transaction and may update/delete them.
+    await tx
+      .select({ id: labels.id })
+      .from(labels)
+      .where(eq(labels.projectFileId, fileId))
+      .orderBy(asc(labels.id))
+      .for("update");
 
     if (
       expectedContentHash !== undefined &&

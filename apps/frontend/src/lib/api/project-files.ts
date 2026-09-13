@@ -10,8 +10,14 @@ import type {
   ProjectFile,
   ImportZipResponse,
   ExportPreviewResponse,
+  CreateProjectFileRequest,
+  CreateProjectFileResponse,
+  ProjectFileWithLabels,
+  DeleteProjectFileResponse,
+  RenameProjectFileResponse,
+  SourceOrigin,
+  ProjectFileDeleteImpact as SharedDeleteFileImpact,
 } from "@branchforge/shared";
-import type { SourceOrigin } from "@branchforge/shared";
 import { isValidSourceOrigin } from "@branchforge/shared";
 
 // ============================================================================
@@ -56,6 +62,46 @@ export interface GenerateExportResponse {
   fileSize: number;
   format: string;
   createdAt: string;
+}
+
+/**
+ * A label defined in the file being deleted.
+ * Frontend-local contract until promoted to @branchforge/shared.
+ */
+export interface DeleteFileImpactLabel {
+  id: string;
+  title: string;
+  labelName: string | null;
+}
+
+/**
+ * An occurrence where a label from the file being deleted is referenced
+ * (jump / menu choice target) from another file.
+ * Frontend-local contract until promoted to @branchforge/shared.
+ */
+export interface DeleteFileImpactReference {
+  referenceType: "JUMP" | "CALL" | "MENU_CHOICE";
+  targetLabelId: string;
+  targetLabelName: string;
+  sourceFileId: string;
+  sourceFilePath: string;
+  sourceLabelId: string;
+  sourceLabelName: string | null;
+  sourceLabelTitle: string;
+  lineNumber: number | null;
+}
+
+/**
+ * Authoritative impact report for deleting a project file.
+ * Frontend-local contract until promoted to @branchforge/shared.
+ */
+export interface DeleteFileImpact {
+  fileId: string;
+  filePath: string;
+  labelCount: number;
+  labels: DeleteFileImpactLabel[];
+  referenceCount: number;
+  references: DeleteFileImpactReference[];
 }
 
 // ============================================================================
@@ -164,6 +210,32 @@ export const projectFilesApi = {
       },
       true // allow 409 Conflict responses (STALE_CONTENT_HASH) to be returned instead of thrown
     );
+  },
+
+  /**
+   * Create a new empty Ren'Py story file in the project
+   */
+  async createFile(
+    projectId: string,
+    filePath: string
+  ): Promise<ProjectFileNode> {
+    validateRequired(projectId, "Project ID");
+    validateRequired(filePath, "File path");
+
+    const body: CreateProjectFileRequest = { filePath };
+    const response = await request<CreateProjectFileResponse>(
+      `/projects/${projectId}/files`,
+      {
+        method: "POST",
+        body: JSON.stringify(body),
+      }
+    );
+
+    const file: ProjectFileWithLabels = response.file;
+    return {
+      ...file,
+      labels: file.labels ?? [],
+    };
   },
 
   /**
@@ -287,6 +359,85 @@ export const projectFilesApi = {
     }
 
     return response.json();
+  },
+
+  /**
+   * Rename or move a project file to a new full relative path.
+   * The backend rejects the operation when the target path is already taken
+   * (409) or when the caller is not the project owner (403).
+   */
+  async renameFile(
+    projectId: string,
+    fileId: string,
+    filePath: string
+  ): Promise<ProjectFileNode> {
+    validateRequired(projectId, "Project ID");
+    validateRequired(fileId, "File ID");
+    validateRequired(filePath, "File path");
+
+    const response = await request<RenameProjectFileResponse>(
+      `/projects/files/${fileId}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({ filePath }),
+      }
+    );
+
+    return response.file;
+  },
+
+  /**
+   * Get the authoritative impact report for deleting a project file:
+   * which labels it defines and where those labels are referenced.
+   */
+  async getDeleteImpact(
+    projectId: string,
+    fileId: string
+  ): Promise<DeleteFileImpact> {
+    validateRequired(projectId, "Project ID");
+    validateRequired(fileId, "File ID");
+
+    const response = await request<{ impact: SharedDeleteFileImpact }>(
+      `/projects/files/${fileId}/delete-impact`,
+      { method: "POST" }
+    );
+    return {
+      fileId: response.impact.fileId,
+      filePath: response.impact.filePath,
+      labelCount: response.impact.labelCount,
+      labels: response.impact.labels,
+      referenceCount: response.impact.occurrenceCount,
+      references: response.impact.occurrences.map((occurrence) => ({
+        referenceType: occurrence.referenceType,
+        targetLabelId: occurrence.targetLabelId,
+        targetLabelName: occurrence.targetLabelName,
+        sourceFileId: occurrence.sourceFileId,
+        sourceFilePath: occurrence.sourceFilePath,
+        sourceLabelId: occurrence.sourceLabelId,
+        sourceLabelName: occurrence.sourceLabelName,
+        sourceLabelTitle: occurrence.sourceLabelTitle,
+        lineNumber: occurrence.sourceLineNumber,
+      })),
+    };
+  },
+
+  /**
+   * Delete a project file and its labels.
+   * `force: true` discards unsaved autosave state server-side and is only
+   * offered by the UI when a pending autosave could not be flushed.
+   */
+  async deleteFile(
+    projectId: string,
+    fileId: string,
+    options?: { force?: boolean }
+  ): Promise<DeleteProjectFileResponse> {
+    validateRequired(projectId, "Project ID");
+    validateRequired(fileId, "File ID");
+
+    return request<DeleteProjectFileResponse>(`/projects/files/${fileId}`, {
+      method: "DELETE",
+      body: JSON.stringify({ force: options?.force ?? false }),
+    });
   },
 
   /**

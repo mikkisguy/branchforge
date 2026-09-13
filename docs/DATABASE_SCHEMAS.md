@@ -454,22 +454,39 @@ User-level GitLab integration storing encrypted PAT.
 
 Unified file storage for all project sources (GitLab, zip, etc.). Stores full RPY file content for Script Mode editing and links to labels.
 
-| Column             | Type                          | Notes                                                       |
-| ------------------ | ----------------------------- | ----------------------------------------------------------- |
-| `id`               | uuid PK                       |                                                             |
-| `project_id`       | uuid FK → projects            |                                                             |
-| `source`           | `file_source`, not null       | `GITLAB` or `ZIP` (where the file came from)                |
-| `file_path`        | text, not null                | e.g., `"labels/act_i.rpy"` or `"gui/screens.rpy"`           |
-| `file_type`        | `project_file_type`, not null | `STORY` (story labels) or `SETTINGS` (gui, etc.)            |
-| `content`          | text, not null                | Full RPY file content for Script Mode                       |
-| `original_content` | text, nullable                | Original imported content (used as base for reconstruction) |
-| `content_hash`     | text, not null                | SHA-256 hash for idempotency                                |
-| `last_synced_at`   | timestamp, nullable           | Last sync timestamp (GitLab-specific, null for non-GitLab)  |
-| `last_commit_sha`  | text, nullable                | Last commit SHA (GitLab-specific, null for non-GitLab)      |
-| `created_at`       | timestamp                     |                                                             |
-| `updated_at`       | timestamp                     |                                                             |
+| Column                     | Type                          | Notes                                                       |
+| -------------------------- | ----------------------------- | ----------------------------------------------------------- |
+| `id`                       | uuid PK                       |                                                             |
+| `project_id`               | uuid FK → projects            |                                                             |
+| `source`                   | `file_source`, not null       | `GITLAB` or `ZIP` (where the file came from)                |
+| `file_path`                | text, not null                | e.g., `"labels/act_i.rpy"` or `"gui/screens.rpy"`           |
+| `file_type`                | `project_file_type`, not null | `STORY` (story labels) or `SETTINGS` (gui, etc.)            |
+| `content`                  | text, not null                | Full RPY file content for Script Mode                       |
+| `original_content`         | text, nullable                | Original imported content (used as base for reconstruction) |
+| `content_hash`             | text, not null                | SHA-256 hash for idempotency                                |
+| `last_synced_at`           | timestamp, nullable           | Last sync timestamp (GitLab-specific, null for non-GitLab)  |
+| `last_commit_sha`          | text, nullable                | Last commit SHA (GitLab-specific, null for non-GitLab)      |
+| `remote_file_path`         | text, nullable                | Last successfully synced remote path                        |
+| `remote_branch`            | text, nullable                | Branch for the per-file remote baseline                     |
+| `remote_content_hash`      | text, nullable                | Hash of remote baseline content                             |
+| `remote_revision`          | text, nullable                | Per-file GitLab revision, never repository-head SHA         |
+| `last_pushed_content_hash` | text, nullable                | Local baseline from the last confirmed push                 |
+| `deleted_at`               | timestamp, nullable           | GitLab deletion tombstone; ZIP deletion is hard             |
+| `created_at`               | timestamp                     |                                                             |
+| `updated_at`               | timestamp                     |                                                             |
 
 Unique constraint: `(project_id, source, file_path)`
+
+Active paths additionally have a case-insensitive partial unique index on
+`(project_id, lower(file_path)) WHERE deleted_at IS NULL`.
+
+### 24a. Project File Pending Operations
+
+One durable, collapsed GitLab structural operation exists per file while a
+push is pending. `CREATE`, `RENAME`, and `DELETE` are the only operation types;
+renames store the original remote path and current local path. Deletions retain
+the exact label and line IDs affected so restoring does not revive earlier
+deletions.
 
 ---
 

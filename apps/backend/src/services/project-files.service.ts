@@ -7,7 +7,7 @@
 
 import { getDb } from "../db/index.js";
 import { projectFiles } from "../db/schema/index.js";
-import { eq, and, desc, ne } from "drizzle-orm";
+import { eq, and, desc, ne, isNull } from "drizzle-orm";
 import { calculateContentHash } from "../lib/hash.js";
 import type { SourceOrigin } from "@branchforge/shared";
 
@@ -39,9 +39,13 @@ export async function getProjectFiles(
   const whereConditions = options?.source
     ? and(
         eq(projectFiles.projectId, projectId),
-        eq(projectFiles.source, options.source)
+        eq(projectFiles.source, options.source),
+        isNull(projectFiles.deletedAt)
       )
-    : eq(projectFiles.projectId, projectId);
+    : and(
+        eq(projectFiles.projectId, projectId),
+        isNull(projectFiles.deletedAt)
+      );
 
   const files = await db
     .select()
@@ -74,7 +78,8 @@ export async function getFileByPath(
       and(
         eq(projectFiles.projectId, projectId),
         eq(projectFiles.source, source),
-        eq(projectFiles.filePath, filePath)
+        eq(projectFiles.filePath, filePath),
+        isNull(projectFiles.deletedAt)
       )
     )
     .limit(1);

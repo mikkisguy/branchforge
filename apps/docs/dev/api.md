@@ -31,6 +31,24 @@ Interactive API documentation (Swagger/OpenAPI) is planned for v1. Until then, r
 
 Most endpoints require authentication via session cookies. The session is created by `/api/auth/login` and validated on each request.
 
+## Project-file structural operations
+
+All endpoints below require the project owner. Paths are project-relative
+Ren'Py `.rpy` paths.
+
+- `PATCH /api/projects/files/:fileId` — rename or move with
+  `{ filePath, expectedContentHash? }`.
+- `POST /api/projects/files/:fileId/delete-impact` — returns active labels and
+  every incoming jump, call, and menu-choice occurrence.
+- `DELETE /api/projects/files/:fileId` — hard-deletes ZIP files and tombstones
+  GitLab files until push or restore.
+- `GET /api/projects/:projectId/files/pending-structural` — collapsed pending
+  create/rename/delete operations plus the content-change count.
+- `POST /api/projects/files/:fileId/reverse` — cancels a creation, undoes a
+  rename, or restores a deletion.
+- `POST /api/projects/:projectId/files/discard-all` — transactionally restores
+  the project to its remote file structure.
+
 ## Rate Limiting
 
 Public endpoints (especially auth) are rate-limited. See the rate limiter service for details.

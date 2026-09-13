@@ -7,7 +7,15 @@
  * metadata editing, and soft delete.
  */
 
-import { useState, useMemo, useRef, useEffect, useCallback } from "react";
+import {
+  useState,
+  useMemo,
+  useRef,
+  useEffect,
+  useEffectEvent,
+  useCallback,
+} from "react";
+import type { MouseEvent as ReactMouseEvent } from "react";
 import type { PublicLabel, LabelStatus } from "@branchforge/shared";
 import {
   ArrowUpDown,
@@ -20,9 +28,16 @@ import {
   X,
 } from "lucide-react";
 import { LabelContextMenu } from "@/components/write-mode/LabelContextMenu";
+import { buildFileMenuItems } from "@/components/ide-shared/file-menu-items";
+import {
+  FileContextMenu,
+  FileRowMenu,
+} from "@/components/ide-shared/FileRowMenu";
+import { isGeneratedPreviewFilePath } from "@/lib/generated-preview-files";
 import { Tooltip } from "@/components/ui/tooltip";
 import { ACTIVE_NAVIGATOR_ITEM_CLASSNAME } from "@/components/workspace/navigator-item";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { FormErrorMessage } from "@/components/ui/form-error-message";
 import type { UpdateLabelInput } from "@/lib/api/labels";
 
@@ -37,6 +52,11 @@ function compareByUpdatedAt(a: PublicLabel, b: PublicLabel): number {
     new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
   if (timeDiff !== 0) return timeDiff;
   return b.labelNumber - a.labelNumber;
+}
+
+function getFileBasename(filePath: string): string {
+  const parts = filePath.split("/");
+  return parts[parts.length - 1] || filePath;
 }
 
 // ============================================================================
@@ -310,6 +330,7 @@ function InlineCreateInput({
 interface FileGroupProps {
   fileName: string;
   projectFileId: string;
+  filePath: string;
   labels: PublicLabel[];
   activeLabelId: string | null;
   onLabelSelect: (labelId: string) => void;
@@ -324,11 +345,14 @@ interface FileGroupProps {
   onRenameSave: (labelId: string, value: string) => Promise<void>;
   onRenameCancel: () => void;
   isSavingRename: boolean;
+  onFileContextMenu?: (e: ReactMouseEvent, file: StoryFileRef) => void;
+  fileActions?: LabelNavigatorFileActions;
 }
 
 function FileGroup({
   fileName,
   projectFileId: fileGroupId,
+  filePath,
   labels,
   activeLabelId,
   onLabelSelect,
@@ -340,6 +364,8 @@ function FileGroup({
   onRenameSave,
   onRenameCancel,
   isSavingRename,
+  onFileContextMenu,
+  fileActions,
 }: FileGroupProps) {
   const [showInput, setShowInput] = useState(false);
 
@@ -351,17 +377,39 @@ function FileGroup({
     setShowInput(false);
   };
 
+  const fileRef = useMemo<StoryFileRef>(
+    () => ({ id: fileGroupId, filePath }),
+    [fileGroupId, filePath]
+  );
+  const showFileMenu = !!fileActions && !isGeneratedPreviewFilePath(filePath);
+
   return (
     <div className="mb-4">
       {/* File Header */}
-      <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-md bg-muted/20 border border-border/40">
+      <div
+        className="group/row flex items-center gap-2 px-2.5 py-1.5 rounded-md bg-muted/20 border border-border/40"
+        onContextMenu={
+          onFileContextMenu
+            ? (event) => onFileContextMenu(event, fileRef)
+            : undefined
+        }
+      >
         <File className="size-3.5 text-muted-foreground shrink-0" />
-        <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider truncate">
+        <span className="min-w-0 flex-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider truncate">
           {fileName}
         </span>
-        <span className="text-[10px] text-muted-foreground ml-auto shrink-0">
-          {labels.length}
-        </span>
+        {showFileMenu && fileActions ? (
+          <FileRowMenu
+            fileName={fileName}
+            items={buildFileMenuItems({
+              onRename: () => fileActions.onRenameRequest(fileRef),
+              onDelete: () => fileActions.onDeleteRequest(fileRef),
+              renameDisabled: fileActions.disabled,
+              deleteDisabled: fileActions.disabled,
+            })}
+            disabled={fileActions.disabled}
+          />
+        ) : null}
       </div>
 
       {/* Label list */}
@@ -408,10 +456,31 @@ function FileGroup({
 // Label Navigator Component
 // ============================================================================
 
+export interface StoryFileRef {
+  id: string;
+  filePath: string;
+}
+
+/**
+ * Owner-only structural file actions rendered on Write Mode file group
+ * headers. Omitted entirely for non-owners so no affordance appears.
+ */
+export interface LabelNavigatorFileActions {
+  onRenameRequest: (file: StoryFileRef) => void | Promise<void>;
+  onDeleteRequest: (file: StoryFileRef) => void | Promise<void>;
+  /** Disables both actions while a file operation is in flight. */
+  disabled?: boolean;
+}
+
 interface LabelNavigatorProps {
   labels: PublicLabel[];
+  storyFiles: StoryFileRef[];
   activeLabelId: string | null;
   onSelect: (labelId: string) => void;
+  revealFileId?: string | null;
+  sortResetToken?: number;
+  onNewFile?: () => void;
+  onFileRevealed?: () => void;
   // Create
   onCreateLabel?: (data: {
     title: string;
@@ -428,18 +497,27 @@ interface LabelNavigatorProps {
   onEditLabel?: (label: PublicLabel) => void;
   /** Called when user wants to delete a label (replaces internal confirm dialog) */
   onDeleteRequest?: (label: PublicLabel) => void;
+  /** Owner-only structural file actions for file group headers */
+  fileActions?: LabelNavigatorFileActions;
 }
 
+// react-doctor-disable-next-line react-doctor/no-high-complexity-react-function, react-doctor/no-giant-component -- cohesive navigator state spans filtering, sorting, renaming, and context-menu interactions while row/group rendering is already extracted
 export function LabelNavigator({
   labels,
+  storyFiles,
   activeLabelId,
   onSelect,
+  revealFileId,
+  sortResetToken = 0,
+  onNewFile,
+  onFileRevealed,
   onCreateLabel,
   isCreatingLabel,
   onUpdateLabel,
   isUpdatingLabel,
   onEditLabel,
   onDeleteRequest,
+  fileActions,
 }: LabelNavigatorProps) {
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{
@@ -448,6 +526,14 @@ export function LabelNavigator({
     y: number;
     label: PublicLabel | null;
   }>({ open: false, x: 0, y: 0, label: null });
+
+  // File context menu state (right-click on file group headers)
+  const [fileContextMenu, setFileContextMenu] = useState<{
+    open: boolean;
+    x: number;
+    y: number;
+    file: StoryFileRef | null;
+  }>({ open: false, x: 0, y: 0, file: null });
 
   // Inline rename state
   const [renamingLabelId, setRenamingLabelId] = useState<string | null>(null);
@@ -459,6 +545,32 @@ export function LabelNavigator({
   const [sortMode, setSortMode] = useState<"sequence" | "lastUpdated">(
     "sequence"
   );
+  const fileGroupRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+
+  useEffect(() => {
+    // react-doctor-disable-next-line react-doctor/no-adjust-state-on-prop-change -- command token intentionally restores sequence order so a newly created empty file remains visible
+    setSortMode("sequence");
+    // react-doctor-disable-next-line react-doctor/no-adjust-state-on-prop-change -- the same create-file command clears filtering that could hide the new file
+    setSearchQuery("");
+  }, [sortResetToken]);
+
+  const notifyFileRevealed = useEffectEvent(() => {
+    onFileRevealed?.();
+  });
+
+  useEffect(() => {
+    if (!revealFileId) {
+      return;
+    }
+    const element = fileGroupRefs.current.get(revealFileId);
+    if (!element) {
+      return;
+    }
+    requestAnimationFrame(() => {
+      element.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      notifyFileRevealed();
+    });
+  }, [revealFileId, sortResetToken, storyFiles, sortMode, searchQuery]);
 
   // Context menu handler
   const handleContextMenu = useCallback(
@@ -510,6 +622,38 @@ export function LabelNavigator({
     }
   }, [contextMenu.label, onDeleteRequest]);
 
+  // File context menu handlers (right-click on file group headers)
+  const handleFileContextMenu = useCallback(
+    (event: ReactMouseEvent, file: StoryFileRef) => {
+      if (!fileActions) return;
+      if (isGeneratedPreviewFilePath(file.filePath)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      setFileContextMenu({
+        open: true,
+        x: event.clientX,
+        y: event.clientY,
+        file,
+      });
+    },
+    [fileActions]
+  );
+
+  const closeFileContextMenu = useCallback(() => {
+    setFileContextMenu((prev) => ({ ...prev, open: false, file: null }));
+  }, []);
+
+  const fileContextMenuItems = useMemo(() => {
+    if (!fileActions || !fileContextMenu.file) return [];
+    const file = fileContextMenu.file;
+    return buildFileMenuItems({
+      onRename: () => fileActions.onRenameRequest(file),
+      onDelete: () => fileActions.onDeleteRequest(file),
+      renameDisabled: fileActions.disabled,
+      deleteDisabled: fileActions.disabled,
+    });
+  }, [fileActions, fileContextMenu.file]);
+
   const filteredLabels = useMemo(() => {
     if (!searchQuery.trim()) return labels;
     const query = searchQuery.toLowerCase().trim();
@@ -521,39 +665,48 @@ export function LabelNavigator({
   }, [labels, searchQuery]);
 
   const groupedLabels = useMemo(() => {
-    // Short-circuit: "lastUpdated" mode only needs the flat list
     if (sortMode === "lastUpdated") {
       const flat = filteredLabels.toSorted(compareByUpdatedAt);
-      return { map: new Map<string, PublicLabel[]>(), flat, mode: sortMode };
+      return { entries: [], flat, mode: sortMode };
     }
 
-    const groups = new Map<string, PublicLabel[]>();
+    const labelsByFileId = new Map<string, PublicLabel[]>();
 
     for (const label of filteredLabels) {
       const key = label.projectFileId;
-      if (!groups.has(key)) {
-        groups.set(key, []);
+      if (!labelsByFileId.has(key)) {
+        labelsByFileId.set(key, []);
       }
-      groups.get(key)!.push(label);
+      labelsByFileId.get(key)!.push(label);
     }
 
-    const groupEntries = Array.from(groups.entries());
-    groupEntries.sort(([, aLabels], [, bLabels]) => {
-      const aName = aLabels[0]?.fileName ?? "";
-      const bName = bLabels[0]?.fileName ?? "";
-      return aName.localeCompare(bName);
+    const hasSearch = searchQuery.trim().length > 0;
+    const filesToShow = hasSearch
+      ? storyFiles.filter(
+          (file) => (labelsByFileId.get(file.id)?.length ?? 0) > 0
+        )
+      : storyFiles;
+
+    const entries = filesToShow.map((file) => {
+      const fileLabels = labelsByFileId.get(file.id) ?? [];
+      const fileName =
+        file.filePath ||
+        fileLabels[0]?.fileName ||
+        getFileBasename(file.filePath);
+      return {
+        projectFileId: file.id,
+        fileName,
+        filePath: file.filePath,
+        labels: fileLabels.toSorted(
+          (a, b) => a.sequenceOrder - b.sequenceOrder
+        ),
+      };
     });
 
-    const sorted = new Map<string, PublicLabel[]>();
-    for (const [key, groupLabels] of groupEntries) {
-      sorted.set(
-        key,
-        groupLabels.toSorted((a, b) => a.sequenceOrder - b.sequenceOrder)
-      );
-    }
+    entries.sort((a, b) => a.fileName.localeCompare(b.fileName));
 
-    return { map: sorted, flat: null, mode: sortMode };
-  }, [filteredLabels, sortMode]);
+    return { entries, flat: null, mode: sortMode };
+  }, [filteredLabels, sortMode, storyFiles, searchQuery]);
 
   return (
     <div className="h-full overflow-y-auto bg-transparent">
@@ -605,38 +758,40 @@ export function LabelNavigator({
             </button>
           </Tooltip>
         </div>
+        {onNewFile ? (
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            onClick={onNewFile}
+            className="mt-2 w-full"
+          >
+            + New File
+          </Button>
+        ) : null}
       </div>
 
       {/* Label List */}
       <div className="p-3 space-y-2">
-        {groupedLabels.flat && groupedLabels.flat.length > 0 ? (
-          // Flat list for "last updated" sort — no file grouping
-          <div className="space-y-1" key={sortMode}>
-            {groupedLabels.flat.map((label) => (
-              <LabelItem
-                key={label.id}
-                label={label}
-                isActive={activeLabelId === label.id}
-                onSelect={() => onSelect(label.id)}
-                onContextMenu={handleContextMenu}
-                onDoubleClick={handleDoubleClick}
-                isRenaming={renamingLabelId === label.id}
-                onRenameSave={(value) => handleRenameSave(label.id, value)}
-                onRenameCancel={handleRenameCancel}
-                isSavingRename={isUpdatingLabel ?? false}
-              />
-            ))}
-          </div>
-        ) : groupedLabels.map.size === 0 ? (
-          labels.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <FolderOpen className="size-10 text-muted-foreground mb-3" />
-              <p className="text-sm text-muted-foreground">No labels found</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Import a .rpy file or create labels to get started.
-              </p>
+        {groupedLabels.flat !== null ? (
+          groupedLabels.flat.length > 0 ? (
+            <div className="space-y-1" key={sortMode}>
+              {groupedLabels.flat.map((label) => (
+                <LabelItem
+                  key={label.id}
+                  label={label}
+                  isActive={activeLabelId === label.id}
+                  onSelect={() => onSelect(label.id)}
+                  onContextMenu={handleContextMenu}
+                  onDoubleClick={handleDoubleClick}
+                  isRenaming={renamingLabelId === label.id}
+                  onRenameSave={(value) => handleRenameSave(label.id, value)}
+                  onRenameCancel={handleRenameCancel}
+                  isSavingRename={isUpdatingLabel ?? false}
+                />
+              ))}
             </div>
-          ) : (
+          ) : searchQuery.trim() && labels.length > 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
               <Search className="size-10 text-muted-foreground mb-3" />
               <p className="text-sm text-muted-foreground">
@@ -650,17 +805,65 @@ export function LabelNavigator({
                 Clear search
               </button>
             </div>
+          ) : storyFiles.length > 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <FolderOpen className="size-10 text-muted-foreground mb-3" />
+              <p className="text-sm text-muted-foreground">No labels yet</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Switch to file order to add labels to your story files.
+              </p>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <FolderOpen className="size-10 text-muted-foreground mb-3" />
+              <p className="text-sm text-muted-foreground">No labels found</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Import a .rpy file or create labels to get started.
+              </p>
+            </div>
           )
+        ) : groupedLabels.entries.length === 0 ? (
+          searchQuery.trim() && labels.length > 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <Search className="size-10 text-muted-foreground mb-3" />
+              <p className="text-sm text-muted-foreground">
+                No labels match "{searchQuery}"
+              </p>
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="text-xs text-[var(--theme-color)] hover:underline mt-2"
+              >
+                Clear search
+              </button>
+            </div>
+          ) : storyFiles.length === 0 && labels.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <FolderOpen className="size-10 text-muted-foreground mb-3" />
+              <p className="text-sm text-muted-foreground">No labels found</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Import a .rpy file or create labels to get started.
+              </p>
+            </div>
+          ) : null
         ) : (
           <div className="space-y-3" key={sortMode}>
-            {Array.from(groupedLabels.map.entries()).map(
-              ([projectFileId, fileLabels]) => {
-                const fileName = fileLabels[0]?.fileName ?? "unknown";
-                return (
+            {groupedLabels.entries.map(
+              ({ projectFileId, fileName, filePath, labels: fileLabels }) => (
+                <div
+                  key={projectFileId}
+                  ref={(element) => {
+                    if (element) {
+                      fileGroupRefs.current.set(projectFileId, element);
+                    } else {
+                      fileGroupRefs.current.delete(projectFileId);
+                    }
+                  }}
+                >
                   <FileGroup
-                    key={projectFileId}
                     fileName={fileName}
                     projectFileId={projectFileId}
+                    filePath={filePath}
                     labels={fileLabels}
                     activeLabelId={activeLabelId}
                     onLabelSelect={onSelect}
@@ -672,9 +875,13 @@ export function LabelNavigator({
                     onRenameSave={handleRenameSave}
                     onRenameCancel={handleRenameCancel}
                     isSavingRename={isUpdatingLabel ?? false}
+                    onFileContextMenu={
+                      fileActions ? handleFileContextMenu : undefined
+                    }
+                    fileActions={fileActions}
                   />
-                );
-              }
+                </div>
+              )
             )}
           </div>
         )}
@@ -690,6 +897,17 @@ export function LabelNavigator({
         onEditDetails={handleContextEditDetails}
         onDelete={handleContextDelete}
       />
+
+      {/* File context menu (right-click on file group headers) */}
+      {fileActions ? (
+        <FileContextMenu
+          open={fileContextMenu.open && fileContextMenu.file !== null}
+          onClose={closeFileContextMenu}
+          x={fileContextMenu.x}
+          y={fileContextMenu.y}
+          items={fileContextMenuItems}
+        />
+      ) : null}
     </div>
   );
 }

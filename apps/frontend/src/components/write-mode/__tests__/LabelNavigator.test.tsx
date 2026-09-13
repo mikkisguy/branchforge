@@ -59,12 +59,18 @@ const labelsFromMultipleFiles: PublicLabel[] = [
   }),
 ];
 
+const storyFilesFromLabels = [
+  { id: "file1", filePath: "act_i.rpy" },
+  { id: "file2", filePath: "act_ii.rpy" },
+];
+
 describe("LabelNavigator", () => {
   describe("file grouping", () => {
     it("groups labels by fileName", () => {
       render(
         <LabelNavigator
           labels={labelsFromMultipleFiles}
+          storyFiles={storyFilesFromLabels}
           activeLabelId={null}
           onSelect={vi.fn()}
         />
@@ -74,10 +80,11 @@ describe("LabelNavigator", () => {
       expect(screen.getByText("act_ii.rpy")).toBeInTheDocument();
     });
 
-    it("shows correct label counts per file", () => {
+    it("does not show label counts in file headers", () => {
       render(
         <LabelNavigator
           labels={labelsFromMultipleFiles}
+          storyFiles={storyFilesFromLabels}
           activeLabelId={null}
           onSelect={vi.fn()}
         />
@@ -85,8 +92,64 @@ describe("LabelNavigator", () => {
 
       const actIHeader = screen.getByText("act_i.rpy").parentElement!;
       const actIiHeader = screen.getByText("act_ii.rpy").parentElement!;
-      expect(within(actIHeader).getByText("2")).toBeInTheDocument();
-      expect(within(actIiHeader).getByText("1")).toBeInTheDocument();
+      expect(within(actIHeader).queryByText("2")).not.toBeInTheDocument();
+      expect(within(actIiHeader).queryByText("1")).not.toBeInTheDocument();
+    });
+
+    it("renders empty story file groups from storyFiles with Add label", () => {
+      render(
+        <LabelNavigator
+          labels={labelsFromMultipleFiles}
+          storyFiles={[
+            ...storyFilesFromLabels,
+            { id: "file-empty", filePath: "chapters/empty.rpy" },
+          ]}
+          activeLabelId={null}
+          onSelect={vi.fn()}
+          onCreateLabel={vi.fn()}
+        />
+      );
+
+      expect(screen.getByText("chapters/empty.rpy")).toBeInTheDocument();
+      expect(screen.getAllByText("Add label")).toHaveLength(3);
+    });
+
+    it("shows full paths for files with identical basenames", () => {
+      render(
+        <LabelNavigator
+          labels={[
+            makeLabel({
+              id: "nested-label",
+              projectFileId: "file-a",
+              fileName: "scene.rpy",
+            }),
+          ]}
+          storyFiles={[
+            { id: "file-a", filePath: "chapters/one/scene.rpy" },
+            { id: "file-b", filePath: "chapters/two/scene.rpy" },
+          ]}
+          activeLabelId={null}
+          onSelect={vi.fn()}
+        />
+      );
+
+      expect(screen.getByText("chapters/one/scene.rpy")).toBeInTheDocument();
+      expect(screen.getByText("chapters/two/scene.rpy")).toBeInTheDocument();
+    });
+
+    it("builds groups from story files even when a file has no labels", () => {
+      render(
+        <LabelNavigator
+          labels={[]}
+          storyFiles={[{ id: "file-empty", filePath: "new_story.rpy" }]}
+          activeLabelId={null}
+          onSelect={vi.fn()}
+          onCreateLabel={vi.fn()}
+        />
+      );
+
+      expect(screen.getByText("new_story.rpy")).toBeInTheDocument();
+      expect(screen.getByText("Add label")).toBeInTheDocument();
     });
   });
 
@@ -95,6 +158,7 @@ describe("LabelNavigator", () => {
       render(
         <LabelNavigator
           labels={labelsFromMultipleFiles}
+          storyFiles={storyFilesFromLabels}
           activeLabelId={null}
           onSelect={vi.fn()}
         />
@@ -111,6 +175,7 @@ describe("LabelNavigator", () => {
       render(
         <LabelNavigator
           labels={labelsFromMultipleFiles}
+          storyFiles={storyFilesFromLabels}
           activeLabelId={null}
           onSelect={vi.fn()}
         />
@@ -131,12 +196,185 @@ describe("LabelNavigator", () => {
   });
 
   describe("empty state", () => {
-    it("shows empty state when no labels", () => {
+    it("shows empty state when no labels and no story files", () => {
       render(
-        <LabelNavigator labels={[]} activeLabelId={null} onSelect={vi.fn()} />
+        <LabelNavigator
+          labels={[]}
+          storyFiles={[]}
+          activeLabelId={null}
+          onSelect={vi.fn()}
+        />
       );
 
       expect(screen.getByText("No labels found")).toBeInTheDocument();
+    });
+  });
+
+  describe("new file control", () => {
+    it("shows + New File in the navigator header", () => {
+      const onNewFile = vi.fn();
+      render(
+        <LabelNavigator
+          labels={labelsFromMultipleFiles}
+          storyFiles={storyFilesFromLabels}
+          activeLabelId={null}
+          onSelect={vi.fn()}
+          onNewFile={onNewFile}
+        />
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: "+ New File" }));
+      expect(onNewFile).toHaveBeenCalledTimes(1);
+    });
+
+    it("hides + New File when the owner action is omitted", () => {
+      render(
+        <LabelNavigator
+          labels={labelsFromMultipleFiles}
+          storyFiles={storyFilesFromLabels}
+          activeLabelId={null}
+          onSelect={vi.fn()}
+        />
+      );
+
+      expect(
+        screen.queryByRole("button", { name: "+ New File" })
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  describe("reveal created file", () => {
+    it("scrolls the file group into view after it appears", async () => {
+      const scrollIntoView = vi.fn();
+      HTMLElement.prototype.scrollIntoView = scrollIntoView;
+      const onFileRevealed = vi.fn();
+
+      const { rerender } = render(
+        <LabelNavigator
+          labels={[]}
+          storyFiles={[]}
+          activeLabelId={null}
+          onSelect={vi.fn()}
+          revealFileId="file-new"
+          onFileRevealed={onFileRevealed}
+        />
+      );
+
+      expect(scrollIntoView).not.toHaveBeenCalled();
+
+      rerender(
+        <LabelNavigator
+          labels={[]}
+          storyFiles={[{ id: "file-new", filePath: "chapters/new_scene.rpy" }]}
+          activeLabelId={null}
+          onSelect={vi.fn()}
+          revealFileId="file-new"
+          onFileRevealed={onFileRevealed}
+        />
+      );
+
+      await waitFor(() => {
+        expect(scrollIntoView).toHaveBeenCalled();
+      });
+      await waitFor(() => {
+        expect(onFileRevealed).toHaveBeenCalled();
+      });
+    });
+
+    it("reveals a new file after leaving last-updated sort", async () => {
+      const scrollIntoView = vi.fn();
+      HTMLElement.prototype.scrollIntoView = scrollIntoView;
+      const onFileRevealed = vi.fn();
+
+      const { rerender } = render(
+        <LabelNavigator
+          labels={labelsFromMultipleFiles}
+          storyFiles={storyFilesFromLabels}
+          activeLabelId={null}
+          onSelect={vi.fn()}
+        />
+      );
+
+      fireEvent.click(
+        screen.getByRole("button", { name: /sort mode: sequence order/i })
+      );
+
+      rerender(
+        <LabelNavigator
+          labels={labelsFromMultipleFiles}
+          storyFiles={storyFilesFromLabels}
+          activeLabelId={null}
+          onSelect={vi.fn()}
+          revealFileId="file-new"
+          sortResetToken={1}
+          onFileRevealed={onFileRevealed}
+        />
+      );
+
+      expect(scrollIntoView).not.toHaveBeenCalled();
+
+      rerender(
+        <LabelNavigator
+          labels={labelsFromMultipleFiles}
+          storyFiles={[
+            ...storyFilesFromLabels,
+            { id: "file-new", filePath: "chapters/new_scene.rpy" },
+          ]}
+          activeLabelId={null}
+          onSelect={vi.fn()}
+          revealFileId="file-new"
+          sortResetToken={1}
+          onFileRevealed={onFileRevealed}
+        />
+      );
+
+      await waitFor(() => {
+        expect(scrollIntoView).toHaveBeenCalled();
+      });
+      await waitFor(() => {
+        expect(onFileRevealed).toHaveBeenCalled();
+      });
+    });
+
+    it("clears search and reveals a new file after create", async () => {
+      const scrollIntoView = vi.fn();
+      HTMLElement.prototype.scrollIntoView = scrollIntoView;
+      const onFileRevealed = vi.fn();
+
+      const { rerender } = render(
+        <LabelNavigator
+          labels={labelsFromMultipleFiles}
+          storyFiles={storyFilesFromLabels}
+          activeLabelId={null}
+          onSelect={vi.fn()}
+        />
+      );
+
+      fireEvent.change(screen.getByPlaceholderText("Filter..."), {
+        target: { value: "Label A" },
+      });
+
+      rerender(
+        <LabelNavigator
+          labels={labelsFromMultipleFiles}
+          storyFiles={[
+            ...storyFilesFromLabels,
+            { id: "file-new", filePath: "chapters/new_scene.rpy" },
+          ]}
+          activeLabelId={null}
+          onSelect={vi.fn()}
+          revealFileId="file-new"
+          sortResetToken={1}
+          onFileRevealed={onFileRevealed}
+        />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText("Filter...")).toHaveValue("");
+      });
+      await waitFor(() => {
+        expect(scrollIntoView).toHaveBeenCalled();
+      });
     });
   });
 
@@ -146,6 +384,7 @@ describe("LabelNavigator", () => {
       render(
         <LabelNavigator
           labels={labelsFromMultipleFiles}
+          storyFiles={storyFilesFromLabels}
           activeLabelId={null}
           onSelect={onSelect}
         />
@@ -159,6 +398,7 @@ describe("LabelNavigator", () => {
       render(
         <LabelNavigator
           labels={labelsFromMultipleFiles}
+          storyFiles={storyFilesFromLabels}
           activeLabelId="2"
           onSelect={vi.fn()}
         />
@@ -168,7 +408,7 @@ describe("LabelNavigator", () => {
       expect(activeButton).toHaveAttribute("aria-pressed", "true");
       expect(activeButton).toHaveClass(
         "bg-[rgba(var(--theme-color-rgb),0.06)]",
-        "border-transparent",
+        "border-transparent"
       );
       expect(activeButton).toHaveClass("gap-2.5", "px-2.5", "py-2");
     });
@@ -184,13 +424,16 @@ describe("LabelNavigator", () => {
       render(
         <LabelNavigator
           labels={singleFileLabels}
+          storyFiles={[{ id: "file-default", filePath: "story.rpy" }]}
           activeLabelId={null}
           onSelect={vi.fn()}
         />
       );
 
       expect(screen.getByText("story.rpy")).toBeInTheDocument();
-      expect(screen.getByText("2")).toBeInTheDocument();
+      expect(screen.getAllByRole("button", { name: "Add label" })).toHaveLength(
+        1
+      );
     });
   });
 
@@ -199,6 +442,7 @@ describe("LabelNavigator", () => {
       render(
         <LabelNavigator
           labels={labelsFromMultipleFiles}
+          storyFiles={storyFilesFromLabels}
           activeLabelId={null}
           onSelect={vi.fn()}
           onCreateLabel={vi.fn()}
@@ -214,6 +458,7 @@ describe("LabelNavigator", () => {
       render(
         <LabelNavigator
           labels={labelsFromMultipleFiles}
+          storyFiles={storyFilesFromLabels}
           activeLabelId={null}
           onSelect={vi.fn()}
           onCreateLabel={vi.fn()}
@@ -232,6 +477,7 @@ describe("LabelNavigator", () => {
       render(
         <LabelNavigator
           labels={labelsFromMultipleFiles}
+          storyFiles={storyFilesFromLabels}
           activeLabelId={null}
           onSelect={vi.fn()}
           onCreateLabel={onCreateLabel}
@@ -258,6 +504,7 @@ describe("LabelNavigator", () => {
       render(
         <LabelNavigator
           labels={labelsFromMultipleFiles}
+          storyFiles={storyFilesFromLabels}
           activeLabelId={null}
           onSelect={vi.fn()}
           onCreateLabel={vi.fn()}
@@ -281,6 +528,7 @@ describe("LabelNavigator", () => {
       render(
         <LabelNavigator
           labels={labelsFromMultipleFiles}
+          storyFiles={storyFilesFromLabels}
           activeLabelId={null}
           onSelect={vi.fn()}
           onCreateLabel={vi.fn()}
@@ -304,6 +552,7 @@ describe("LabelNavigator", () => {
       render(
         <LabelNavigator
           labels={labelsFromMultipleFiles}
+          storyFiles={storyFilesFromLabels}
           activeLabelId={null}
           onSelect={vi.fn()}
           onCreateLabel={vi.fn()}

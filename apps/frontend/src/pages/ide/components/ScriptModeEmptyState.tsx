@@ -1,4 +1,4 @@
-import { Download, FileCode } from "lucide-react";
+import { Download, FileCode, FilePlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { GitLabSyncDialog } from "@/components/script-mode/GitLabSyncDialog";
 import { ZipImportFilesDialog } from "@/components/ide-shared/ZipImportFilesDialog";
@@ -13,6 +13,7 @@ interface ScriptModeEmptyStateProps {
   showZipImportDialog: boolean;
   onShowZipImportDialogChange: (open: boolean) => void;
   onOpenSettings?: () => void;
+  onNewFile?: () => void;
 }
 
 export function ScriptModeEmptyState({
@@ -25,6 +26,7 @@ export function ScriptModeEmptyState({
   showZipImportDialog,
   onShowZipImportDialogChange,
   onOpenSettings,
+  onNewFile,
 }: ScriptModeEmptyStateProps) {
   if (!projectId) {
     return (
@@ -57,7 +59,12 @@ export function ScriptModeEmptyState({
           : "Import from a zip file to get started"}
       </p>
 
-      <div className="flex gap-2 mt-4">
+      <div className="flex flex-wrap justify-center gap-2 mt-4">
+        {onNewFile && (
+          <Button type="button" onClick={onNewFile}>
+            <FilePlus className="size-4 mr-2" />+ New File
+          </Button>
+        )}
         {isLinked && linkedRepoDefaultBranch && (
           <Button
             variant="outline"

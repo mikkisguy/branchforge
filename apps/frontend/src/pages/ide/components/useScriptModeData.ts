@@ -27,6 +27,10 @@ export interface UseScriptModeDataReturn {
   projectFiles: ProjectFileNode[];
   updateFileContent: UseProjectFilesReturn["updateFileContent"];
   refreshFiles: () => Promise<unknown>;
+  createFile: UseProjectFilesReturn["createFile"];
+  isCreatingFile: boolean;
+  createFileError: Error | null;
+  resetCreateFileError: () => void;
   isProjectLinked: (projectId: string) => boolean;
   getLinkedRepository: UseGitLabReturn["getLinkedRepository"];
   showSyncDialog: boolean;
@@ -59,6 +63,10 @@ export function useScriptModeData({
     isLoadingFiles,
     updateFileContent,
     refreshFiles,
+    createFile,
+    isCreatingFile,
+    createFileError,
+    resetCreateFileError,
   } = useProjectFiles(projectId);
 
   const [showSyncDialog, setShowSyncDialog] = useState(false);
@@ -104,6 +112,10 @@ export function useScriptModeData({
     projectFiles,
     updateFileContent,
     refreshFiles,
+    createFile,
+    isCreatingFile,
+    createFileError,
+    resetCreateFileError,
     isProjectLinked,
     getLinkedRepository,
     showSyncDialog,

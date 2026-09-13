@@ -1,0 +1,210 @@
+const MAX_STORED_PATH_LENGTH = 500;
+
+const WINDOWS_UNSAFE_CHARACTERS = /[<>:"|?*]/;
+// Windows recognizes superscript digits ¹ (U+00B9), ² (U+00B2), and ³
+// (U+00B3) as COM/LPT device suffixes, so reject them alongside 1-9.
+const WINDOWS_RESERVED_DEVICE_BASENAME =
+  /^(?:con|prn|aux|nul|com[1-9\u00b9\u00b2\u00b3]|lpt[1-9\u00b9\u00b2\u00b3])(?:\.|$)/i;
+
+function hasDisallowedPathChars(value: string): boolean {
+  for (const char of value) {
+    const code = char.charCodeAt(0);
+    if (code <= 0x1f) {
+      return true;
+    }
+    if (code >= 0x7f && code <= 0x9f) {
+      return true;
+    }
+    if (code === 0x2028 || code === 0x2029) {
+      return true;
+    }
+    if (code >= 0x202a && code <= 0x202e) {
+      return true;
+    }
+    if (code >= 0x2066 && code <= 0x2069) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function hasWindowsUnsafeSegment(segments: string[]): boolean {
+  return segments.some((segment) => {
+    if (segment === "" || segment === "." || segment === "..") {
+      return false;
+    }
+
+    return (
+      WINDOWS_UNSAFE_CHARACTERS.test(segment) ||
+      segment.endsWith(".") ||
+      segment.endsWith(" ") ||
+      WINDOWS_RESERVED_DEVICE_BASENAME.test(segment)
+    );
+  });
+}
+
+const RESERVED_BASENAMES = new Set([
+  "branchforge_variables.rpy",
+  "branchforge_stats.rpy",
+  "branchforge_definitions.rpy",
+]);
+
+export type CanonicalizeRpyFilePathErrorCode =
+  | "EMPTY"
+  | "ABSOLUTE"
+  | "TRAVERSAL"
+  | "CONTROL"
+  | "INVALID_SEGMENT"
+  | "TOO_LONG"
+  | "EXTENSION"
+  | "RESERVED";
+
+export type CanonicalizeRpyFilePathResult =
+  | { ok: true; filePath: string }
+  | {
+      ok: false;
+      code: CanonicalizeRpyFilePathErrorCode;
+      message: string;
+    };
+
+export interface CanonicalizeRpyFilePathOptions {
+  allowBranchForgeReserved?: boolean;
+}
+
+function isAbsolutePath(path: string): boolean {
+  return (
+    path.startsWith("/") || path.startsWith("//") || /^[a-zA-Z]:/.test(path)
+  );
+}
+
+function normalizeSegments(path: string): string {
+  const segments = path.split("/").filter((segment) => {
+    return segment !== "" && segment !== ".";
+  });
+
+  return segments.join("/");
+}
+
+function normalizeExtension(path: string): string | { code: "EXTENSION" } {
+  const lastSlash = path.lastIndexOf("/");
+  const dir = lastSlash >= 0 ? path.slice(0, lastSlash + 1) : "";
+  const basename = lastSlash >= 0 ? path.slice(lastSlash + 1) : path;
+
+  const dotIndex = basename.lastIndexOf(".");
+  if (dotIndex === -1) {
+    return `${dir}${basename}.rpy`;
+  }
+
+  const nameWithoutExt = basename.slice(0, dotIndex);
+  const extension = basename.slice(dotIndex);
+
+  if (nameWithoutExt === "" || extension.toLowerCase() !== ".rpy") {
+    return { code: "EXTENSION" };
+  }
+
+  return `${dir}${nameWithoutExt}.rpy`;
+}
+
+/**
+ * Canonicalize a user-provided Ren'Py file path for storage.
+ */
+export function canonicalizeRpyFilePath(
+  input: string,
+  options: CanonicalizeRpyFilePathOptions = {}
+): CanonicalizeRpyFilePathResult {
+  if (hasDisallowedPathChars(input)) {
+    return {
+      ok: false,
+      code: "CONTROL",
+      message: "File path contains invalid control characters",
+    };
+  }
+
+  const trimmed = input.trim();
+  if (trimmed === "") {
+    return {
+      ok: false,
+      code: "EMPTY",
+      message: "File path cannot be empty",
+    };
+  }
+
+  if (input.endsWith(" ")) {
+    return {
+      ok: false,
+      code: "INVALID_SEGMENT",
+      message: "File path contains a Windows-unsafe path segment",
+    };
+  }
+
+  const normalizedSlashes = trimmed.replace(/\\/g, "/");
+
+  if (isAbsolutePath(normalizedSlashes)) {
+    return {
+      ok: false,
+      code: "ABSOLUTE",
+      message: "File path must be relative",
+    };
+  }
+
+  const segments = normalizedSlashes.split("/");
+  if (segments.some((segment) => segment === "..")) {
+    return {
+      ok: false,
+      code: "TRAVERSAL",
+      message: "File path cannot contain parent directory segments",
+    };
+  }
+
+  if (hasWindowsUnsafeSegment(segments)) {
+    return {
+      ok: false,
+      code: "INVALID_SEGMENT",
+      message: "File path contains a Windows-unsafe path segment",
+    };
+  }
+
+  const normalizedPath = normalizeSegments(normalizedSlashes);
+  if (normalizedPath === "") {
+    return {
+      ok: false,
+      code: "EMPTY",
+      message: "File path cannot be empty",
+    };
+  }
+
+  const withExtension = normalizeExtension(normalizedPath);
+  if (typeof withExtension !== "string") {
+    return {
+      ok: false,
+      code: "EXTENSION",
+      message: "File path must have a .rpy extension",
+    };
+  }
+
+  if (withExtension.length > MAX_STORED_PATH_LENGTH) {
+    return {
+      ok: false,
+      code: "TOO_LONG",
+      message: "File path is too long",
+    };
+  }
+
+  const basename =
+    withExtension.lastIndexOf("/") >= 0
+      ? withExtension.slice(withExtension.lastIndexOf("/") + 1)
+      : withExtension;
+
+  if (
+    !options.allowBranchForgeReserved &&
+    RESERVED_BASENAMES.has(basename.toLowerCase())
+  ) {
+    return {
+      ok: false,
+      code: "RESERVED",
+      message: "This file name is reserved by BranchForge",
+    };
+  }
+
+  return { ok: true, filePath: withExtension };
+}

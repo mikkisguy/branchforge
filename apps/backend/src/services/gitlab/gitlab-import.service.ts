@@ -10,6 +10,7 @@ import type { Db } from "../../db/index.js";
 import { requireProjectOwnership } from "../authz.service.js";
 import {
   projectFiles,
+  projectFilePendingOperations,
   labels,
   labelLines,
   characters,
@@ -47,7 +48,7 @@ import type { ProjectFile } from "../../db/schema/tables/project-files.js";
 import { ConcurrencyLimiter } from "../concurrency-limiter.js";
 import {
   listRpyFiles,
-  getFileContent,
+  getFileContentWithMetadata,
   getBranchCommitSha,
   getGitlabProject,
   linkRepository,
@@ -58,7 +59,12 @@ import {
   updateSyncOperation,
 } from "./gitlab-sync-ops.service.js";
 import { createProject, deleteProject } from "../projects.service.js";
-import { NotFoundError } from "../../middleware/error-handler.middleware.js";
+import { assertNoPendingStructuralOperations } from "../project-files-operations.service.js";
+import { lockProject } from "../project-files-operations.service.js";
+import {
+  NotFoundError,
+  ConflictError,
+} from "../../middleware/error-handler.middleware.js";
 
 /**
  * Helper function to fetch characters and build a Map of renpyTag -> id
@@ -206,6 +212,23 @@ export async function importFromGitlab(
 
   const db = getDb();
 
+  // Pull guard (pre-check): import/pull is blocked iff any structural
+  // CREATE/RENAME/DELETE exists. Ordinary autosaved content edits do not
+  // block pull. The authoritative check runs again under the project lock
+  // inside the write transaction below.
+  {
+    const [pendingRow] = await db
+      .select({ id: projectFilePendingOperations.id })
+      .from(projectFilePendingOperations)
+      .where(eq(projectFilePendingOperations.projectId, projectId))
+      .limit(1);
+    if (pendingRow) {
+      throw new ConflictError(
+        "Push or discard your structural file changes before pulling from GitLab"
+      );
+    }
+  }
+
   // Create sync operation
   const operation = await createSyncOperation(projectId, "IMPORT", branch);
 
@@ -263,18 +286,19 @@ export async function importFromGitlab(
       settings?.excludedCharacterTags || DEFAULT_EXCLUDED_RENPY_TAGS
     );
 
-    // Fetch file contents in parallel with concurrency limit
+    // Fetch file contents (with true per-file metadata) in parallel with
+    // concurrency limit
     const limiter = new ConcurrencyLimiter(5); // Limit to 5 concurrent requests
     const fileFetchResults = await Promise.allSettled(
       rpyFiles.map((file) =>
         limiter.run(async () => {
-          const content = await getFileContent(
+          const metadata = await getFileContentWithMetadata(
             projectId,
             userId,
             file.path,
             branch
           );
-          return { file, content };
+          return { file, metadata };
         })
       )
     );
@@ -325,6 +349,11 @@ export async function importFromGitlab(
     // export-time defensive strip still keeps Ren'Py-safe but
     // would be confusing for the user. See issue #244.
     await db.transaction(async (tx) => {
+      // Pull guard re-check under the project lock: serialize against
+      // concurrent rename/create/delete operations before any DB write.
+      await lockProject(tx, projectId);
+      await assertNoPendingStructuralOperations(tx, projectId);
+
       for (const result of fileFetchResults) {
         if (result.status === "rejected") {
           // Capture the first error for reporting
@@ -337,13 +366,13 @@ export async function importFromGitlab(
           continue;
         }
         fetchedSuccessfully = true;
-        if (!result.value.content) {
+        const { file, metadata } = result.value;
+        const content = metadata.content;
+        if (!content) {
           // Skip files with no content
           continue;
         }
         anySuccess = true;
-
-        const { file, content } = result.value;
 
         // Parse with new label-aware parser, passing filename for better detection
         const parsed = parseRPYFileWithLabels(content, file.path);
@@ -372,6 +401,15 @@ export async function importFromGitlab(
             contentHash,
             lastSyncedAt: new Date(),
             lastCommitSha: importCommitSha,
+            // True per-file remote baseline (NEVER the branch head SHA)
+            remoteFilePath: file.path,
+            remoteBranch: branch,
+            remoteContent: content,
+            remoteContentHash: calculateContentHash(content),
+            remoteRevision: metadata.lastCommitId,
+            // Last-pushed LOCAL baseline: freshly imported content is in
+            // sync locally too.
+            lastPushedContentHash: contentHash,
           })
           .onConflictDoUpdate({
             target: [
@@ -386,6 +424,17 @@ export async function importFromGitlab(
               contentHash,
               lastSyncedAt: new Date(),
               lastCommitSha: importCommitSha,
+              // True per-file remote baseline (backfills legacy rows; no
+              // CREATE rows are produced, so legacy rows never appear as
+              // pending creates).
+              remoteFilePath: file.path,
+              remoteBranch: branch,
+              remoteContent: content,
+              remoteContentHash: calculateContentHash(content),
+              remoteRevision: metadata.lastCommitId,
+              // Reset the last-pushed LOCAL baseline on a successful pull
+              // (the remote content is now reflected locally).
+              lastPushedContentHash: contentHash,
               updatedAt: new Date(),
             },
           })

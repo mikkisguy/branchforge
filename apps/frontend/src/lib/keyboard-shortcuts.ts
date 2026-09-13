@@ -24,6 +24,7 @@ export type ShortcutId =
   | "undo"
   | "redo"
   | "focus-mode"
+  | "file-rename"
   | "write-add-line"
   | "write-delete-empty-line"
   | "write-move-line-up"
@@ -43,6 +44,7 @@ export type ShortcutKeyToken =
   | "escape"
   | "arrowup"
   | "arrowdown"
+  | "f2"
   | "f3"
   | "s"
   | "z"
@@ -134,6 +136,17 @@ const GENERAL_SHORTCUTS = [
       "Enter or exit distraction-free focus mode in Write Mode or Script Mode.",
     chords: [{ keys: ["mod", "shift", "f"] }],
     actionLabel: "Toggle focus mode",
+  },
+  {
+    id: "file-rename",
+    group: "general",
+    scope: "global",
+    source: "branchforge",
+    label: "Rename file",
+    description:
+      "Open the rename dialog for the active or selected project file when focus is outside editable controls. Project owners only. There is no keyboard shortcut for deleting files.",
+    chords: [{ keys: ["f2"] }],
+    actionLabel: "Rename file",
   },
 ] as const satisfies readonly KeyboardShortcut[];
 
@@ -304,6 +317,8 @@ function keyTokenMatchesEvent(
       return event.key === "ArrowUp";
     case "arrowdown":
       return event.key === "ArrowDown";
+    case "f2":
+      return event.code === "F2" || event.key === "F2";
     case "f3":
       return event.code === "F3" || event.key === "F3";
     default:
@@ -452,6 +467,8 @@ function tokenAccessibleLabel(
       return "Arrow Up";
     case "arrowdown":
       return "Arrow Down";
+    case "f2":
+      return "F2";
     case "f3":
       return "F3";
     default:
@@ -480,6 +497,8 @@ function tokenVisualLabel(
       return "↑";
     case "arrowdown":
       return "↓";
+    case "f2":
+      return "F2";
     case "f3":
       return "F3";
     default:

@@ -59,6 +59,16 @@ export const projectFilesQuerySchema = z.object({
 });
 
 export type ProjectFilesQuery = z.infer<typeof projectFilesQuerySchema>;
+/**
+ * Create project file request validation
+ */
+export const createProjectFileSchema = z
+  .object({
+    filePath: z.string(),
+  })
+  .strict();
+
+export type CreateProjectFileInput = z.infer<typeof createProjectFileSchema>;
 
 /**
  * Layout mode validation — accepts the values emitted by the frontend
@@ -133,3 +143,16 @@ export const updateFileContentSchema = z
   .strict();
 
 export type UpdateFileContentInput = z.infer<typeof updateFileContentSchema>;
+
+/**
+ * Rename/move project file request validation (PATCH /projects/files/:fileId)
+ * Body: { filePath, expectedContentHash? }
+ */
+export const renameProjectFileSchema = z
+  .object({
+    filePath: z.string().min(1).max(500),
+    expectedContentHash: expectedContentHashSchema,
+  })
+  .strict();
+
+export type RenameProjectFileInput = z.infer<typeof renameProjectFileSchema>;

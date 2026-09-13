@@ -134,9 +134,7 @@ describe("ProjectFileTree - Generated section", () => {
 
     const activeItem = screen.getByRole("treeitem", { name: /outline\.md/i });
     expect(activeItem).toHaveAttribute("aria-selected", "true");
-    expect(activeItem).toHaveClass(
-      "bg-[rgba(var(--theme-color-rgb),0.06)]",
-    );
+    expect(activeItem).toHaveClass("bg-[rgba(var(--theme-color-rgb),0.06)]");
     expect(
       screen.getByRole("treeitem", { name: /summary\.md/i })
     ).toHaveAttribute("aria-selected", "false");
@@ -256,4 +254,76 @@ it("opens a story file from its filename and toggles labels from the chevron", a
 
   await userEvent.click(filenameButton);
   expect(onFileSelect).toHaveBeenCalledWith("story-file");
+});
+
+describe("ProjectFileTree - folder expansion", () => {
+  const nestedFiles = [
+    {
+      id: "file-1",
+      projectId: "project-1",
+      filePath: "game/chapter1.rpy",
+      fileType: "STORY" as const,
+      content: "",
+      source: "ZIP" as const,
+      contentHash: "hash",
+      createdAt: "2024-01-01T00:00:00.000Z",
+      updatedAt: "2024-01-01T00:00:00.000Z",
+      labels: [],
+    },
+  ];
+
+  it("expands folders when foldersToExpand changes", () => {
+    const { rerender } = render(
+      <ProjectFileTree
+        files={nestedFiles}
+        onFileSelect={noopFileSelect}
+        onSceneSelect={noopSceneSelect}
+        initialExpandedFolders={[]}
+      />
+    );
+
+    expect(screen.queryByTitle("game/chapter1.rpy")).not.toBeInTheDocument();
+
+    rerender(
+      <ProjectFileTree
+        files={nestedFiles}
+        onFileSelect={noopFileSelect}
+        onSceneSelect={noopSceneSelect}
+        initialExpandedFolders={[]}
+        foldersToExpand={["game"]}
+      />
+    );
+
+    expect(screen.getByTitle("game/chapter1.rpy")).toBeInTheDocument();
+  });
+
+  it("re-expands a folder when foldersToExpand is sent again", async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(
+      <ProjectFileTree
+        files={nestedFiles}
+        onFileSelect={noopFileSelect}
+        onSceneSelect={noopSceneSelect}
+        initialExpandedFolders={[]}
+        foldersToExpand={["game"]}
+      />
+    );
+
+    expect(screen.getByTitle("game/chapter1.rpy")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("treeitem", { expanded: true }));
+    expect(screen.queryByTitle("game/chapter1.rpy")).not.toBeInTheDocument();
+
+    rerender(
+      <ProjectFileTree
+        files={nestedFiles}
+        onFileSelect={noopFileSelect}
+        onSceneSelect={noopSceneSelect}
+        initialExpandedFolders={[]}
+        foldersToExpand={["game"]}
+      />
+    );
+
+    expect(screen.getByTitle("game/chapter1.rpy")).toBeInTheDocument();
+  });
 });

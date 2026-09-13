@@ -61,6 +61,14 @@ These apply while a dialogue line editor is focused.
 
 ## Script Mode
 
+| Action             | Shortcut |
+| ------------------ | -------- |
+| Rename active file | `F2`     |
+
+`F2` applies only to the active/selected file and is ignored while editing
+text or when a dialog is open. There is no keyboard shortcut for deleting a
+file.
+
 Script Mode search uses CodeMirror editor commands inside the script editor.
 
 | Action        | Shortcut                    |

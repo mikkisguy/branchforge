@@ -37,6 +37,25 @@ Script Mode uses CodeMirror 6 with custom Ren'Py syntax highlighting:
 
 The file tree on the left shows all `.rpy` files in your project, organized by source (imported from zip, synced from GitLab, etc.). Click a file to open it in the editor.
 
+### Creating a New File
+
+Click **New File** in the file tree, or on the empty-project screen when you have no files yet. Enter a relative path such as `labels/chapter_01` or `labels/chapter_01.rpy`. BranchForge adds `.rpy` if you omit the extension.
+
+The file is created in your project right away and opens in a new tab. It stays in BranchForge until you [export a ZIP](./import-export#zip-export) or [push to GitLab](./import-export#push-to-gitlab) — new files are not sent to GitLab automatically.
+
+You cannot create files with these reserved names: `branchforge_variables.rpy`, `branchforge_stats.rpy`, and `branchforge_definitions.rpy` (BranchForge generates these).
+
+### Renaming, moving, and deleting files
+
+Use a file row's **…** menu (or right-click it) to rename, move, or delete a
+file. Renaming accepts a full relative path and adds `.rpy` when needed. Press
+`F2` to rename the active file when focus is not in an editor or dialog.
+
+Before deletion, BranchForge shows labels in the file and every incoming jump,
+call, and menu choice. Larger impacts require typing the file's exact basename.
+GitLab files can be restored before the next push; ZIP files are removed from
+the local project immediately.
+
 ## Editing Conditions and Technical Details
 
 Because conditions are part of the Ren'Py source, you author them directly in Script Mode. For example:

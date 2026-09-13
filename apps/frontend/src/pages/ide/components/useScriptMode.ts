@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFileEditor } from "@/hooks/useFileEditor";
 import { useFileTabs } from "@/hooks/useFileTabs";
 import { useLabelFileSync } from "@/hooks/useLabelFileSync";
+import { useProjectFileActions } from "@/hooks/useProjectFileActions";
+import { useProject } from "@/hooks/useProject";
 import { useProjectReset } from "@/hooks/useProjectReset";
 import { useScriptModeRefresh } from "@/hooks/useScriptModeRefresh";
 import { useTextUndo } from "@/hooks/useTextUndo";
@@ -9,9 +11,17 @@ import type { LabelTitleMap } from "@/lib/codemirror/label-title-decoration";
 import type { SourceOrigin } from "@branchforge/shared";
 import { useScriptModeData } from "./useScriptModeData";
 import { useExportPreview } from "@/hooks/useExportPreview";
+import type { ProjectFileNode } from "@/hooks/useProjectFiles";
+
+function getContainingFolder(filePath: string): string | null {
+  const parts = filePath.split("/");
+  return parts.length > 1 ? parts[0] : null;
+}
 
 export function useScriptMode({ projectId }: { projectId?: string }) {
   const data = useScriptModeData({ projectId });
+  const { currentProject } = useProject();
+  const canModifyFiles = currentProject?.visibility === "OWNER";
   const {
     setActiveLabelId,
     projectFiles,
@@ -21,6 +31,22 @@ export function useScriptMode({ projectId }: { projectId?: string }) {
   } = data;
   const previousEditFileIdRef = useRef<string | null>(null);
   const [scrollToLine, setScrollToLine] = useState<number | null>(null);
+  const [showCreateFileDialog, setShowCreateFileDialog] = useState(false);
+  const [foldersToExpand, setFoldersToExpand] = useState<string[]>([]);
+  const [pendingSelectFileId, setPendingSelectFileId] = useState<string | null>(
+    null
+  );
+  // Tracks the most recently launched pending file selection so a stale
+  // effect instance's late resolution can never update state.
+  const pendingSelectionIdRef = useRef<string | null>(null);
+  // StrictMode-safe unmount guard: reset on (re)mount, set on unmount.
+  const isUnmountedRef = useRef(false);
+  useEffect(() => {
+    isUnmountedRef.current = false;
+    return () => {
+      isUnmountedRef.current = true;
+    };
+  }, []);
 
   const [generatedPreview, setGeneratedPreview] = useState<{
     fileName: string;
@@ -104,6 +130,7 @@ export function useScriptMode({ projectId }: { projectId?: string }) {
   }, [setActiveLabelId]);
 
   const {
+    openTabs,
     activeFileId,
     tabItems,
     selectFileTab,
@@ -119,6 +146,63 @@ export function useScriptMode({ projectId }: { projectId?: string }) {
     onNoTabsRemaining: handleNoTabsRemaining,
   });
 
+  const resetCreateFileError = data.resetCreateFileError;
+  const handleOpenCreateFileDialog = useCallback(() => {
+    resetCreateFileError();
+    setShowCreateFileDialog(true);
+  }, [resetCreateFileError]);
+
+  const handleCreateFileDialogOpenChange = useCallback((open: boolean) => {
+    setShowCreateFileDialog(open);
+  }, []);
+
+  const createFile = data.createFile;
+  const handleCreateFile = useCallback(
+    async (filePath: string) => {
+      const newFile = await createFile(filePath);
+
+      const folder = getContainingFolder(newFile.filePath);
+      if (folder) {
+        setFoldersToExpand([folder]);
+      }
+
+      setPendingSelectFileId(newFile.id);
+    },
+    [createFile]
+  );
+
+  useEffect(() => {
+    if (!pendingSelectFileId) {
+      return;
+    }
+    if (!projectFiles.some((file) => file.id === pendingSelectFileId)) {
+      return;
+    }
+
+    const fileId = pendingSelectFileId;
+    let cancelled = false;
+    pendingSelectionIdRef.current = fileId;
+    void (async () => {
+      const selected = await selectFileTab(fileId);
+      // Ignore stale resolutions: only the most recent pending selection
+      // may clear the generated preview, and never after unmount.
+      if (
+        !selected ||
+        cancelled ||
+        isUnmountedRef.current ||
+        pendingSelectionIdRef.current !== fileId
+      ) {
+        return;
+      }
+      pendingSelectionIdRef.current = null;
+      setPendingSelectFileId(null);
+      setGeneratedPreview(null);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [pendingSelectFileId, projectFiles, selectFileTab]);
+
   const { resetRefreshState } = useScriptModeRefresh({
     projectId,
     isLoadingFiles: data.isLoadingFiles,
@@ -127,10 +211,15 @@ export function useScriptMode({ projectId }: { projectId?: string }) {
 
   const handleResetState = useCallback(() => {
     resetRefreshState();
+    pendingSelectionIdRef.current = null;
+    setPendingSelectFileId(null);
     clearTabsState();
     void clearEditorState();
     setScrollToLine(null);
     setGeneratedPreview(null);
+    setFoldersToExpand([]);
+    setPendingSelectFileId(null);
+    setShowCreateFileDialog(false);
   }, [clearEditorState, clearTabsState, resetRefreshState]);
 
   const setSkipSave = useCallback(
@@ -209,6 +298,66 @@ export function useScriptMode({ projectId }: { projectId?: string }) {
       : activeProjectFile?.content || "";
 
   const isGeneratedPreview = !!generatedPreview;
+
+  // --- Structural file actions (rename/move, delete) -----------------------
+  // Owner-only; flushes the pending autosave before opening a dialog and
+  // blocks the operation when the flush fails (rename) or enables the
+  // force-delete pathway (delete).
+  const flushAutosaveForFileAction = useCallback(
+    async (fileId: string) => {
+      if (fileId !== currentEditFileId) return true;
+      if (!hasPendingSave) return true;
+      return await triggerFileSave();
+    },
+    [currentEditFileId, hasPendingSave, triggerFileSave]
+  );
+
+  const handleFileDeleted = useCallback(
+    (deletedFile: ProjectFileNode) => {
+      // Repair tabs/selection: fall back to the previous tab, then the
+      // next; with no tabs left, clear into the empty state.
+      if (activeFileId !== deletedFile.id) return;
+      const index = openTabs.indexOf(deletedFile.id);
+      const remaining = openTabs.filter((id) => id !== deletedFile.id);
+      if (remaining.length === 0) {
+        handleNoTabsRemaining();
+        return;
+      }
+      const fallbackFileId = openTabs[index - 1] ?? remaining[0];
+      void selectFileTab(fallbackFileId);
+    },
+    [activeFileId, handleNoTabsRemaining, openTabs, selectFileTab]
+  );
+
+  const handleFileRenamed = useCallback((renamedFile: ProjectFileNode) => {
+    const folder = getContainingFolder(renamedFile.filePath);
+    if (folder) {
+      setFoldersToExpand([folder]);
+    }
+  }, []);
+
+  const fileActions = useProjectFileActions({
+    projectId,
+    canModify: canModifyFiles,
+    flushAutosave: flushAutosaveForFileAction,
+    getActiveFile: () => (generatedPreview ? null : activeProjectFile),
+    onFileDeleted: handleFileDeleted,
+    onFileRenamed: handleFileRenamed,
+    showErrorToast,
+  });
+
+  const fileRowActions = useMemo(
+    () =>
+      canModifyFiles
+        ? {
+            onRenameRequest: (file: ProjectFileNode) =>
+              fileActions.requestRename(file),
+            onDeleteRequest: (file: ProjectFileNode) =>
+              fileActions.requestDelete(file),
+          }
+        : undefined,
+    [canModifyFiles, fileActions]
+  );
 
   const activeFileContent = generatedPreview
     ? generatedPreview.content
@@ -416,5 +565,16 @@ export function useScriptMode({ projectId }: { projectId?: string }) {
     onGeneratedFileSelect: handleGeneratedFileSelect,
     isGeneratedPreview,
     generatedFileName,
+    showCreateFileDialog,
+    handleOpenCreateFileDialog,
+    handleCreateFileDialogOpenChange,
+    handleCreateFile,
+    isCreatingFile: data.isCreatingFile,
+    createFileError: data.createFileError,
+    resetCreateFileError: data.resetCreateFileError,
+    foldersToExpand,
+    canModifyFiles,
+    fileActions,
+    fileRowActions,
   };
 }

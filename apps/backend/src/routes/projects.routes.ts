@@ -12,22 +12,32 @@ import {
   updateProject,
   deleteProject,
   getProjectFiles,
+  createProjectFile,
   updateFileContent,
 } from "../services/projects.service.js";
-import type { SourceOrigin, PublicProject } from "@branchforge/shared";
+import type {
+  CreateProjectFileResponse,
+  PublicProject,
+  SourceOrigin,
+} from "@branchforge/shared";
 import { authenticate } from "../middleware/auth.middleware.js";
 import {
   validateParams,
+  validateBody,
   validateRequest,
 } from "../middleware/validation.middleware.js";
 import {
   updateProjectSchema,
   projectIdParamsSchema,
   projectFilesQuerySchema,
+  createProjectFileSchema,
   fileIdParamsSchema,
   updateFileContentSchema,
+  renameProjectFileSchema,
+  type RenameProjectFileInput,
   type UpdateFileContentInput,
   type UpdateProjectInput,
+  type CreateProjectFileInput,
 } from "../lib/validation.js";
 import {
   NotFoundError,
@@ -35,6 +45,14 @@ import {
   ValidationError,
   ConflictError,
 } from "../middleware/error-handler.middleware.js";
+import {
+  renameProjectFile,
+  deleteProjectFile,
+  getDeleteImpact,
+  getPendingStructuralSummary,
+  reverseOneOperation,
+  discardAllOperations,
+} from "../services/project-files-operations.service.js";
 
 // ============================================================================
 // Types
@@ -235,6 +253,62 @@ async function getProjectFilesHandler(
 }
 
 /**
+ * Create a new empty project file
+ *
+ * POST /projects/:projectId/files
+ * Body: { filePath: string }
+ * Requires authentication and project ownership
+ */
+async function createProjectFileHandler(
+  request: FastifyRequest<{
+    Params: { projectId: string };
+    Body: CreateProjectFileInput;
+  }>,
+  reply: FastifyReply
+): Promise<void> {
+  const { projectId } = request.params;
+  const { filePath } = request.body;
+  const user = request.user!;
+
+  try {
+    const file = await createProjectFile(projectId, user.id, filePath);
+    const response: CreateProjectFileResponse = {
+      file: {
+        ...file,
+        lastSyncedAt: file.lastSyncedAt?.toISOString() ?? null,
+        createdAt: file.createdAt.toISOString(),
+        updatedAt: file.updatedAt.toISOString(),
+      },
+    };
+    reply.status(201).send(response);
+  } catch (err) {
+    if (err instanceof NotFoundError) {
+      reply.status(404).send({ error: "Project not found" });
+      return;
+    }
+    if (err instanceof ForbiddenError) {
+      reply.status(403).send({ error: "Forbidden" });
+      return;
+    }
+    if (err instanceof ValidationError) {
+      reply.status(400).send({ error: err.userMessage } as ErrorResponse);
+      return;
+    }
+    if (err instanceof ConflictError) {
+      reply.status(409).send({ error: err.userMessage } as ErrorResponse);
+      return;
+    }
+    request.log.error(
+      { err, projectId },
+      `createProjectFileHandler: Failed to create project file: ${
+        err instanceof Error ? err.message : "Unknown error"
+      }`
+    );
+    reply.status(500).send({ error: "Failed to create project file" });
+  }
+}
+
+/**
  * Update file content
  *
  * PUT /projects/files/:fileId
@@ -301,6 +375,272 @@ async function updateFileContentHandler(
   }
 }
 
+/**
+ * Rename or move a project file.
+ *
+ * PATCH /projects/files/:fileId
+ * Body: { filePath: string, expectedContentHash?: string }
+ */
+async function renameProjectFileHandler(
+  request: FastifyRequest<{
+    Params: { fileId: string };
+    Body: RenameProjectFileInput;
+  }>,
+  reply: FastifyReply
+): Promise<void> {
+  const { fileId } = request.params;
+  const { filePath, expectedContentHash } = request.body;
+  const user = request.user!;
+
+  try {
+    const result = await renameProjectFile(
+      fileId,
+      user.id,
+      filePath,
+      expectedContentHash
+    );
+    reply.status(200).send({
+      file: {
+        ...result.file,
+        lastSyncedAt: result.file.lastSyncedAt?.toISOString() ?? null,
+        createdAt: result.file.createdAt.toISOString(),
+        updatedAt: result.file.updatedAt.toISOString(),
+      },
+      operation: result.operation,
+    });
+  } catch (err) {
+    request.log.error(
+      { err, fileId },
+      `renameProjectFileHandler: Failed to rename file: ${
+        err instanceof Error ? err.message : "Unknown error"
+      }`
+    );
+
+    if (err instanceof NotFoundError) {
+      reply.status(404).send({ error: err.userMessage } as ErrorResponse);
+      return;
+    }
+    if (err instanceof ForbiddenError) {
+      reply.status(403).send({ error: err.userMessage } as ErrorResponse);
+      return;
+    }
+    if (err instanceof ValidationError) {
+      reply.status(400).send({ error: err.userMessage } as ErrorResponse);
+      return;
+    }
+    if (err instanceof ConflictError) {
+      reply.status(409).send({ error: err.userMessage } as ErrorResponse);
+      return;
+    }
+    reply.status(500).send({ error: "Internal server error" } as ErrorResponse);
+  }
+}
+
+/**
+ * Get delete-impact for a project file.
+ *
+ * POST /projects/files/:fileId/delete-impact
+ */
+async function getDeleteImpactHandler(
+  request: FastifyRequest<{ Params: { fileId: string } }>,
+  reply: FastifyReply
+): Promise<void> {
+  const { fileId } = request.params;
+  const user = request.user!;
+
+  try {
+    const impact = await getDeleteImpact(fileId, user.id);
+    reply.status(200).send({ impact });
+  } catch (err) {
+    request.log.error(
+      { err, fileId },
+      `getDeleteImpactHandler: Failed to get delete impact: ${
+        err instanceof Error ? err.message : "Unknown error"
+      }`
+    );
+
+    if (err instanceof NotFoundError) {
+      reply.status(404).send({ error: err.userMessage } as ErrorResponse);
+      return;
+    }
+    if (err instanceof ForbiddenError) {
+      reply.status(403).send({ error: err.userMessage } as ErrorResponse);
+      return;
+    }
+    if (err instanceof ConflictError) {
+      reply.status(409).send({ error: err.userMessage } as ErrorResponse);
+      return;
+    }
+    reply.status(500).send({ error: "Internal server error" } as ErrorResponse);
+  }
+}
+
+/**
+ * Delete a project file.
+ *
+ * DELETE /projects/files/:fileId
+ */
+async function deleteProjectFileHandler(
+  request: FastifyRequest<{ Params: { fileId: string } }>,
+  reply: FastifyReply
+): Promise<void> {
+  const { fileId } = request.params;
+  const user = request.user!;
+
+  try {
+    const result = await deleteProjectFile(fileId, user.id);
+    reply.status(200).send({
+      file: {
+        ...result.file,
+        lastSyncedAt: result.file.lastSyncedAt?.toISOString() ?? null,
+        createdAt: result.file.createdAt.toISOString(),
+        updatedAt: result.file.updatedAt.toISOString(),
+      },
+      operation: result.operation,
+      hardDeleted: result.hardDeleted,
+    });
+  } catch (err) {
+    request.log.error(
+      { err, fileId },
+      `deleteProjectFileHandler: Failed to delete file: ${
+        err instanceof Error ? err.message : "Unknown error"
+      }`
+    );
+
+    if (err instanceof NotFoundError) {
+      reply.status(404).send({ error: err.userMessage } as ErrorResponse);
+      return;
+    }
+    if (err instanceof ForbiddenError) {
+      reply.status(403).send({ error: err.userMessage } as ErrorResponse);
+      return;
+    }
+    if (err instanceof ValidationError) {
+      reply.status(400).send({ error: err.userMessage } as ErrorResponse);
+      return;
+    }
+    if (err instanceof ConflictError) {
+      reply.status(409).send({ error: err.userMessage } as ErrorResponse);
+      return;
+    }
+    reply.status(500).send({ error: "Internal server error" } as ErrorResponse);
+  }
+}
+
+/**
+ * Get pending structural summary for a project.
+ *
+ * GET /projects/:projectId/files/pending-structural
+ */
+async function getPendingStructuralSummaryHandler(
+  request: FastifyRequest<{ Params: { projectId: string } }>,
+  reply: FastifyReply
+): Promise<void> {
+  const { projectId } = request.params;
+  const user = request.user!;
+
+  try {
+    const summary = await getPendingStructuralSummary(projectId, user.id);
+    reply.status(200).send(summary);
+  } catch (err) {
+    request.log.error(
+      { err, projectId },
+      `getPendingStructuralSummaryHandler: Failed to get pending summary: ${
+        err instanceof Error ? err.message : "Unknown error"
+      }`
+    );
+
+    if (err instanceof NotFoundError) {
+      reply.status(404).send({ error: err.userMessage } as ErrorResponse);
+      return;
+    }
+    if (err instanceof ForbiddenError) {
+      reply.status(403).send({ error: err.userMessage } as ErrorResponse);
+      return;
+    }
+    reply.status(500).send({ error: "Internal server error" } as ErrorResponse);
+  }
+}
+
+/**
+ * Reverse the most recent pending operation on a file.
+ *
+ * POST /projects/files/:fileId/reverse
+ */
+async function reverseOneOperationHandler(
+  request: FastifyRequest<{ Params: { fileId: string } }>,
+  reply: FastifyReply
+): Promise<void> {
+  const { fileId } = request.params;
+  const user = request.user!;
+
+  try {
+    const result = await reverseOneOperation(fileId, user.id);
+    reply.status(200).send({
+      success: result.reversed,
+      reversed: result.reversed,
+      operation: result.operation,
+    });
+  } catch (err) {
+    request.log.error(
+      { err, fileId },
+      `reverseOneOperationHandler: Failed to reverse operation: ${
+        err instanceof Error ? err.message : "Unknown error"
+      }`
+    );
+
+    if (err instanceof NotFoundError) {
+      reply.status(404).send({ error: err.userMessage } as ErrorResponse);
+      return;
+    }
+    if (err instanceof ForbiddenError) {
+      reply.status(403).send({ error: err.userMessage } as ErrorResponse);
+      return;
+    }
+    reply.status(500).send({ error: "Internal server error" } as ErrorResponse);
+  }
+}
+
+/**
+ * Discard all pending structural operations in a project, restoring every
+ * affected file to its actual pre-operation state.
+ *
+ * POST /projects/:projectId/files/discard-all
+ */
+async function discardAllOperationsHandler(
+  request: FastifyRequest<{ Params: { projectId: string } }>,
+  reply: FastifyReply
+): Promise<void> {
+  const { projectId } = request.params;
+  const user = request.user!;
+
+  try {
+    const result = await discardAllOperations(projectId, user.id);
+    reply.status(200).send({
+      success: result.discarded,
+      discarded: result.discarded,
+      count: result.count,
+    });
+  } catch (err) {
+    request.log.error(
+      { err, projectId },
+      `discardAllOperationsHandler: Failed to discard operations: ${
+        err instanceof Error ? err.message : "Unknown error"
+      }`
+    );
+
+    if (err instanceof NotFoundError) {
+      reply.status(404).send({ error: err.userMessage } as ErrorResponse);
+      return;
+    }
+    if (err instanceof ForbiddenError) {
+      reply.status(403).send({ error: err.userMessage } as ErrorResponse);
+      return;
+    }
+    reply.status(500).send({ error: "Internal server error" } as ErrorResponse);
+  }
+}
+
 // ============================================================================
 // Routes Registration
 // ============================================================================
@@ -351,6 +691,18 @@ export async function projectsRoutes(fastify: FastifyInstance): Promise<void> {
     getProjectFilesHandler
   );
 
+  fastify.post<{ Params: { projectId: string }; Body: CreateProjectFileInput }>(
+    "/projects/:projectId/files",
+    {
+      onRequest: authenticate,
+      preValidation: [
+        validateParams(projectIdParamsSchema),
+        validateBody(createProjectFileSchema),
+      ],
+    },
+    createProjectFileHandler
+  );
+
   // Update file content (unified endpoint for both script mode and write mode)
   fastify.put<{
     Params: { fileId: string };
@@ -365,5 +717,71 @@ export async function projectsRoutes(fastify: FastifyInstance): Promise<void> {
       }),
     },
     updateFileContentHandler
+  );
+
+  // Rename/move a project file
+  fastify.patch<{
+    Params: { fileId: string };
+    Body: RenameProjectFileInput;
+  }>(
+    "/projects/files/:fileId",
+    {
+      onRequest: authenticate,
+      preValidation: validateRequest({
+        params: fileIdParamsSchema,
+        body: renameProjectFileSchema,
+      }),
+    },
+    renameProjectFileHandler
+  );
+
+  // Delete impact
+  fastify.post<{ Params: { fileId: string } }>(
+    "/projects/files/:fileId/delete-impact",
+    {
+      onRequest: authenticate,
+      preValidation: validateParams(fileIdParamsSchema),
+    },
+    getDeleteImpactHandler
+  );
+
+  // Delete a project file
+  fastify.delete<{ Params: { fileId: string } }>(
+    "/projects/files/:fileId",
+    {
+      onRequest: authenticate,
+      preValidation: validateParams(fileIdParamsSchema),
+    },
+    deleteProjectFileHandler
+  );
+
+  // Pending structural summary for a project
+  fastify.get<{ Params: { projectId: string } }>(
+    "/projects/:projectId/files/pending-structural",
+    {
+      onRequest: authenticate,
+      preValidation: validateParams(projectIdParamsSchema),
+    },
+    getPendingStructuralSummaryHandler
+  );
+
+  // Reverse one operation
+  fastify.post<{ Params: { fileId: string } }>(
+    "/projects/files/:fileId/reverse",
+    {
+      onRequest: authenticate,
+      preValidation: validateParams(fileIdParamsSchema),
+    },
+    reverseOneOperationHandler
+  );
+
+  // Discard all pending structural operations (project-wide)
+  fastify.post<{ Params: { projectId: string } }>(
+    "/projects/:projectId/files/discard-all",
+    {
+      onRequest: authenticate,
+      preValidation: validateParams(projectIdParamsSchema),
+    },
+    discardAllOperationsHandler
   );
 }

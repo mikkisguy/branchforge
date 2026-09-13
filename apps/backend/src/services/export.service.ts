@@ -7,7 +7,6 @@
  */
 
 import JSZip from "jszip";
-import path from "node:path";
 import { getDb } from "../db/index.js";
 import {
   exportsTable,
@@ -39,6 +38,7 @@ import {
 import { checkRateLimit } from "./rate-limiter.service.js";
 import { logInfo, logError, logWarn, LogEventType } from "../lib/logger.js";
 import {
+  canonicalizeRpyFilePath,
   type ExportPreviewResponse,
   type GeneratedExportPreviewFile,
 } from "@branchforge/shared";
@@ -77,17 +77,8 @@ export interface GenerateExportResult {
  * @returns The sanitized relative path, or null if the path is unsafe.
  */
 function sanitizeZipEntryPath(filePath: string): string | null {
-  const normalized = path.posix.normalize(filePath);
-  if (
-    normalized.length === 0 ||
-    normalized === "." ||
-    normalized === ".." ||
-    normalized.startsWith("/") ||
-    normalized.includes("../")
-  ) {
-    return null;
-  }
-  return normalized;
+  const canonical = canonicalizeRpyFilePath(filePath);
+  return canonical.ok ? canonical.filePath : null;
 }
 
 /**
@@ -205,11 +196,13 @@ export async function generateExport(
     throw new NotFoundError("Project");
   }
 
-  // Fetch all project files
+  // Fetch all project files (excluding tombstones)
   const files = await db
     .select()
     .from(projectFiles)
-    .where(eq(projectFiles.projectId, projectId));
+    .where(
+      and(eq(projectFiles.projectId, projectId), isNull(projectFiles.deletedAt))
+    );
 
   if (files.length === 0) {
     throw new NotFoundError("Project files");

@@ -59,6 +59,8 @@ export interface SyncOperation {
   status: "PENDING" | "IN_PROGRESS" | "COMPLETED" | "FAILED";
   branch: string | null;
   conflictCount: number;
+  /** Actual GitLab commit id of the created commit (exports). */
+  commitId?: string | null;
   errorMessage: string | null;
   startedAt: Date;
   completedAt: Date | null;
