@@ -51,11 +51,13 @@ Update `.env` for production:
 
 ```bash
 # Docker Compose database
-# POSTGRES_PASSWORD must contain only URI-safe characters (letters, digits,
-# - _ . ~) unless you also set the percent-encoded variant used to build
-# DATABASE_URL — see "Database URI password encoding".
+# POSTGRES_USER and POSTGRES_PASSWORD need URL-encoded variants for
+# DATABASE_URL when they contain characters outside letters, digits, - _ . ~.
+# See "Database URI credential encoding" below.
 POSTGRES_USER=branchforge
+POSTGRES_USER_URL_ENCODED=branchforge
 POSTGRES_PASSWORD=generate-strong-password
+POSTGRES_PASSWORD_URL_ENCODED=generate-strong-password
 POSTGRES_DB=branchforge
 PGPORT=5432
 
@@ -134,7 +136,7 @@ services:
     environment:
       # URI-composed credentials must be percent-encoded — see
       # "Database URI password encoding" below.
-      DATABASE_URL: postgresql://${POSTGRES_USER:-branchforge}:${POSTGRES_PASSWORD_URL_ENCODED:-branchforge}@postgres:5432/${POSTGRES_DB:-branchforge}
+      DATABASE_URL: postgresql://${POSTGRES_USER_URL_ENCODED:-branchforge}:${POSTGRES_PASSWORD_URL_ENCODED:-branchforge}@postgres:5432/${POSTGRES_DB:-branchforge}
       NODE_ENV: production
     depends_on:
       postgres:
@@ -144,7 +146,7 @@ services:
   backend:
     image: ghcr.io/mikkisguy/branchforge-backend:${IMAGE_TAG:-beta}
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-branchforge}:${POSTGRES_PASSWORD_URL_ENCODED:-branchforge}@postgres:5432/${POSTGRES_DB:-branchforge}
+      DATABASE_URL: postgresql://${POSTGRES_USER_URL_ENCODED:-branchforge}:${POSTGRES_PASSWORD_URL_ENCODED:-branchforge}@postgres:5432/${POSTGRES_DB:-branchforge}
     depends_on:
       postgres:
         condition: service_healthy
@@ -157,24 +159,26 @@ volumes:
   postgres_data:
 ```
 
-Compose constructs the containers' `DATABASE_URL` from `POSTGRES_USER`,
-the **URL-encoded** password, and `POSTGRES_DB`. The raw password is still
-passed to the `postgres` container itself. A standalone `DATABASE_URL` is only
-used by the manual/non-Compose command below.
+Compose constructs the containers' `DATABASE_URL` from the **URL-encoded**
+username and password plus `POSTGRES_DB`. The raw username and password are
+still passed to the `postgres` container itself. A standalone `DATABASE_URL`
+is only used by the manual/non-Compose command below.
 
-### Database URI password encoding
+### Database URI credential encoding
 
-The PostgreSQL connection URI embeds username and password directly, so
+The PostgreSQL connection URI embeds its username and password directly, so
 characters that are syntactically meaningful in a URI must be percent-encoded
-(RFC 3986). The `postgres` container keeps receiving the **raw** password via
-`POSTGRES_PASSWORD`; only the composed `DATABASE_URL` needs the encoded form.
+(RFC 3986). The `postgres` container keeps receiving the **raw** values via
+`POSTGRES_USER` and `POSTGRES_PASSWORD`; only the composed `DATABASE_URL`
+uses the encoded forms.
 
 Docker Compose interpolation is plain `${VAR}` substitution — it cannot encode
-for you — so keep a second variable in `.env` that holds the encoded password
-and reference it in the URI:
+for you — so keep encoded variants in `.env` and reference them in the URI:
 
 ```bash
 # .env
+POSTGRES_USER=branch@forge                   # raw — used by the postgres container
+POSTGRES_USER_URL_ENCODED=branch%40forge     # encoded — used in DATABASE_URL
 POSTGRES_PASSWORD=p@ss:word/2026              # raw — used by the postgres container
 POSTGRES_PASSWORD_URL_ENCODED=p%40ss%3Aword%2F2026  # encoded — used in DATABASE_URL
 ```
@@ -182,18 +186,18 @@ POSTGRES_PASSWORD_URL_ENCODED=p%40ss%3Aword%2F2026  # encoded — used in DATABA
 Common characters and their encodings: `@` → `%40`, `:` → `%3A`, `/` → `%2F`,
 `?` → `%3F`, `#` → `%23`, `%` → `%25`, space → `%20`.
 
-Generate the encoded value from the raw one instead of hand-editing:
+Generate the encoded values from the raw ones instead of hand-editing:
 
 ```bash
 # Node.js
-node -e "console.log(encodeURIComponent(process.env.POSTGRES_PASSWORD))"
+node -e "console.log(encodeURIComponent(process.env.POSTGRES_USER)); console.log(encodeURIComponent(process.env.POSTGRES_PASSWORD))"
 
 # Python
-python3 -c "import os, urllib.parse; print(urllib.parse.quote(os.environ['POSTGRES_PASSWORD'], safe=''))"
+python3 -c "import os, urllib.parse; print(urllib.parse.quote(os.environ['POSTGRES_USER'], safe='')); print(urllib.parse.quote(os.environ['POSTGRES_PASSWORD'], safe=''))"
 ```
 
-Passwords made only of letters, digits, `-`, `_`, `.`, and `~` need no
-encoding and may reuse `POSTGRES_PASSWORD` directly.
+Usernames and passwords made only of letters, digits, `-`, `_`, `.`, and `~`
+need no encoding and may reuse their raw values directly.
 
 ### Upgrading PostgreSQL 16 to 18
 
@@ -218,8 +222,13 @@ dump-and-restore is required **before** pulling the new image:
      > branchforge_pg16.dump
    ```
 
-   If you created additional roles or global objects, also run
-   `pg_dumpall --globals-only` and capture its output.
+   If you created additional roles or global objects, also save the globals
+   dump to a file:
+
+   ```bash
+   docker compose exec -T postgres pg_dumpall -U branchforge --globals-only \
+     > branchforge_pg16_globals.sql
+   ```
 
 3. **Tear down the old database and its volume.** Verify the dump is non-empty
    and keep a copy off-host before deleting anything:
@@ -240,9 +249,19 @@ dump-and-restore is required **before** pulling the new image:
    docker compose ps postgres   # wait for "healthy"
    ```
 
-5. **Restore the dump into 18:**
+5. **Restore globals, then the database dump into 18:**
+
+   The new container normally bootstraps the raw `POSTGRES_USER` role. If that
+   role is also in `branchforge_pg16_globals.sql`, its `CREATE ROLE` statement
+   collides. Prefer temporarily bootstrapping PostgreSQL 18 with a distinct
+   superuser (for example, `POSTGRES_USER=postgres`) while restoring; restore
+   with that superuser and then return the Compose setting to `branchforge`.
+   Alternatively, remove the duplicate bootstrap-role statements from the
+   globals file before restoring it.
 
    ```bash
+   docker compose exec -T postgres psql -U postgres -d postgres \
+     -v ON_ERROR_STOP=1 < branchforge_pg16_globals.sql
    docker compose exec -T postgres pg_restore -U branchforge -d branchforge \
      --clean --if-exists < branchforge_pg16.dump
    ```
