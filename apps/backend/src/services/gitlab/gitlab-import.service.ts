@@ -61,6 +61,7 @@ import {
 import { createProject, deleteProject } from "../projects.service.js";
 import { assertNoPendingStructuralOperations } from "../project-files-operations.service.js";
 import { lockProject } from "../project-files-operations.service.js";
+import { hasUnpushedLocalContent } from "../project-file-baseline.js";
 import {
   NotFoundError,
   ConflictError,
@@ -287,8 +288,8 @@ export async function importFromGitlab(
     );
 
     // Fetch file contents (with true per-file metadata) in parallel with
-    // concurrency limit
-    const limiter = new ConcurrencyLimiter(5); // Limit to 5 concurrent requests
+    // concurrency limit. All fetches must succeed before any DB write.
+    const limiter = new ConcurrencyLimiter(5);
     const fileFetchResults = await Promise.allSettled(
       rpyFiles.map((file) =>
         limiter.run(async () => {
@@ -303,248 +304,415 @@ export async function importFromGitlab(
       )
     );
 
-    // Track if any file fetch succeeded and capture first error.
-    // Distinguish successful fetches (fetchedSuccessfully) from
-    // fetches that returned importable content (anySuccess) so that
-    // the blockade message accurately reflects which files could
-    // not be fetched vs. which were empty after successful fetch.
-    let anySuccess = false;
-    let fetchedSuccessfully = false;
-    // We narrow `firstError` to its eventual assignment site below;
-    // the type annotation is broader than the inferred type so that
-    // the closure that captures it (the db.transaction callback)
-    // doesn't narrow it to `never`.
-    let firstError: Error | null = null as Error | null;
+    const fetchFailures = fileFetchResults.filter(
+      (result) => result.status === "rejected"
+    );
+    if (fetchFailures.length > 0) {
+      const firstFailure = fetchFailures[0] as PromiseRejectedResult;
+      const errorMessage =
+        firstFailure.reason instanceof Error
+          ? firstFailure.reason.message
+          : String(firstFailure.reason);
+      logErrorShared("gitlab_sync.file_fetch_failed", {
+        projectId,
+        failedCount: fetchFailures.length,
+        totalFiles: rpyFiles.length,
+        error: errorMessage,
+      });
+      await updateSyncOperation(operation.id, {
+        status: "FAILED",
+        errorMessage,
+      });
+      return {
+        ...operation,
+        status: "FAILED",
+        errorMessage,
+      };
+    }
 
-    // Phase 1: Parse all files and detect characters
-    const parsedFiles: Array<{
+    // Parse and prepare every file before opening the write transaction so a
+    // parse failure never leaves a partial DB write behind.
+    type PreparedFile = {
       file: (typeof rpyFiles)[0];
       content: string;
       cleanedContent: string;
       parsed: ParsedRPYFileWithLabels;
-      projectFile: ProjectFile;
       symbols: ReturnType<typeof extractAndStripRpySymbols>;
-    }> = [];
+      contentHash: string;
+      remoteContentHash: string;
+      remoteRevision: string | null;
+    };
+    const preparedFiles: PreparedFile[] = [];
 
-    // Cross-file symbol aggregation. We populate this inside the
-    // transaction below as files are successfully processed, so a
-    // mid-import rollback leaves no orphan symbols behind. The
-    // `extracted` prefix disambiguates from the existing
-    // `charactersByTag` map in Phase 3 that maps `renpyTag -> id`
-    // for speaker linking.
-    const extractedCharactersByTag = new Map<
-      string,
-      DetectedCharacterStatement
-    >();
-    const extractedVariablesByKey = new Map<string, DetectedDefaultStatement>();
-    const extractedStatsByKey = new Map<string, DetectedDefaultStatement>();
+    for (const result of fileFetchResults) {
+      if (result.status !== "fulfilled") {
+        continue;
+      }
+      const { file, metadata } = result.value;
+      const content = metadata.content;
+      if (!content) {
+        continue;
+      }
 
-    // Phase 1 + Phase 1.5 are wrapped in a single transaction so
-    // that the file inserts (which strip `define`/`default` from
-    // the stored content) and the symbol promotion (which puts
-    // those statements into the database) commit or roll back
-    // together. Without this, a partial failure could leave the
-    // project with cleaned `project_files.content` but no matching
-    // `characters` / `variables` / `stats` rows, which the
-    // export-time defensive strip still keeps Ren'Py-safe but
-    // would be confusing for the user. See issue #244.
+      const parsed = parseRPYFileWithLabels(content, file.path);
+      const symbols = extractAndStripRpySymbols(content);
+      const contentHash = calculateContentHash(symbols.cleanedContent);
+      preparedFiles.push({
+        file,
+        content,
+        cleanedContent: symbols.cleanedContent,
+        parsed,
+        symbols,
+        contentHash,
+        remoteContentHash: calculateContentHash(content),
+        remoteRevision: metadata.lastCommitId,
+      });
+    }
+
+    if (preparedFiles.length === 0) {
+      const errorMessage =
+        "No importable content found in the fetched files. Each file was either empty or contained only whitespace.";
+      await updateSyncOperation(operation.id, {
+        status: "FAILED",
+        errorMessage,
+      });
+      return {
+        ...operation,
+        status: "FAILED",
+        errorMessage,
+      };
+    }
+
+    // Single project-locked transaction: file upserts, symbol promotion,
+    // label import, and incoming-jump recompute all commit or roll back
+    // together. Conflict resolution is applied consistently to file content
+    // and labels.
     await db.transaction(async (tx) => {
-      // Pull guard re-check under the project lock: serialize against
-      // concurrent rename/create/delete operations before any DB write.
       await lockProject(tx, projectId);
       await assertNoPendingStructuralOperations(tx, projectId);
 
-      for (const result of fileFetchResults) {
-        if (result.status === "rejected") {
-          // Capture the first error for reporting
-          if (!firstError) {
-            firstError =
-              result.reason instanceof Error
-                ? result.reason
-                : new Error(String(result.reason));
+      const existingRows = await tx
+        .select()
+        .from(projectFiles)
+        .where(
+          and(
+            eq(projectFiles.projectId, projectId),
+            eq(projectFiles.source, "GITLAB")
+          )
+        );
+      const existingByPath = new Map(
+        existingRows.map((row) => [row.filePath, row])
+      );
+
+      const extractedCharactersByTag = new Map<
+        string,
+        DetectedCharacterStatement
+      >();
+      const extractedVariablesByKey = new Map<
+        string,
+        DetectedDefaultStatement
+      >();
+      const extractedStatsByKey = new Map<string, DetectedDefaultStatement>();
+
+      const filesForLabels: Array<{
+        prepared: PreparedFile;
+        projectFile: ProjectFile;
+        applyLabels: boolean;
+      }> = [];
+
+      for (const prepared of preparedFiles) {
+        const existing = existingByPath.get(prepared.file.path) ?? null;
+        const localDirty = existing ? hasUnpushedLocalContent(existing) : false;
+        const remoteChanged =
+          !existing ||
+          existing.remoteContentHash == null ||
+          existing.remoteContentHash !== prepared.remoteContentHash;
+        const trueConflict = localDirty && remoteChanged;
+
+        // Preserve local Script Mode content when the user has unpushed edits
+        // and either the remote is unchanged or conflict policy keeps BranchForge.
+        let preserveLocal = false;
+        if (existing && localDirty) {
+          if (!remoteChanged) {
+            preserveLocal = true;
+          } else if (conflictResolution !== "gitlab_wins") {
+            preserveLocal = true;
+            if (conflictResolution === "manual_review" && trueConflict) {
+              conflictCount++;
+            }
           }
-          continue;
         }
-        fetchedSuccessfully = true;
-        const { file, metadata } = result.value;
-        const content = metadata.content;
-        if (!content) {
-          // Skip files with no content
-          continue;
-        }
-        anySuccess = true;
 
-        // Parse with new label-aware parser, passing filename for better detection
-        const parsed = parseRPYFileWithLabels(content, file.path);
+        let projectFile: ProjectFile;
+        let applyLabels = true;
 
-        // Strip BranchForge-managed `define`/`default` statements from
-        // the stored content. The DB is the single source of truth for
-        // those symbols, so re-exporting the project cannot produce
-        // duplicate lines that would crash Ren'Py with
-        // `NameError: name 'X' is already defined`. See issue #244.
-        const symbols = extractAndStripRpySymbols(content);
-
-        // Hash the cleaned content because that's what we store in
-        // `project_files.content`; identical source files produce
-        // identical cleaned output, so re-syncs of unchanged files are
-        // correctly detected as no-ops.
-        const contentHash = calculateContentHash(symbols.cleanedContent);
-        const [projectFile] = await tx
-          .insert(projectFiles)
-          .values({
-            projectId,
-            source: "GITLAB",
-            filePath: file.path,
-            fileType: parsed.fileType,
-            content: symbols.cleanedContent, // Store cleaned content (no define/default)
-            originalContent: content, // Preserve original for reconstruction
-            contentHash,
-            lastSyncedAt: new Date(),
-            lastCommitSha: importCommitSha,
-            // True per-file remote baseline (NEVER the branch head SHA)
-            remoteFilePath: file.path,
-            remoteBranch: branch,
-            remoteContent: content,
-            remoteContentHash: calculateContentHash(content),
-            remoteRevision: metadata.lastCommitId,
-            // Last-pushed LOCAL baseline: freshly imported content is in
-            // sync locally too.
-            lastPushedContentHash: contentHash,
-          })
-          .onConflictDoUpdate({
-            target: [
-              projectFiles.projectId,
-              projectFiles.source,
-              projectFiles.filePath,
-            ],
-            set: {
-              content: symbols.cleanedContent, // Update cleaned content on sync
-              // Only set originalContent if it's null (preserve original on subsequent syncs)
-              originalContent: sql`COALESCE(${projectFiles.originalContent}, ${content})`,
-              contentHash,
+        if (!existing) {
+          const [inserted] = await tx
+            .insert(projectFiles)
+            .values({
+              projectId,
+              source: "GITLAB",
+              filePath: prepared.file.path,
+              fileType: prepared.parsed.fileType,
+              content: prepared.cleanedContent,
+              originalContent: prepared.content,
+              contentHash: prepared.contentHash,
               lastSyncedAt: new Date(),
               lastCommitSha: importCommitSha,
-              // True per-file remote baseline (backfills legacy rows; no
-              // CREATE rows are produced, so legacy rows never appear as
-              // pending creates).
-              remoteFilePath: file.path,
+              remoteFilePath: prepared.file.path,
               remoteBranch: branch,
-              remoteContent: content,
-              remoteContentHash: calculateContentHash(content),
-              remoteRevision: metadata.lastCommitId,
-              // Reset the last-pushed LOCAL baseline on a successful pull
-              // (the remote content is now reflected locally).
-              lastPushedContentHash: contentHash,
+              remoteContent: prepared.content,
+              remoteContentHash: prepared.remoteContentHash,
+              remoteRevision: prepared.remoteRevision,
+              lastPushedContentHash: prepared.contentHash,
+              hasRemoteConflict: false,
+            })
+            .returning();
+          projectFile = inserted;
+          existingByPath.set(prepared.file.path, inserted);
+        } else if (preserveLocal) {
+          const [updated] = await tx
+            .update(projectFiles)
+            .set({
+              lastSyncedAt: new Date(),
+              lastCommitSha: importCommitSha,
+              remoteFilePath: prepared.file.path,
+              remoteBranch: branch,
+              remoteContent: prepared.content,
+              remoteContentHash: prepared.remoteContentHash,
+              remoteRevision: prepared.remoteRevision,
+              hasRemoteConflict: trueConflict,
               updatedAt: new Date(),
-            },
-          })
-          .returning();
+            })
+            .where(eq(projectFiles.id, existing.id))
+            .returning();
+          projectFile = updated;
+          applyLabels = false;
+          existingByPath.set(prepared.file.path, updated);
+        } else {
+          const [updated] = await tx
+            .update(projectFiles)
+            .set({
+              content: prepared.cleanedContent,
+              originalContent: sql`COALESCE(${projectFiles.originalContent}, ${prepared.content})`,
+              contentHash: prepared.contentHash,
+              fileType: prepared.parsed.fileType,
+              lastSyncedAt: new Date(),
+              lastCommitSha: importCommitSha,
+              remoteFilePath: prepared.file.path,
+              remoteBranch: branch,
+              remoteContent: prepared.content,
+              remoteContentHash: prepared.remoteContentHash,
+              remoteRevision: prepared.remoteRevision,
+              lastPushedContentHash: prepared.contentHash,
+              hasRemoteConflict: false,
+              updatedAt: new Date(),
+            })
+            .where(eq(projectFiles.id, existing.id))
+            .returning();
+          projectFile = updated;
+          existingByPath.set(prepared.file.path, updated);
+        }
 
-        parsedFiles.push({
-          file,
-          content,
-          cleanedContent: symbols.cleanedContent,
-          parsed,
-          projectFile,
-          symbols,
-        });
+        filesForLabels.push({ prepared, projectFile, applyLabels });
 
-        // Aggregate this file's symbols into the cross-file maps.
-        // We do this here (not in a pre-pass) so that any rollback
-        // of the surrounding transaction discards partial symbol
-        // accumulations along with the file insert.
-        for (const c of symbols.characters) {
-          if (!extractedCharactersByTag.has(c.tag))
+        for (const c of prepared.symbols.characters) {
+          if (!extractedCharactersByTag.has(c.tag)) {
             extractedCharactersByTag.set(c.tag, c);
+          }
         }
-        for (const v of symbols.variables) {
-          if (!extractedVariablesByKey.has(v.key))
+        for (const v of prepared.symbols.variables) {
+          if (!extractedVariablesByKey.has(v.key)) {
             extractedVariablesByKey.set(v.key, v);
+          }
         }
-        for (const s of symbols.stats) {
-          if (!extractedStatsByKey.has(s.key))
+        for (const s of prepared.symbols.stats) {
+          if (!extractedStatsByKey.has(s.key)) {
             extractedStatsByKey.set(s.key, s);
+          }
         }
       }
 
-      // Phase 1.5: Promote extracted `define`/`default` symbols
-      // into the database. The DB is the single source of truth
-      // for those symbols, so re-exporting the project cannot
-      // produce duplicate lines that would crash Ren'Py with
-      // `NameError: name 'X' is already defined`. We use
-      // `onConflictDoNothing` so re-syncs of unchanged files are
-      // no-ops and the user's later UI edits to the DB rows are
-      // preserved. See issue #244.
       const dedupedCharacters = Array.from(extractedCharactersByTag.values());
       const dedupedVariables = Array.from(extractedVariablesByKey.values());
       const dedupedStats = Array.from(extractedStatsByKey.values());
 
-      if (
-        dedupedCharacters.length > 0 ||
-        dedupedVariables.length > 0 ||
-        dedupedStats.length > 0
-      ) {
-        for (const c of dedupedCharacters) {
-          await tx
-            .insert(characters)
-            .values({
-              projectId,
-              name: c.name ?? c.tag,
-              displayName: c.name ?? c.tag,
-              renpyTag: c.tag,
-              color: c.color || "#cfcfcf",
-              updatedAt: new Date(),
-            })
-            .onConflictDoNothing({
-              target: [characters.projectId, characters.renpyTag],
-            });
+      for (const c of dedupedCharacters) {
+        await tx
+          .insert(characters)
+          .values({
+            projectId,
+            name: c.name ?? c.tag,
+            displayName: c.name ?? c.tag,
+            renpyTag: c.tag,
+            color: c.color || "#cfcfcf",
+            updatedAt: new Date(),
+          })
+          .onConflictDoNothing({
+            target: [characters.projectId, characters.renpyTag],
+          });
+      }
+      for (const v of dedupedVariables) {
+        await tx
+          .insert(variables)
+          .values({
+            projectId,
+            key: v.key,
+          })
+          .onConflictDoNothing({
+            target: [variables.projectId, variables.key],
+          });
+      }
+      for (const s of dedupedStats) {
+        const minValue = Math.round(Number.parseFloat(s.value)) || 0;
+        await tx
+          .insert(stats)
+          .values({
+            projectId,
+            key: s.key,
+            name: s.key,
+            minValue,
+            maxValue: 100,
+            updatedAt: new Date(),
+          })
+          .onConflictDoNothing({
+            target: [stats.projectId, stats.key],
+          });
+      }
+
+      // Speaker linking must see symbols promoted in this same transaction.
+      const charactersByTag = await fetchCharactersByTag(tx, projectId);
+
+      for (const { prepared, projectFile, applyLabels } of filesForLabels) {
+        if (!applyLabels || prepared.parsed.fileType !== "STORY") {
+          continue;
         }
-        for (const v of dedupedVariables) {
-          await tx
-            .insert(variables)
-            .values({
-              projectId,
-              key: v.key,
-            })
-            .onConflictDoNothing({
-              target: [variables.projectId, variables.key],
-            });
+
+        const fileScenes = await tx
+          .select()
+          .from(labels)
+          .where(eq(labels.projectFileId, projectFile.id));
+
+        const scenesByLabel = new Map<string, (typeof fileScenes)[0]>();
+        for (const scene of fileScenes) {
+          if (scene.labelName) {
+            scenesByLabel.set(scene.labelName, scene);
+          }
         }
-        for (const s of dedupedStats) {
-          // `default x = 0` becomes a stat with minValue=0 and the
-          // default maxValue of 100; users can adjust in the UI.
-          // Use parseFloat + round so that float values like 3.5
-          // are preserved (parseInt would silently truncate to 3).
-          const minValue = Math.round(Number.parseFloat(s.value)) || 0;
-          await tx
-            .insert(stats)
-            .values({
-              projectId,
-              key: s.key,
-              name: s.key,
-              minValue,
-              maxValue: 100,
-              updatedAt: new Date(),
-            })
-            .onConflictDoNothing({
-              target: [stats.projectId, stats.key],
-            });
+
+        for (let i = 0; i < prepared.parsed.labels.length; i++) {
+          const label = prepared.parsed.labels[i];
+          const existingScene = scenesByLabel.get(label.label);
+          const labelData = convertToBranchForgeFormatFromLabels(
+            prepared.parsed,
+            label.label,
+            prepared.content
+          );
+          const labelContentHash = calculateLinesHash(labelData.entries);
+
+          if (existingScene && existingScene.deletedAt) {
+            await tx
+              .delete(labelLines)
+              .where(eq(labelLines.labelId, existingScene.id));
+
+            const allValues = mapEntriesToLabelLineValues(
+              labelData.entries,
+              existingScene.id,
+              projectFile.id,
+              charactersByTag
+            );
+            if (allValues.length > 0) {
+              await tx.insert(labelLines).values(allValues);
+            }
+
+            await tx
+              .update(labels)
+              .set({
+                contentHash: labelContentHash,
+                lastSyncedHash: labelContentHash,
+                syncStatus: "SYNCED",
+                lastImportedAt: new Date(),
+                importCommitSha,
+                updatedAt: new Date(),
+                deletedAt: null,
+              })
+              .where(eq(labels.id, existingScene.id));
+          } else if (existingScene && !existingScene.deletedAt) {
+            // Accepted remote file content: overwrite labels to match Script Mode.
+            await tx
+              .delete(labelLines)
+              .where(eq(labelLines.labelId, existingScene.id));
+
+            const allValues = mapEntriesToLabelLineValues(
+              labelData.entries,
+              existingScene.id,
+              projectFile.id,
+              charactersByTag
+            );
+            if (allValues.length > 0) {
+              await tx.insert(labelLines).values(allValues);
+            }
+
+            await tx
+              .update(labels)
+              .set({
+                contentHash: labelContentHash,
+                lastSyncedHash: labelContentHash,
+                syncStatus: "SYNCED",
+                lastImportedAt: new Date(),
+                importCommitSha,
+                updatedAt: new Date(),
+              })
+              .where(eq(labels.id, existingScene.id));
+          } else {
+            const [newScene] = await tx
+              .insert(labels)
+              .values({
+                projectId,
+                title: label.label,
+                projectFileId: projectFile.id,
+                labelName: label.label,
+                labelPosition: i,
+                sequenceOrder: i,
+                route: null,
+                labelNumber: i + 1,
+                status: "DRAFT",
+                conditions: {},
+                effects: {},
+                contentHash: labelContentHash,
+                lastSyncedHash: labelContentHash,
+                syncStatus: "SYNCED",
+                lastImportedAt: new Date(),
+                importCommitSha,
+              })
+              .returning();
+
+            const allValues = mapEntriesToLabelLineValues(
+              labelData.entries,
+              newScene.id,
+              projectFile.id,
+              charactersByTag
+            );
+            if (allValues.length > 0) {
+              await tx.insert(labelLines).values(allValues);
+            }
+          }
         }
       }
+
+      const allProjectLabels = await tx
+        .select({ id: labels.id })
+        .from(labels)
+        .where(and(eq(labels.projectId, projectId), isNull(labels.deletedAt)));
+      const allLabelIds = allProjectLabels.map((l) => l.id);
+      await updateIncomingJumpsForLabels(tx, allLabelIds, projectId);
     });
 
-    // Phase 2: Collect detected characters for return value
-    // Note: We don't import them here - let the frontend call detectCharacters
-    // after the sync, which will parse from project_files.content and show
-    // the import wizard for NEW characters only.
-    //
-    // The rpy-parser only extracts a narrow {tag, name, color} shape; we
-    // don't have the form info to classify, so we default to "literal" —
-    // the wizard's "new characters" view lets the user override anyway.
+    // Collect detected characters for return value (wizard still handles import).
     const allDetected: DetectedCharacter[] = [];
-    for (const { parsed } of parsedFiles) {
+    for (const prepared of preparedFiles) {
       allDetected.push(
-        ...parsed.characters.map((c) => ({
+        ...prepared.parsed.characters.map((c) => ({
           tag: c.tag,
           name: c.name || null,
           displayName: c.name || c.tag,
@@ -557,7 +725,6 @@ export async function importFromGitlab(
       );
     }
 
-    // Deduplicate by tag, excluding special tags
     const seenTags = new Set<string>();
     const uniqueCharacters: DetectedCharacter[] = [];
     for (const char of allDetected) {
@@ -566,292 +733,19 @@ export async function importFromGitlab(
         uniqueCharacters.push(char);
       }
     }
-
-    // Set detectedCharacters for return value (for backwards compatibility)
     detectedCharacters = uniqueCharacters;
 
-    // Phase 3: Process parsed files to create labels
-    // Fetch existing characters for speaker linking (will be empty if none imported yet)
-    const charactersByTag = await fetchCharactersByTag(db, projectId);
+    await updateSyncOperation(operation.id, {
+      status: "COMPLETED",
+      conflictCount,
+    });
 
-    // Process each file in its own transaction to avoid long-lived locks
-    // Wrap each transaction in try-catch so individual file failures don't
-    // abort the whole import — earlier files that already committed are preserved.
-    const fileProcessingFailures: Array<{
-      projectFileId: string;
-      error: string;
-    }> = [];
-
-    for (const { parsed, projectFile, content } of parsedFiles) {
-      try {
-        await db.transaction(async (tx) => {
-          // For STORY files, import labels as scenes
-          if (parsed.fileType === "STORY") {
-            // Fetch all scenes for this file once to avoid N+1 queries
-            // Include soft-deleted rows so the revive path can clear deletedAt
-            const fileScenes = await tx
-              .select()
-              .from(labels)
-              .where(eq(labels.projectFileId, projectFile.id));
-
-            // Build a Map keyed by labelName for O(1) lookups
-            const scenesByLabel = new Map<string, (typeof fileScenes)[0]>();
-            for (const scene of fileScenes) {
-              if (scene.labelName) {
-                scenesByLabel.set(scene.labelName, scene);
-              }
-            }
-
-            for (let i = 0; i < parsed.labels.length; i++) {
-              const label = parsed.labels[i];
-
-              // Check if scene already exists for this file+label (Map lookup)
-              const existingScene = scenesByLabel.get(label.label);
-
-              const labelData = convertToBranchForgeFormatFromLabels(
-                parsed,
-                label.label,
-                content
-              );
-
-              // Calculate content hash for the label's lines
-              const contentHash = calculateLinesHash(labelData.entries);
-
-              if (existingScene && existingScene.deletedAt) {
-                // Scene exists but is soft-deleted - revive it (update lines and clear deletedAt)
-                await tx
-                  .delete(labelLines)
-                  .where(eq(labelLines.labelId, existingScene.id));
-
-                const allValues = mapEntriesToLabelLineValues(
-                  labelData.entries,
-                  existingScene.id,
-                  projectFile.id,
-                  charactersByTag
-                );
-
-                if (allValues.length > 0) {
-                  await tx.insert(labelLines).values(allValues);
-                }
-
-                // Revive the soft-deleted label
-                await tx
-                  .update(labels)
-                  .set({
-                    contentHash,
-                    lastSyncedHash: contentHash,
-                    syncStatus: "SYNCED",
-                    lastImportedAt: new Date(),
-                    importCommitSha,
-                    updatedAt: new Date(),
-                    deletedAt: null,
-                  })
-                  .where(eq(labels.id, existingScene.id));
-              } else if (existingScene && !existingScene.deletedAt) {
-                // Scene exists and is active - apply conflict resolution
-                if (conflictResolution === "manual_review") {
-                  // Only count as a conflict if the content has actually changed
-                  if (
-                    existingScene.contentHash !== contentHash &&
-                    existingScene.lastSyncedHash !== contentHash
-                  ) {
-                    conflictCount++;
-                  }
-                } else if (conflictResolution === "gitlab_wins") {
-                  // Update existing scene
-                  await tx
-                    .delete(labelLines)
-                    .where(eq(labelLines.labelId, existingScene.id));
-
-                  const allValues = mapEntriesToLabelLineValues(
-                    labelData.entries,
-                    existingScene.id,
-                    projectFile.id,
-                    charactersByTag
-                  );
-
-                  if (allValues.length > 0) {
-                    await tx.insert(labelLines).values(allValues);
-                  }
-
-                  // Update label metadata
-                  await tx
-                    .update(labels)
-                    .set({
-                      contentHash,
-                      lastSyncedHash: contentHash,
-                      syncStatus: "SYNCED",
-                      lastImportedAt: new Date(),
-                      importCommitSha,
-                      updatedAt: new Date(),
-                    })
-                    .where(eq(labels.id, existingScene.id));
-                }
-                // If branchforge_wins, do nothing (keep local data)
-              } else {
-                // Scene doesn't exist - create new scene
-                const [newScene] = await tx
-                  .insert(labels)
-                  .values({
-                    projectId,
-                    title: label.label,
-                    projectFileId: projectFile.id,
-                    labelName: label.label,
-                    labelPosition: i,
-                    sequenceOrder: i,
-                    route: null, // User will assign route later
-                    labelNumber: i + 1,
-                    status: "DRAFT",
-                    conditions: {},
-                    effects: {},
-                    // Sync fields
-                    contentHash,
-                    lastSyncedHash: contentHash,
-                    syncStatus: "SYNCED",
-                    lastImportedAt: new Date(),
-                    importCommitSha,
-                  })
-                  .returning();
-
-                const allValues = mapEntriesToLabelLineValues(
-                  labelData.entries,
-                  newScene.id,
-                  projectFile.id,
-                  charactersByTag
-                );
-
-                if (allValues.length > 0) {
-                  await tx.insert(labelLines).values(allValues);
-                }
-              }
-            }
-          }
-        });
-      } catch (fileError) {
-        const errorMessage =
-          fileError instanceof Error ? fileError.message : String(fileError);
-        logErrorShared("gitlab_sync.file_import_failed", {
-          projectId,
-          projectFileId: projectFile.id,
-          error: errorMessage,
-        });
-        fileProcessingFailures.push({
-          projectFileId: projectFile.id,
-          error: errorMessage,
-        });
-      }
-    }
-
-    // If all file fetches failed, mark operation as failed and skip
-    // the incomingJumps sweep (no new labels to compute for).
-    // Blockade: distinguish rejected fetches from successfully-fetched
-    // files that happened to be empty.
-    if (!anySuccess && rpyFiles.length > 0) {
-      let errorMessage: string;
-      if (!fetchedSuccessfully) {
-        // Every file fetch rejected — use the captured error.
-        errorMessage = firstError?.message || "All file fetches failed";
-      } else {
-        // Some (or all) files were fetched successfully but none contained
-        // importable content (e.g. all were empty).
-        errorMessage =
-          "No importable content found in the fetched files. Each file was either empty or contained only whitespace.";
-      }
-      await updateSyncOperation(operation.id, {
-        status: "FAILED",
-        errorMessage,
-      });
-
-      return {
-        ...operation,
-        status: "FAILED",
-        errorMessage,
-      };
-    }
-
-    // Compute incomingJumps for all labels in the project after import.
-    // This must happen after all files are processed so cross-file jumps are captured.
-    // Wrapped in try/catch so a recompute failure does not invalidate per-file
-    // transactions that have already committed.
-    try {
-      await db.transaction(async (tx) => {
-        const allProjectLabels = await tx
-          .select({ id: labels.id })
-          .from(labels)
-          .where(
-            and(eq(labels.projectId, projectId), isNull(labels.deletedAt))
-          );
-        const allLabelIds = allProjectLabels.map((l) => l.id);
-        await updateIncomingJumpsForLabels(tx, allLabelIds, projectId);
-      });
-    } catch (recomputeError) {
-      logErrorShared("gitlab_sync.incoming_jumps_recompute_failed", {
-        projectId,
-        error:
-          recomputeError instanceof Error
-            ? recomputeError.message
-            : String(recomputeError),
-      });
-    }
-
-    // Determine final status based on file processing failures
-    const successfulFiles = parsedFiles.length - fileProcessingFailures.length;
-    const totalFiles = parsedFiles.length;
-
-    if (fileProcessingFailures.length === 0) {
-      // All files processed successfully
-      await updateSyncOperation(operation.id, {
-        status: "COMPLETED",
-        conflictCount,
-      });
-
-      return {
-        ...operation,
-        status: "COMPLETED",
-        conflictCount,
-        detectedCharacters,
-      };
-    } else if (successfulFiles === 0) {
-      // Every file failed during processing
-      const errorMessage = `All ${totalFiles} file(s) failed during import`;
-      await updateSyncOperation(operation.id, {
-        status: "FAILED",
-        errorMessage,
-      });
-
-      return {
-        ...operation,
-        status: "FAILED",
-        errorMessage,
-        detectedCharacters,
-      };
-    } else {
-      // Partial success: some files succeeded, some failed.
-      // Do not leak internal projectFileId values into the
-      // client-facing errorMessage; log them server-side instead.
-      const errorMessage =
-        `${successfulFiles}/${totalFiles} file(s) imported successfully. ` +
-        `${fileProcessingFailures.length} file(s) were skipped due to errors.`;
-      logWarn("gitlab_sync.partial_import", {
-        projectId,
-        successfulFiles,
-        totalFiles,
-        failures: fileProcessingFailures,
-      });
-      await updateSyncOperation(operation.id, {
-        status: "COMPLETED",
-        conflictCount,
-        errorMessage,
-      });
-
-      return {
-        ...operation,
-        status: "COMPLETED",
-        conflictCount,
-        errorMessage,
-        detectedCharacters,
-      };
-    }
+    return {
+      ...operation,
+      status: "COMPLETED",
+      conflictCount,
+      detectedCharacters,
+    };
   } catch (error) {
     // Mark operation as failed
     const errorMessage =

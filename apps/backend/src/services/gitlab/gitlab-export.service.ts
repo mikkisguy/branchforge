@@ -66,6 +66,7 @@ import { validateGitLabUrl } from "../encryption.service.js";
 import { getDecryptedToken } from "./gitlab-integration.service.js";
 import { requireProjectOwnership } from "../authz.service.js";
 import { lockProject } from "../project-files-operations.service.js";
+import { localContentBaselineHash } from "../project-file-baseline.js";
 import { logWarn } from "../../lib/logger.js";
 import { NotFoundError } from "../../middleware/error-handler.middleware.js";
 import type { Transaction } from "../../db/types.js";
@@ -97,19 +98,6 @@ interface ExportPlan {
   operations: PlannedOperation[];
   /** Active files whose content was pushed as a plain update (no pending op). */
   contentUpdatedFiles: Array<{ file: ProjectFileRow; content: string }>;
-}
-
-/** Last-pushed LOCAL baseline for a file, falling back to import-time content. */
-function localBaselineHash(file: {
-  lastPushedContentHash: string | null;
-  originalContent: string | null;
-}): string | null {
-  if (file.lastPushedContentHash) return file.lastPushedContentHash;
-  if (!file.originalContent) return null;
-  const cleaned = extractAndStripRpySymbols(
-    file.originalContent
-  ).cleanedContent;
-  return calculateContentHash(cleaned);
 }
 
 function buildPlannedActions(
@@ -174,7 +162,7 @@ function buildPlannedActions(
   for (const file of files) {
     if (file.deletedAt) continue;
     if (opsByFileId.has(file.id)) continue;
-    const baseline = localBaselineHash(file);
+    const baseline = localContentBaselineHash(file);
     if (baseline === null || baseline === file.contentHash) continue;
     actions.push({
       action: "update",
