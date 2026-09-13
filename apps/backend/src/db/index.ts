@@ -110,8 +110,10 @@ export async function checkDatabaseReady(
       return false;
     }
 
-    const client = await Promise.race([
-      pool.connect(),
+    // Use pool.query so timed-out work is owned by the pool, not a
+    // checked-out client that Promise.race might abandon.
+    await Promise.race([
+      pool.query("SELECT 1"),
       new Promise<never>((_, reject) => {
         setTimeout(
           () => reject(new Error("database readiness timeout")),
@@ -119,21 +121,7 @@ export async function checkDatabaseReady(
         );
       }),
     ]);
-
-    try {
-      await Promise.race([
-        client.query("SELECT 1"),
-        new Promise<never>((_, reject) => {
-          setTimeout(
-            () => reject(new Error("database readiness timeout")),
-            timeoutMs
-          );
-        }),
-      ]);
-      return true;
-    } finally {
-      client.release();
-    }
+    return true;
   } catch (error) {
     logError(
       LogEventType.DB_CONNECTION_ERROR,

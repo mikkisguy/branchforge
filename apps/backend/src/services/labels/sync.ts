@@ -1051,58 +1051,38 @@ export async function syncLabelsFromFile(
     // Step 3: Validate RPY content
     validateRPYContent(rpyContent, parsed);
 
-    // Step 4: Execute sync in atomic transaction
-    // If an external transaction is provided, use it directly; otherwise create a new one
-    const syncResult = await (externalTx
-      ? syncLabelsInTransaction(
-          dbOrTx as Transaction,
-          projectId,
-          parsed,
-          rpyContent,
-          sourceId,
-          skipCleanup
-        )
-      : dbOrTx.transaction((tx: Transaction) =>
-          syncLabelsInTransaction(
-            tx,
-            projectId,
-            parsed,
-            rpyContent,
-            sourceId,
-            skipCleanup
-          )
-        ));
-
-    // Partial per-label failures must not leave callers with a committed file
-    // content update. When running inside an external transaction, throw so
-    // the caller's transaction rolls back. Standalone callers get success:false.
-    if (syncResult.errors.length > 0) {
-      logError(LogEventType.SERVICE_ERROR, {
-        event: "labels.sync_partial_failure",
+    // Step 4: Execute sync in atomic transaction.
+    // Partial per-label failures must roll back — throw inside the transaction
+    // (standalone or external) so successful sibling labels cannot commit alone.
+    const runSync = async (tx: Transaction) => {
+      const syncResult = await syncLabelsInTransaction(
+        tx,
         projectId,
+        parsed,
+        rpyContent,
         sourceId,
-        errorCount: syncResult.errors.length,
-        errors: syncResult.errors,
-      });
+        skipCleanup
+      );
 
-      if (externalTx) {
+      if (syncResult.errors.length > 0) {
+        logError(LogEventType.SERVICE_ERROR, {
+          event: "labels.sync_partial_failure",
+          projectId,
+          sourceId,
+          errorCount: syncResult.errors.length,
+          errors: syncResult.errors,
+        });
         throw new ValidationError(
           `Label sync failed with ${syncResult.errors.length} error(s)`
         );
       }
 
-      return {
-        success: false,
-        labelsCreated: syncResult.labelsCreated,
-        labelsUpdated: syncResult.labelsUpdated,
-        labelsDeleted: syncResult.labelsDeleted,
-        linesProcessed: syncResult.linesProcessed,
-        errors: syncResult.errors,
-        skipped: false,
-        affectedLabelIds: syncResult.affectedLabelIds,
-        dbLabelCount: syncResult.dbLabelCount,
-      };
-    }
+      return syncResult;
+    };
+
+    const syncResult = await (externalTx
+      ? runSync(dbOrTx as Transaction)
+      : dbOrTx.transaction((tx: Transaction) => runSync(tx)));
 
     // Return success
     return {

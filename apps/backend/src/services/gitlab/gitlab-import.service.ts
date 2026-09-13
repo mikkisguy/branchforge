@@ -516,6 +516,12 @@ export async function importFromGitlab(
 
         filesForLabels.push({ prepared, projectFile, applyLabels });
 
+        // Only promote symbols from files whose content we accepted. Preserving
+        // local Script Mode content must not import remote define/default rows.
+        if (!applyLabels) {
+          continue;
+        }
+
         for (const c of prepared.symbols.characters) {
           if (!extractedCharactersByTag.has(c.tag)) {
             extractedCharactersByTag.set(c.tag, c);
