@@ -730,6 +730,13 @@ async function applyFileUpdate(
           )
         : undefined;
 
+    // Belt-and-suspenders: never commit a file write with partial label sync.
+    if (syncResultForFile && syncResultForFile.errors.length > 0) {
+      throw new ValidationError(
+        `Label sync failed with ${syncResultForFile.errors.length} error(s)`
+      );
+    }
+
     // When file type transitions away from STORY, soft-delete existing labels
     let deletedCount = 0;
 

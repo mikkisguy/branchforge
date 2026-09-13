@@ -39,6 +39,7 @@ import {
   validateFileType,
 } from "../labels.service.js";
 import { parseRPYFileWithLabels } from "../rpy-parser.service.js";
+import * as labelLineMapper from "../label-line-mapper.js";
 import { calculateContentHash } from "../../lib/hash.js";
 import { testEmail, testUuid } from "../../utils/test-ids.js";
 
@@ -109,6 +110,7 @@ describe("LabelsService Sync (Integration)", () => {
   }
 
   beforeEach(async () => {
+    vi.restoreAllMocks();
     vi.clearAllMocks();
     await cleanupTestData();
     await setupTestData();
@@ -401,6 +403,36 @@ describe("LabelsService Sync (Integration)", () => {
 
       expect(result.success).toBe(false);
       expect(result.errors[0].error).toContain("No labels found");
+    });
+
+    it("throws and rolls back when external tx sees per-label sync errors (H3)", async () => {
+      const content = 'label start:\n    "Hello"\n    return';
+      vi.spyOn(labelLineMapper, "mapEntryToDbType").mockImplementation(() => {
+        throw new Error("forced per-label failure");
+      });
+
+      await expect(
+        db.transaction(async (tx) => {
+          await syncLabelsFromFile(
+            testProjectId,
+            { filePath: testFile.filePath, fileType: testFile.fileType },
+            content,
+            testFileId,
+            { skipCleanup: false, tx }
+          );
+        })
+      ).rejects.toThrow(/Label sync failed/);
+
+      const labels = await db
+        .select()
+        .from(labelsTable)
+        .where(
+          and(
+            eq(labelsTable.projectFileId, testFileId),
+            isNull(labelsTable.deletedAt)
+          )
+        );
+      expect(labels).toHaveLength(0);
     });
 
     it("should return error for duplicate labels", async () => {
