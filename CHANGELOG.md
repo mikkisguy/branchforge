@@ -4,6 +4,13 @@ All notable changes to BranchForge will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v1.0.0-beta.4 - 2026-09-13
+
+- Added project file management in Write and Script modes, including creating, renaming, moving, and deleting Ren'Py files.
+- Fixed several bugs and made other small changes in frontend for stable v1 release
+- Moved project file import and export controls into the project menu.
+- Fixed several bugs and made other small changes in backend for stable v1 release
+
 ## v1.0.0-beta.3 - 2026-09-08
 
 - Overhauled the UI and introduced a unified workspace
