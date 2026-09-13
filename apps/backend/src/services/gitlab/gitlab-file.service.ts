@@ -11,13 +11,10 @@ import { eq, and, inArray, isNull } from "drizzle-orm";
 import { validateGitLabUrl } from "../encryption.service.js";
 import {
   NotFoundError,
-  ConflictError,
   RepositoryNotLinkedError,
 } from "../../middleware/error-handler.middleware.js";
 import { requireProjectOwnership } from "../authz.service.js";
-import { syncLabelsFromGitLabFile } from "../labels.service.js";
-import { calculateContentHash } from "../../lib/hash.js";
-import { logError, logWarn, LogEventType } from "../../lib/logger.js";
+import { logError, LogEventType } from "../../lib/logger.js";
 import { getDecryptedToken } from "./gitlab-integration.service.js";
 import {
   getRepositoryLink,
@@ -368,98 +365,3 @@ export async function getGitLabFilesWithScenes(
   return filesWithScenes;
 }
 
-/**
- * Update GitLab file content and sync labels
- *
- * Updates file content (Script Mode editing) and re-parses the content to
- * update associated scenes using syncLabelsFromGitLabFile.
- *
- * @param fileId - The file ID to update
- * @param content - The new file content
- * @param userId - The user ID making the update
- * @returns Update result with sync statistics
- * @throws NotFoundError if file not found
- * @throws ForbiddenError if user lacks access
- * @throws ConflictError if sync is already in progress
- */
-export async function updateGitLabFileContent(
-  fileId: string,
-  content: string,
-  userId: string
-): Promise<{
-  success: boolean;
-  sync: {
-    skipped: boolean;
-    scenesCreated: number;
-    scenesUpdated: number;
-    scenesDeleted: number;
-    linesProcessed: number;
-    errors: Array<{ label: string; error: string }>;
-  };
-}> {
-  const db = getDb();
-
-  // Get file to check project access (tombstoned files are not mutable)
-  const [file] = await db
-    .select()
-    .from(projectFiles)
-    .where(and(eq(projectFiles.id, fileId), isNull(projectFiles.deletedAt)))
-    .limit(1);
-
-  if (!file) {
-    throw new NotFoundError("File");
-  }
-
-  // Guard: only GitLab-sourced files can be updated via this helper
-  if (file.source !== "GITLAB") {
-    throw new NotFoundError("File");
-  }
-
-  // Verify user owns the project
-  await requireProjectOwnership(file.projectId, userId);
-
-  const syncResult = await syncLabelsFromGitLabFile(fileId, content);
-
-  if (!syncResult.success && syncResult.errors.length > 0) {
-    // Check if it's a concurrent sync error
-    const concurrentError = syncResult.errors.find((e) =>
-      e.error.includes("already in progress")
-    );
-
-    if (concurrentError) {
-      throw new ConflictError(concurrentError.error);
-    }
-
-    // Other sync errors - log but still return success for file update
-    logWarn("gitlab.scene_sync_errors", {
-      projectId: file.projectId,
-      fileId,
-      errors: syncResult.errors,
-    });
-  }
-
-  // Update file content and hash (syncLabelsFromGitLabFile also updates
-  // contentHash in a best-effort manner, but we set it here as a safety net
-  // in case that update was swallowed by its internal error handling)
-  await db
-    .update(projectFiles)
-    .set({
-      content,
-      contentHash: calculateContentHash(content),
-      updatedAt: new Date(),
-    })
-    .where(eq(projectFiles.id, fileId));
-
-  // Return success with sync details
-  return {
-    success: true,
-    sync: {
-      skipped: syncResult.skipped,
-      scenesCreated: syncResult.labelsCreated,
-      scenesUpdated: syncResult.labelsUpdated,
-      scenesDeleted: syncResult.labelsDeleted,
-      linesProcessed: syncResult.linesProcessed,
-      errors: syncResult.errors,
-    },
-  };
-}

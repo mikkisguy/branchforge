@@ -74,7 +74,6 @@ vi.mock("../../services/gitlab.service.js", () => ({
   listRpyFiles: vi.fn(),
   importProjectFromGitLab: vi.fn(),
   getGitLabFilesWithScenes: vi.fn(),
-  updateGitLabFileContent: vi.fn(),
 }));
 
 vi.mock("../../services/gitlab-sync.service.js", () => ({
@@ -471,6 +470,20 @@ describe("GitLab Routes (Integration)", () => {
       });
 
       expect(response.statusCode).toBe(400);
+    });
+  });
+
+  describe("PUT /api/gitlab/files/:fileId", () => {
+    it("does not expose the removed legacy file-save endpoint", async () => {
+      const response = await fastify.inject({
+        method: "PUT",
+        url: `/api/gitlab/files/${testProjectId}`,
+        payload: {
+          content: 'label start:\n    "Updated"',
+        },
+      });
+
+      expect(response.statusCode).toBe(404);
     });
   });
 

@@ -476,19 +476,6 @@ export const gitlabApi = {
   },
 
   /**
-   * Update GitLab file content (Script Mode)
-   */
-  async updateGitLabFile(
-    fileId: string,
-    content: string
-  ): Promise<{ success: boolean }> {
-    return request<{ success: boolean }>(`/gitlab/files/${fileId}`, {
-      method: "PUT",
-      body: JSON.stringify({ content }),
-    });
-  },
-
-  /**
    * Export scenes to GitLab
    */
   async exportToGitlab(
