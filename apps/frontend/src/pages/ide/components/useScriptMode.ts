@@ -195,6 +195,7 @@ export function useScriptMode({ projectId }: { projectId?: string }) {
         return;
       }
       pendingSelectionIdRef.current = null;
+      // react-doctor-disable-next-line react-doctor/no-set-state-after-await-in-effect -- the unmount and operation-identity guards above reject stale completions
       setGeneratedPreview(null);
     })();
   }, [pendingSelectFileId, projectFiles, selectFileTab]);

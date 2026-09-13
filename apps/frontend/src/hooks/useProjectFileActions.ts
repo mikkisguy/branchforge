@@ -124,6 +124,7 @@ export function useProjectFileActions({
   const projectIdRef = useRef(projectId);
   useEffect(() => {
     projectIdRef.current = projectId;
+    // react-doctor-disable-next-line react-doctor/no-adjust-state-on-prop-change -- project switches must close a dialog bound to the previous project's file
     setPendingAction(null);
   }, [projectId]);
 

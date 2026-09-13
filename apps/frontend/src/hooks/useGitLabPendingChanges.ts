@@ -80,6 +80,7 @@ export function useGitLabPendingChanges(
     [queryClient]
   );
 
+  // react-doctor-disable-next-line react-doctor/query-mutation-missing-invalidation -- onSuccess calls refreshCaches for every affected query family
   const reverseMutation = useMutation({
     mutationFn: async ({
       operationProjectId,
@@ -95,6 +96,7 @@ export function useGitLabPendingChanges(
     },
   });
 
+  // react-doctor-disable-next-line react-doctor/query-mutation-missing-invalidation -- onSuccess calls refreshCaches for every affected query family
   const discardAllMutation = useMutation({
     mutationFn: async (operationProjectId: string) => {
       await gitlabApi.discardAllPendingChanges(operationProjectId);
