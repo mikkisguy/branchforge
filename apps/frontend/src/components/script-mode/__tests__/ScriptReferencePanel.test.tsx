@@ -268,6 +268,8 @@ describe("ScriptReferencePanel - Characters Section", () => {
     expect(
       within(variablesSection).getByText("null_category")
     ).toBeInTheDocument();
-    expect(within(variablesSection).getByText("story_flag")).toBeInTheDocument();
+    expect(
+      within(variablesSection).getByText("story_flag")
+    ).toBeInTheDocument();
   });
 });
