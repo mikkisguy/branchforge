@@ -106,6 +106,6 @@ jobs:
         run: pnpm --filter @branchforge/shared build
 
       - name: Run frontend tests
-        run: cd apps/frontend && pnpm test
+        run: cd apps/frontend && pnpm test:unit
         # Note: the docs site build is covered by build-verification, since
         # `pnpm build` now includes @branchforge/docs via the apps/* filter.
