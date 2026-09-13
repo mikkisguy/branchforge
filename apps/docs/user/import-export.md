@@ -8,7 +8,7 @@ BranchForge supports importing existing Ren'Py projects and exporting your work 
 
 ## Zip Import
 
-[screenshot of import dialog]
+<!-- screenshot: import-dialog.png — Zip import dialog, light theme -->
 
 Import a Ren'Py project as a ZIP archive:
 
@@ -34,7 +34,7 @@ The importer parses your RPY files and extracts:
 
 ## Zip Export
 
-[screenshot of export dialog]
+<!-- screenshot: export-dialog.png — Export dialog, dark theme -->
 
 Export your project as a Ren'Py-compatible ZIP:
 
@@ -47,7 +47,7 @@ The ZIP contains RPY files ready to drop into a Ren'Py project, including any `.
 
 ## GitLab Sync
 
-[screenshot of GitLab sync configuration]
+<!-- screenshot: gitlab-sync.png — GitLab sync settings (redact token), dark theme -->
 
 BranchForge syncs directly with GitLab repositories:
 
@@ -74,14 +74,19 @@ remote file structure in one operation. Pulling is paused only while one of
 these structural changes is pending; ordinary autosaved edits do not block a
 pull.
 
-### Conflict Detection
+### Conflict Detection (read-only review)
 
-If GitLab has changes that conflict with your local work, BranchForge will detect this and show you the conflicts. You can:
+If GitLab has changes that conflict with your local work, BranchForge detects
+them and shows a read-only conflict review. You can compare versions side by
+side, but **Apply is not available in this beta** — resolve conflicts in
+GitLab or locally, then pull again.
 
-- Accept the remote version
-- Keep your local version
-- Manually merge
+::: warning
+GitLab conflict review is inspect-only. Do not expect in-app resolution to
+write files back to your repository.
+:::
 
 ::: tip
-We recommend pulling before pushing to minimize conflicts, especially when collaborating with others.
+Pull before pushing to minimize conflicts, especially when collaborating with
+others.
 :::

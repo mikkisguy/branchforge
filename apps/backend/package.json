@@ -24,6 +24,7 @@
     "db:reset:test": "dotenv -e ../../.env -- tsx scripts/reset-test-db.ts",
     "db:seed:tech-badges": "dotenv -e ../../.env -- tsx scripts/seed-technical-badges.ts",
     "db:seed:flow-perf": "dotenv -e ../../.env -- tsx scripts/seed-flow-perf.ts",
+    "db:seed:docs-demo": "dotenv -e ../../.env -- tsx scripts/seed-docs-demo.ts",
     "db:reset:tech-badges": "dotenv -e ../../.env -- tsx scripts/reset-tech-badges-test-data.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",

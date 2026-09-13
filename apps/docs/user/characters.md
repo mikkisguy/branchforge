@@ -8,7 +8,7 @@ BranchForge helps you manage characters and track narrative state.
 
 ## Character Management
 
-[screenshot of character list]
+<!-- screenshot: character-list.png — Character list with Elena and Marcus, dark theme -->
 
 Characters are automatically detected from your script when you import RPY files. You can also create them manually.
 
@@ -29,7 +29,7 @@ When importing RPY files, BranchForge scans for character definitions and create
 
 ### Dialogue Linking
 
-[screenshot of dialogue linking]
+<!-- screenshot: dialogue-linking.png — Elena dialogue line list, dark theme -->
 
 Click on any character to see all their dialogue lines. Click on a line to jump to it in Write Mode.
 
@@ -37,7 +37,7 @@ Click on any character to see all their dialogue lines. Click on a line to jump 
 
 Variables track boolean flags in your narrative:
 
-[screenshot of variables list]
+<!-- screenshot: variables-list.png — Variables panel, dark theme, docs demo -->
 
 - Create variables with custom names
 - Set initial values (true/false)
@@ -56,7 +56,7 @@ $ hero_entered_cave = True
 
 Stats track numeric values with ranges:
 
-[screenshot of stats list]
+<!-- screenshot: stats-list.png — Stats panel with trust stat, dark theme -->
 
 - Name and description
 - Min and max values

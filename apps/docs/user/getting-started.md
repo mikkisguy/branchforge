@@ -15,7 +15,7 @@ For either path, you will need:
 
 For local development (pnpm path), you will also need:
 
-- PostgreSQL 14+
+- PostgreSQL 18 (Docker Compose uses `postgres:18-alpine`)
 
 ## Quick Start with Docker (Recommended)
 
@@ -72,11 +72,21 @@ cp .env.example .env
 Make sure your PostgreSQL database is running and accessible via the `DATABASE_URL` you configure.
 :::
 
-Run database migrations:
+Prepare the database (creates databases if missing, then migrates):
 
 ```bash
-pnpm --filter @branchforge/backend db:migrate
+pnpm --filter @branchforge/backend db:bootstrap
 ```
+
+Optional: seed the documentation demo project (development only):
+
+```bash
+pnpm db:seed:docs-demo
+```
+
+Sign in with `docs-demo@branchforge.test` / `docsdemo123` to explore a sample
+branching project. See the [developer docs site page](/dev/docs-site) for
+details.
 
 Start both frontend and backend in development mode:
 

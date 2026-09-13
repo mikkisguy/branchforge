@@ -4,11 +4,11 @@ title: Database
 
 # Database
 
-BranchForge uses PostgreSQL 16 with Drizzle ORM.
+BranchForge uses PostgreSQL 18 with Drizzle ORM.
 
 ## Overview
 
-- **Database**: PostgreSQL 16
+- **Database**: PostgreSQL 18 (`postgres:18-alpine` in Docker Compose)
 - **ORM**: Drizzle ORM (TypeScript-based)
 - **Migrations**: Auto-generated from schema files
 

@@ -21,16 +21,21 @@ const docsDst = resolve(__dirname, "..");
 // To re-enable: add an ADR sync loop here that copies docs/adr/*.md into
 // dev/adrs/ with prepended frontmatter. See git history for the original.
 const architectureSrc = resolve(docsSrc, "ARCHITECTURE.md");
+const changelogSrc = resolve(root, "CHANGELOG.md");
 
 try {
   writeFileSync(
     resolve(docsDst, "dev/architecture.md"),
     `---\ntitle: Architecture\n---\n\n${readFileSync(architectureSrc, "utf-8")}`
   );
+  writeFileSync(
+    resolve(docsDst, "dev/changelog.md"),
+    `---\ntitle: Changelog\n---\n\n${readFileSync(changelogSrc, "utf-8")}`
+  );
 } catch (err) {
   if (err && err.code === "ENOENT") {
     console.error(
-      `[sync-source-docs] ${architectureSrc} not found.\n` +
+      `[sync-source-docs] A source document was not found (${architectureSrc} or ${changelogSrc}).\n` +
         "Run this script from the repo root (pnpm docs:build / pnpm docs:dev), " +
         "or check that docs/ARCHITECTURE.md exists."
     );
@@ -39,4 +44,4 @@ try {
   throw err;
 }
 
-console.log("✓ Synced 1 source doc(s) into VitePress pages.");
+console.log("✓ Synced 2 source doc(s) into VitePress pages.");
