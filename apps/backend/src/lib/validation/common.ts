@@ -128,6 +128,13 @@ export const intStringSchema = z
   .transform((val) => (val === undefined ? undefined : parseInt(val, 10)))
   .pipe(z.number().int().optional());
 
+/**
+ * Empty query schema
+ * Rejects any query parameters. Use with `validateQuery()` for endpoints
+ * that must not accept query input (e.g. readiness probes).
+ */
+export const emptyQuerySchema = z.strictObject({});
+
 // ============================================================================
 // Helper Functions
 // ============================================================================

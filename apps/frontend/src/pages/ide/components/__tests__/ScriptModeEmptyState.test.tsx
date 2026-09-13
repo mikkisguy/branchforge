@@ -49,4 +49,46 @@ describe("ScriptModeEmptyState", () => {
       screen.queryByRole("button", { name: /\+ New File/i })
     ).not.toBeInTheDocument();
   });
+
+  it("hides the ZIP import control and dialog from readers", () => {
+    const onShowZipImportDialogChange = vi.fn();
+
+    render(
+      <ScriptModeEmptyState
+        projectId="project-1"
+        isLinked={false}
+        showSyncDialog={false}
+        onShowSyncDialogChange={vi.fn()}
+        showZipImportDialog={false}
+        onShowZipImportDialogChange={onShowZipImportDialogChange}
+        projectVisibility="READER"
+      />
+    );
+
+    expect(
+      screen.queryByRole("button", { name: /import from zip/i })
+    ).not.toBeInTheDocument();
+    expect(onShowZipImportDialogChange).not.toHaveBeenCalled();
+  });
+
+  it("offers the ZIP import control to owners", async () => {
+    const onShowZipImportDialogChange = vi.fn();
+    const user = userEvent.setup();
+
+    render(
+      <ScriptModeEmptyState
+        projectId="project-1"
+        isLinked={false}
+        showSyncDialog={false}
+        onShowSyncDialogChange={vi.fn()}
+        showZipImportDialog={false}
+        onShowZipImportDialogChange={onShowZipImportDialogChange}
+        projectVisibility="OWNER"
+      />
+    );
+
+    await user.click(screen.getByRole("button", { name: /import from zip/i }));
+
+    expect(onShowZipImportDialogChange).toHaveBeenCalledWith(true);
+  });
 });

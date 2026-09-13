@@ -51,6 +51,9 @@ Update `.env` for production:
 
 ```bash
 # Docker Compose database
+# POSTGRES_PASSWORD must contain only URI-safe characters (letters, digits,
+# - _ . ~) unless you also set the percent-encoded variant used to build
+# DATABASE_URL — see "Database URI password encoding".
 POSTGRES_USER=branchforge
 POSTGRES_PASSWORD=generate-strong-password
 POSTGRES_DB=branchforge
@@ -108,10 +111,15 @@ services:
   postgres:
     image: postgres:18-alpine
     environment:
+      # The postgres container receives the RAW password. Never pre-encode it
+      # here — the server needs the literal characters to authenticate.
       POSTGRES_USER: ${POSTGRES_USER:-branchforge}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-branchforge}
       POSTGRES_DB: ${POSTGRES_DB:-branchforge}
     volumes:
+      # postgres:18 changed the data directory layout: PGDATA now lives in a
+      # versioned subdirectory (e.g. /var/lib/postgresql/18/docker) instead of
+      # /var/lib/postgresql/data, so the named volume mounts at the parent.
       - postgres_data:/var/lib/postgresql
     healthcheck:
       test:
@@ -124,7 +132,9 @@ services:
     image: ghcr.io/mikkisguy/branchforge-backend:${IMAGE_TAG:-beta}
     command: ["node", "apps/backend/dist/db/migrate.js"]
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-branchforge}:${POSTGRES_PASSWORD:-branchforge}@postgres:5432/${POSTGRES_DB:-branchforge}
+      # URI-composed credentials must be percent-encoded — see
+      # "Database URI password encoding" below.
+      DATABASE_URL: postgresql://${POSTGRES_USER:-branchforge}:${POSTGRES_PASSWORD_URL_ENCODED:-branchforge}@postgres:5432/${POSTGRES_DB:-branchforge}
       NODE_ENV: production
     depends_on:
       postgres:
@@ -133,6 +143,8 @@ services:
 
   backend:
     image: ghcr.io/mikkisguy/branchforge-backend:${IMAGE_TAG:-beta}
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-branchforge}:${POSTGRES_PASSWORD_URL_ENCODED:-branchforge}@postgres:5432/${POSTGRES_DB:-branchforge}
     depends_on:
       postgres:
         condition: service_healthy
@@ -146,8 +158,103 @@ volumes:
 ```
 
 Compose constructs the containers' `DATABASE_URL` from `POSTGRES_USER`,
-`POSTGRES_PASSWORD`, and `POSTGRES_DB`. A standalone `DATABASE_URL` is only used
-by the manual/non-Compose command below.
+the **URL-encoded** password, and `POSTGRES_DB`. The raw password is still
+passed to the `postgres` container itself. A standalone `DATABASE_URL` is only
+used by the manual/non-Compose command below.
+
+### Database URI password encoding
+
+The PostgreSQL connection URI embeds username and password directly, so
+characters that are syntactically meaningful in a URI must be percent-encoded
+(RFC 3986). The `postgres` container keeps receiving the **raw** password via
+`POSTGRES_PASSWORD`; only the composed `DATABASE_URL` needs the encoded form.
+
+Docker Compose interpolation is plain `${VAR}` substitution — it cannot encode
+for you — so keep a second variable in `.env` that holds the encoded password
+and reference it in the URI:
+
+```bash
+# .env
+POSTGRES_PASSWORD=p@ss:word/2026              # raw — used by the postgres container
+POSTGRES_PASSWORD_URL_ENCODED=p%40ss%3Aword%2F2026  # encoded — used in DATABASE_URL
+```
+
+Common characters and their encodings: `@` → `%40`, `:` → `%3A`, `/` → `%2F`,
+`?` → `%3F`, `#` → `%23`, `%` → `%25`, space → `%20`.
+
+Generate the encoded value from the raw one instead of hand-editing:
+
+```bash
+# Node.js
+node -e "console.log(encodeURIComponent(process.env.POSTGRES_PASSWORD))"
+
+# Python
+python3 -c "import os, urllib.parse; print(urllib.parse.quote(os.environ['POSTGRES_PASSWORD'], safe=''))"
+```
+
+Passwords made only of letters, digits, `-`, `_`, `.`, and `~` need no
+encoding and may reuse `POSTGRES_PASSWORD` directly.
+
+### Upgrading PostgreSQL 16 to 18
+
+The shipped image moved from PostgreSQL 16 to `postgres:18-alpine`. **The 18
+image cannot read 16 data files.** PostgreSQL 18 also changed its data
+directory layout inside the image: PGDATA moved from `/var/lib/postgresql/data`
+(16) into a versioned subdirectory such as `/var/lib/postgresql/18/docker`.
+The existing named volume `postgres_data` therefore mounts at
+`/var/lib/postgresql` and is not portable across the major upgrade — a
+dump-and-restore is required **before** pulling the new image:
+
+1. **Stop the writers:**
+
+   ```bash
+   docker compose stop backend migrate frontend
+   ```
+
+2. **Dump the data with the old (16) container still running:**
+
+   ```bash
+   docker compose exec postgres pg_dump -U branchforge -Fc branchforge \
+     > branchforge_pg16.dump
+   ```
+
+   If you created additional roles or global objects, also run
+   `pg_dumpall --globals-only` and capture its output.
+
+3. **Tear down the old database and its volume.** Verify the dump is non-empty
+   and keep a copy off-host before deleting anything:
+
+   ```bash
+   docker compose down
+   docker volume rm branchforge_postgres_data   # adjust to your volume name
+   ```
+
+   Keep the removed data recoverable (e.g. `docker volume create` + copy) or
+   delay removal until the restore is verified if you need a rollback path.
+
+4. **Pull the new image and start PostgreSQL 18:**
+
+   ```bash
+   docker compose pull postgres
+   docker compose up -d postgres
+   docker compose ps postgres   # wait for "healthy"
+   ```
+
+5. **Restore the dump into 18:**
+
+   ```bash
+   docker compose exec -T postgres pg_restore -U branchforge -d branchforge \
+     --clean --if-exists < branchforge_pg16.dump
+   ```
+
+6. **Bring the stack back up** — Compose runs the one-shot `migrate` service
+   against the restored data before starting the backend:
+
+   ```bash
+   docker compose up -d
+   ```
+
+   Check `docker compose logs migrate` to confirm migrations completed.
 
 ### Custom Docker Compose
 

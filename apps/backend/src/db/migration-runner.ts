@@ -14,6 +14,7 @@ import { fileURLToPath } from "url";
 const { Pool } = pg;
 
 export const DEFAULT_MIGRATION_LOCK_TIMEOUT_MS = 60_000;
+export const DEFAULT_MIGRATION_CONNECT_TIMEOUT_MS = 10_000;
 export const MIGRATION_LOCK_KEY = 0x42524647;
 const LOCK_RETRY_INTERVAL_MS = 250;
 
@@ -21,6 +22,7 @@ export interface MigrationConfig {
   connectionString: string;
   databaseLabel: "MAIN" | "TEST";
   lockTimeoutMs: number;
+  connectTimeoutMs: number;
   migrationsFolder: string;
 }
 
@@ -38,8 +40,15 @@ export interface MigrationPool {
   end(): Promise<void>;
 }
 
+export interface MigrationPoolOptions {
+  connectTimeoutMs: number;
+}
+
 export interface MigrationDependencies {
-  createPool(connectionString: string): MigrationPool;
+  createPool(
+    connectionString: string,
+    options: MigrationPoolOptions
+  ): MigrationPool;
   now(): number;
   sleep(milliseconds: number): Promise<void>;
 }
@@ -89,14 +98,23 @@ export function getMigrationConfig(
       "DB_MIGRATION_LOCK_TIMEOUT_MS",
       DEFAULT_MIGRATION_LOCK_TIMEOUT_MS
     ),
+    connectTimeoutMs: readPositiveInteger(
+      env.DB_MIGRATION_CONNECT_TIMEOUT_MS,
+      "DB_MIGRATION_CONNECT_TIMEOUT_MS",
+      DEFAULT_MIGRATION_CONNECT_TIMEOUT_MS
+    ),
     migrationsFolder,
   };
 }
 
-function createNodePgPool(connectionString: string): MigrationPool {
+function createNodePgPool(
+  connectionString: string,
+  options: MigrationPoolOptions
+): MigrationPool {
   const pool = new Pool({
     connectionString,
     max: 1,
+    connectionTimeoutMillis: options.connectTimeoutMs,
   });
 
   return {
@@ -168,7 +186,9 @@ export async function runMigrations(
   config = getMigrationConfig(),
   dependencies: MigrationDependencies = defaultDependencies
 ): Promise<void> {
-  const pool = dependencies.createPool(config.connectionString);
+  const pool = dependencies.createPool(config.connectionString, {
+    connectTimeoutMs: config.connectTimeoutMs,
+  });
   let connection: MigrationConnection | undefined;
   let lockAcquired = false;
   let operationFailed = false;

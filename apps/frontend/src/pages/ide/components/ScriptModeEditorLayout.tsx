@@ -46,7 +46,12 @@ import { ScriptEditorToolbarPlacementContext } from "@/components/script-mode/Sc
 import { useWorkspacePanel } from "@/hooks/useWorkspacePanel";
 import { useFocusModeKeyboardHandler } from "@/hooks/useFocusModeKeyboardHandler";
 import { SCRIPT_LEFT_PANEL, SCRIPT_RIGHT_PANEL } from "@/lib/workspace-panels";
-import type { LabelDetail, Character, SourceOrigin } from "@branchforge/shared";
+import type {
+  LabelDetail,
+  Character,
+  SourceOrigin,
+  UserRole,
+} from "@branchforge/shared";
 import type { ScriptEditorRef } from "@/components/script-mode/ScriptEditor";
 import type { FocusModeState } from "@/hooks/useFocusModeState";
 import type { ProjectFileNode } from "@/hooks/useProjectFiles";
@@ -93,6 +98,7 @@ interface ScriptModeEditorLayoutProps {
   labelTitles?: LabelTitleMap;
   gitlabBranch?: string;
   fileSourceType?: SourceOrigin;
+  projectVisibility?: UserRole;
   onOpenZipImportDialog?: () => void;
   generatedFiles?: GeneratedFileInfo[];
   activeGeneratedFileId?: string | null;
@@ -138,6 +144,7 @@ export function ScriptModeEditorLayout({
   labelTitles,
   gitlabBranch,
   fileSourceType,
+  projectVisibility,
   onOpenZipImportDialog,
   generatedFiles,
   activeGeneratedFileId,
@@ -471,6 +478,7 @@ export function ScriptModeEditorLayout({
                       projectName={projectName}
                       gitlabBranch={gitlabBranch}
                       fileSourceType={fileSourceType}
+                      projectVisibility={projectVisibility}
                       onOpenZipImportDialog={onOpenZipImportDialog}
                       showBranch={false}
                     />

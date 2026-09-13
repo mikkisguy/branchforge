@@ -7,7 +7,7 @@ import {
   useState,
 } from "react";
 import type { ReactNode } from "react";
-import type { SourceOrigin } from "@branchforge/shared";
+import type { SourceOrigin, UserRole } from "@branchforge/shared";
 import { useToast } from "@/contexts/ToastContext";
 import { GitLabSyncDialog } from "@/components/script-mode/GitLabSyncDialog";
 import type { SyncOperationType } from "@/components/script-mode/GitLabSyncDialog";
@@ -39,12 +39,17 @@ export function ProjectFileTransferProvider({
   projectId,
   projectName,
   fileSourceType,
+  projectVisibility,
 }: {
   children: ReactNode;
   projectId?: string;
   projectName?: string;
   fileSourceType?: SourceOrigin;
+  projectVisibility?: UserRole;
 }) {
+  // Importing into the current project is owner-only. Readers must not be
+  // offered (or able to open) the ZIP import flow.
+  const isProjectOwner = projectVisibility === "OWNER";
   const [overrides, setOverrides] = useState<ProjectFileTransferActions | null>(
     null
   );
@@ -89,11 +94,20 @@ export function ProjectFileTransferProvider({
       onPushGitLab:
         fileSourceType === "GITLAB" ? () => openSync("export") : undefined,
       onImportZip:
-        fileSourceType === "ZIP" ? () => setZipImportOpen(true) : undefined,
+        fileSourceType === "ZIP" && isProjectOwner
+          ? () => setZipImportOpen(true)
+          : undefined,
       onExportZip: projectId ? openZipExport : undefined,
       isExporting,
     }),
-    [fileSourceType, isExporting, openSync, openZipExport, projectId]
+    [
+      fileSourceType,
+      isExporting,
+      isProjectOwner,
+      openSync,
+      openZipExport,
+      projectId,
+    ]
   );
   const setActionsValue = useCallback(
     (nextActions: ProjectFileTransferActions | null) => {
@@ -122,7 +136,7 @@ export function ProjectFileTransferProvider({
           projectName={projectName}
         />
       ) : null}
-      {projectId ? (
+      {projectId && isProjectOwner ? (
         <ZipImportFilesDialog
           open={zipImportOpen}
           onOpenChange={setZipImportOpen}

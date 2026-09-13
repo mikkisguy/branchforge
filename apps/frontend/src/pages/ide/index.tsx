@@ -209,6 +209,7 @@ export function HomePageIDE() {
       projectId={currentProject?.id}
       projectName={currentProject?.name}
       fileSourceType={currentProject?.source}
+      projectVisibility={currentProject?.visibility}
     >
       <div className="relative h-dvh overflow-hidden bg-canvas">
         <WorkspaceChrome

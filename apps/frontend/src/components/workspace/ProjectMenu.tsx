@@ -134,9 +134,9 @@ export function ProjectMenu({
                 </MenuItem>
               ) : null}
             </MenuGroup>
+            <MenuSeparator />
           </>
         ) : null}
-        <MenuSeparator />
         <MenuGroup label="Project settings">
           <MenuItem
             disabled={!projectId}

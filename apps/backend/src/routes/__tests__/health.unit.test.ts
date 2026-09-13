@@ -88,4 +88,14 @@ describe("Health Routes", () => {
       timestamp: expect.any(String),
     });
   });
+
+  it("GET /health/ready rejects unexpected query parameters", async () => {
+    const response = await fastify.inject({
+      method: "GET",
+      url: "/health/ready?unexpected=1",
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(JSON.parse(response.payload).error).toBe("Bad Request");
+  });
 });

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  DEFAULT_MIGRATION_CONNECT_TIMEOUT_MS,
   DEFAULT_MIGRATION_LOCK_TIMEOUT_MS,
   MIGRATION_LOCK_KEY,
   acquireMigrationLock,
@@ -18,6 +19,7 @@ function createConfig(
     connectionString: "postgresql://user:secret@database/branchforge",
     databaseLabel: "MAIN",
     lockTimeoutMs: 1_000,
+    connectTimeoutMs: DEFAULT_MIGRATION_CONNECT_TIMEOUT_MS,
     migrationsFolder: "/app/dist/db/migrations",
     ...overrides,
   };
@@ -39,15 +41,24 @@ function createRuntime(queryResults: boolean[]) {
     end,
   };
   let currentTime = 0;
+  const createPool = vi.fn(() => pool);
   const dependencies: MigrationDependencies = {
-    createPool: vi.fn(() => pool),
+    createPool,
     now: () => currentTime,
     sleep: vi.fn(async (milliseconds: number) => {
       currentTime += milliseconds;
     }),
   };
 
-  return { connection, dependencies, end, migrate, query, release };
+  return {
+    connection,
+    createPool,
+    dependencies,
+    end,
+    migrate,
+    query,
+    release,
+  };
 }
 
 afterEach(() => {
@@ -55,7 +66,7 @@ afterEach(() => {
 });
 
 describe("getMigrationConfig", () => {
-  it("uses the main database and default lock timeout", () => {
+  it("uses the main database and default timeouts", () => {
     const config = getMigrationConfig(
       { DATABASE_URL: "postgresql://main" },
       "/migrations"
@@ -65,6 +76,7 @@ describe("getMigrationConfig", () => {
       connectionString: "postgresql://main",
       databaseLabel: "MAIN",
       lockTimeoutMs: DEFAULT_MIGRATION_LOCK_TIMEOUT_MS,
+      connectTimeoutMs: DEFAULT_MIGRATION_CONNECT_TIMEOUT_MS,
       migrationsFolder: "/migrations",
     });
   });
@@ -76,6 +88,7 @@ describe("getMigrationConfig", () => {
         DATABASE_URL: "postgresql://main",
         DATABASE_URL_TEST: "postgresql://test",
         DB_MIGRATION_LOCK_TIMEOUT_MS: "5000",
+        DB_MIGRATION_CONNECT_TIMEOUT_MS: "20000",
       },
       "/migrations"
     );
@@ -83,9 +96,10 @@ describe("getMigrationConfig", () => {
     expect(config.connectionString).toBe("postgresql://test");
     expect(config.databaseLabel).toBe("TEST");
     expect(config.lockTimeoutMs).toBe(5_000);
+    expect(config.connectTimeoutMs).toBe(20_000);
   });
 
-  it("rejects missing database URLs and invalid lock timeouts", () => {
+  it("rejects missing database URLs and invalid timeouts", () => {
     expect(() => getMigrationConfig({}, "/migrations")).toThrow(
       "DATABASE_URL environment variable is required"
     );
@@ -98,6 +112,15 @@ describe("getMigrationConfig", () => {
         "/migrations"
       )
     ).toThrow("DB_MIGRATION_LOCK_TIMEOUT_MS must be a positive integer");
+    expect(() =>
+      getMigrationConfig(
+        {
+          DATABASE_URL: "postgresql://main",
+          DB_MIGRATION_CONNECT_TIMEOUT_MS: "nope",
+        },
+        "/migrations"
+      )
+    ).toThrow("DB_MIGRATION_CONNECT_TIMEOUT_MS must be a positive integer");
   });
 });
 
@@ -131,6 +154,10 @@ describe("runMigrations", () => {
 
     await runMigrations(createConfig(), runtime.dependencies);
 
+    expect(runtime.createPool).toHaveBeenCalledWith(
+      "postgresql://user:secret@database/branchforge",
+      { connectTimeoutMs: DEFAULT_MIGRATION_CONNECT_TIMEOUT_MS }
+    );
     expect(runtime.migrate).toHaveBeenCalledWith("/app/dist/db/migrations");
     expect(runtime.query).toHaveBeenLastCalledWith(
       "SELECT pg_advisory_unlock($1)",

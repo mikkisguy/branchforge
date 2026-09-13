@@ -1,4 +1,5 @@
 import { Download, FileCode, FilePlus } from "lucide-react";
+import type { UserRole } from "@branchforge/shared";
 import { Button } from "@/components/ui/button";
 import { GitLabSyncDialog } from "@/components/script-mode/GitLabSyncDialog";
 import { ZipImportFilesDialog } from "@/components/ide-shared/ZipImportFilesDialog";
@@ -14,6 +15,7 @@ interface ScriptModeEmptyStateProps {
   onShowZipImportDialogChange: (open: boolean) => void;
   onOpenSettings?: () => void;
   onNewFile?: () => void;
+  projectVisibility?: UserRole;
 }
 
 export function ScriptModeEmptyState({
@@ -27,6 +29,7 @@ export function ScriptModeEmptyState({
   onShowZipImportDialogChange,
   onOpenSettings,
   onNewFile,
+  projectVisibility,
 }: ScriptModeEmptyStateProps) {
   if (!projectId) {
     return (
@@ -46,6 +49,10 @@ export function ScriptModeEmptyState({
       </div>
     );
   }
+
+  // Importing into the current project is owner-only. Readers never see the
+  // ZIP import control or dialog here.
+  const canImportZip = projectVisibility === "OWNER";
 
   return (
     <div className="flex-1 flex flex-col items-center justify-center">
@@ -75,10 +82,15 @@ export function ScriptModeEmptyState({
             Import from GitLab
           </Button>
         )}
-        <Button type="button" onClick={() => onShowZipImportDialogChange(true)}>
-          <FileCode className="size-4 mr-2" />
-          Import from Zip
-        </Button>
+        {canImportZip && (
+          <Button
+            type="button"
+            onClick={() => onShowZipImportDialogChange(true)}
+          >
+            <FileCode className="size-4 mr-2" />
+            Import from Zip
+          </Button>
+        )}
       </div>
 
       {isLinked && linkedRepoDefaultBranch && (
@@ -92,12 +104,14 @@ export function ScriptModeEmptyState({
         />
       )}
 
-      <ZipImportFilesDialog
-        open={showZipImportDialog}
-        onOpenChange={onShowZipImportDialogChange}
-        projectId={projectId}
-        projectName={projectName}
-      />
+      {canImportZip && (
+        <ZipImportFilesDialog
+          open={showZipImportDialog}
+          onOpenChange={onShowZipImportDialogChange}
+          projectId={projectId}
+          projectName={projectName}
+        />
+      )}
     </div>
   );
 }

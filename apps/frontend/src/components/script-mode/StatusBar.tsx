@@ -10,7 +10,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { FABExpandableChoice } from "@/components/ide-shared/MobileOverflowFAB";
 import { cn } from "@/lib/utils";
 import { projectFilesApi } from "@/lib/api/project-files";
-import type { SourceOrigin } from "@branchforge/shared";
+import type { SourceOrigin, UserRole } from "@branchforge/shared";
 import { useProjectFileTransferActions } from "@/components/workspace/ProjectFileTransferContext";
 
 interface StatusBarProps {
@@ -18,6 +18,7 @@ interface StatusBarProps {
   projectName?: string;
   gitlabBranch?: string;
   fileSourceType?: SourceOrigin;
+  projectVisibility?: UserRole;
   onOpenZipImportDialog?: () => void;
   showBranch?: boolean;
   mobile?: boolean;
@@ -69,6 +70,7 @@ export function StatusBar({
   projectName,
   gitlabBranch,
   fileSourceType,
+  projectVisibility,
   onOpenZipImportDialog,
   showBranch = true,
   mobile = false,
@@ -140,9 +142,14 @@ export function StatusBar({
 
   /**
    * Check if ZIP import is available for this project
-   * ZIP is available if the project type is ZIP
+   * ZIP is available if the project type is ZIP and the current user owns
+   * the project — readers never get the current-project ZIP import control.
    */
-  const isZipAvailable = fileSourceType === "ZIP";
+  const isProjectOwner = projectVisibility === "OWNER";
+  const canImportZip =
+    fileSourceType === "ZIP" &&
+    isProjectOwner &&
+    Boolean(onOpenZipImportDialog);
 
   const handleMobileTransferSelect = useCallback(
     (value: string | number) => {
@@ -176,7 +183,7 @@ export function StatusBar({
           { label: "Push to GitLab", value: "push-gitlab", active: false },
         ]
       : []),
-    ...(isZipAvailable && onOpenZipImportDialog
+    ...(canImportZip
       ? [{ label: "Import ZIP", value: "import-zip", active: false }]
       : []),
     ...(projectId
@@ -188,23 +195,20 @@ export function StatusBar({
     setProjectFileTransferActions({
       onPullGitLab: isGitLabAvailable ? handleImportClick : undefined,
       onPushGitLab: isGitLabAvailable ? handleExportClick : undefined,
-      onImportZip:
-        isZipAvailable && onOpenZipImportDialog
-          ? handleZipImportClick
-          : undefined,
+      onImportZip: canImportZip ? handleZipImportClick : undefined,
       onExportZip: projectId ? handleZipExportClick : undefined,
       isExporting,
     });
 
     return () => setProjectFileTransferActions(null);
   }, [
+    canImportZip,
     handleExportClick,
     handleImportClick,
     handleZipExportClick,
     handleZipImportClick,
     isExporting,
     isGitLabAvailable,
-    isZipAvailable,
     onOpenZipImportDialog,
     projectId,
     setProjectFileTransferActions,

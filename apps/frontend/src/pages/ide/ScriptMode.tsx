@@ -151,6 +151,7 @@ export function ScriptMode({
           onShowZipImportDialogChange={setShowZipImportDialog}
           onOpenSettings={onOpenSettings}
           onNewFile={canCreateFile ? handleOpenCreateFileDialog : undefined}
+          projectVisibility={currentProject?.visibility}
         />
         {createFileDialog}
       </div>
@@ -198,6 +199,7 @@ export function ScriptMode({
           labelTitles={labelTitles}
           gitlabBranch={linkedRepo?.defaultBranch}
           fileSourceType={primaryFileSourceType}
+          projectVisibility={currentProject?.visibility}
           onOpenZipImportDialog={() => setShowZipImportDialog(true)}
           generatedFiles={generatedFiles}
           activeGeneratedFileId={activeGeneratedFileId}
@@ -217,6 +219,7 @@ export function ScriptMode({
         onSyncDialogChange={setShowSyncDialog}
         showZipImportDialog={showZipImportDialog}
         onZipImportDialogChange={setShowZipImportDialog}
+        projectVisibility={currentProject?.visibility}
       />
       {createFileDialog}
       {fileActionDialogs}
