@@ -99,6 +99,9 @@ export function useAuth(): UseAuthReturn {
       password: string;
     }) => {
       const response = await authApi.register({ email, password });
+      if (response.csrfToken) {
+        setCsrfToken(response.csrfToken);
+      }
       return response.user;
     },
     onSuccess: (data) => {
