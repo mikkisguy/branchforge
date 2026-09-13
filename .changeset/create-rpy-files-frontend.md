@@ -1,5 +1,5 @@
 ---
-"@branchforge/frontend": patch
+"@branchforge/frontend": minor
 ---
 
-Added create-file dialog, API client method, and project files hook support for new empty Ren'Py story files.
+Added project file management in Write and Script modes, including creating, renaming, moving, and deleting Ren'Py files.
