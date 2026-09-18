@@ -3,6 +3,7 @@ import { render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { ScriptModeEditorLayout } from "../ScriptModeEditorLayout";
 import type { FocusModeState } from "@/hooks/useFocusModeState";
+import type { SaveStatus } from "@/hooks/useAutosave";
 
 const { panelBreakpoint } = vi.hoisted(() => ({
   panelBreakpoint: { current: "wide" as "wide" | "mobile" },
@@ -55,7 +56,6 @@ vi.mock("@/components/ide-shared", () => ({
   FABToggle: () => null,
   FABUndoButton: () => null,
   FABRedoButton: () => null,
-  FABFocusButton: () => null,
   MobileOverflowFAB: ({ children }: { children: ReactNode }) => (
     <div>{children}</div>
   ),
@@ -72,7 +72,7 @@ function createFocusModeState(isFocusMode: boolean): FocusModeState {
   };
 }
 
-function renderLayout(isFocusMode: boolean) {
+function renderLayout(isFocusMode: boolean, saveStatus?: SaveStatus) {
   return render(
     <div className="h-96">
       <ScriptModeEditorLayout
@@ -99,6 +99,7 @@ function renderLayout(isFocusMode: boolean) {
         canRedo={false}
         onUndo={vi.fn()}
         onRedo={vi.fn()}
+        saveStatus={saveStatus}
       />
     </div>
   );
@@ -129,6 +130,36 @@ describe("ScriptModeEditorLayout chrome", () => {
     expect(
       screen.queryByRole("button", { name: "Expand navigator" })
     ).not.toBeInTheDocument();
+  });
+
+  it("keeps the Exit Focus control visible at the mobile breakpoint", () => {
+    panelBreakpoint.current = "mobile";
+    renderLayout(true);
+
+    const exitFocusButton = screen.getByRole("button", {
+      name: "Exit focus mode",
+    });
+    const focusChrome = exitFocusButton.closest("div.fixed");
+
+    expect(exitFocusButton).toBeInTheDocument();
+    expect(focusChrome).toHaveClass("fixed");
+    expect(focusChrome).not.toHaveClass("max-md:hidden");
+  });
+
+  it("does not show a passive saved indicator in focus mode", () => {
+    renderLayout(true);
+
+    expect(screen.queryByLabelText("Saved")).not.toBeInTheDocument();
+  });
+
+  it("places the saving indicator on a translucent round surface in focus mode", () => {
+    renderLayout(true, "saving");
+
+    expect(screen.getByLabelText("Saving...").parentElement).toHaveClass(
+      "size-8",
+      "rounded-full",
+      "bg-card/80"
+    );
   });
 
   it("mounts only the desktop StatusBar when not mobile", () => {

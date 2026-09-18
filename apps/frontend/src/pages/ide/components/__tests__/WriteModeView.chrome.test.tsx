@@ -167,6 +167,34 @@ describe("WriteModeView chrome", () => {
     );
   });
 
+  it("does not show a passive saved indicator in focus mode", () => {
+    render(<WriteModeView {...createProps({ isFocusMode: true })} />);
+
+    expect(screen.queryByLabelText("Saved")).not.toBeInTheDocument();
+  });
+
+  it("places the saving indicator on a translucent round surface in focus mode", () => {
+    render(
+      <WriteModeView
+        {...createProps({
+          isFocusMode: true,
+          editorSaveState: {
+            isSaving: true,
+            lastSaved: null,
+            saveError: false,
+            saveConflict: false,
+          },
+        })}
+      />
+    );
+
+    expect(screen.getByLabelText("Saving...").parentElement).toHaveClass(
+      "size-8",
+      "rounded-full",
+      "bg-card/80"
+    );
+  });
+
   it("renders conflict controls in the toolbar when saveConflict is true", () => {
     render(
       <WriteModeView

@@ -16,8 +16,6 @@ import {
   ChevronDown,
   Undo2,
   Redo2,
-  Maximize2,
-  Minimize2,
 } from "lucide-react";
 import type { ReactNode, CSSProperties, MouseEvent } from "react";
 
@@ -226,33 +224,6 @@ export function FABRedoButton({ canRedo, onRedo }: FABRedoButtonProps) {
     >
       <Redo2 className="size-4" />
       Redo
-    </button>
-  );
-}
-
-interface FABFocusButtonProps {
-  isFocusMode: boolean;
-  onToggle: () => void;
-}
-
-/** Focus mode toggle button for mobile FAB popovers. */
-export function FABFocusButton({ isFocusMode, onToggle }: FABFocusButtonProps) {
-  const { closePopover } = useFABPopover();
-  return (
-    <button
-      type="button"
-      onClick={() => {
-        onToggle();
-        closePopover();
-      }}
-      className="flex items-center gap-3 w-full px-3 py-2.5 text-sm hover:bg-muted/50 transition-colors text-left"
-    >
-      {isFocusMode ? (
-        <Minimize2 className="size-4" />
-      ) : (
-        <Maximize2 className="size-4" />
-      )}
-      {isFocusMode ? "Exit Focus" : "Focus Mode"}
     </button>
   );
 }
