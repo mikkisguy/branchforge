@@ -193,7 +193,7 @@ function ToastContainer({ toasts, onRemove }: ToastContainerProps) {
           className="pointer-events-auto animate-in slide-in-from-right-4 fade-in-50 duration-300"
         >
           <div
-            className={`flex items-start gap-3 rounded-md border p-4 shadow-lg min-w-[300px] max-w-md ${getToastClasses(
+            className={`flex items-start gap-3 rounded-lg border p-4 shadow-xl ring-1 ring-black/10 dark:ring-white/10 min-w-[300px] max-w-md ${getToastClasses(
               toast.variant
             )}`}
           >
@@ -202,7 +202,7 @@ function ToastContainer({ toasts, onRemove }: ToastContainerProps) {
                 <p className="text-sm font-medium">{toast.title}</p>
               )}
               {toast.message && (
-                <p className="text-sm text-muted-foreground mt-0.5">
+                <p className="mt-0.5 text-sm text-foreground/90">
                   {toast.message}
                 </p>
               )}
@@ -211,7 +211,7 @@ function ToastContainer({ toasts, onRemove }: ToastContainerProps) {
               type="button"
               aria-label="Dismiss notification"
               onClick={() => onRemove(toast.id)}
-              className="text-muted-foreground hover:text-foreground transition-colors"
+              className="text-foreground/70 transition-colors hover:text-foreground"
             >
               ×
             </button>

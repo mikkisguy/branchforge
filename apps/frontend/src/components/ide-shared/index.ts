@@ -8,5 +8,4 @@ export {
   FABExpandableChoice,
   FABUndoButton,
   FABRedoButton,
-  FABFocusButton,
 } from "./MobileOverflowFAB";

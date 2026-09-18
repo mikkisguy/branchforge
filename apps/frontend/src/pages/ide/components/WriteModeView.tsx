@@ -236,14 +236,25 @@ export function WriteModeView({
         }
         focusChrome={
           <div className="pointer-events-auto fixed top-2 right-2 z-[100] flex items-center gap-2">
-            <SaveIndicator
-              saveStatus={saveStatus}
-              displayMode="compact"
-              lastSaved={editorSaveState.lastSaved}
-              saveConflict={editorSaveState.saveConflict}
-              onReload={onReloadScene}
-              onDiscard={onDiscardDraft}
-            />
+            {saveStatus === "saving" && (
+              <span className="flex size-8 items-center justify-center rounded-full bg-card/80 shadow-sm backdrop-blur-sm">
+                <SaveIndicator
+                  saveStatus={saveStatus}
+                  displayMode="compact"
+                  lastSaved={editorSaveState.lastSaved}
+                />
+              </span>
+            )}
+            {(saveStatus === "error" || editorSaveState.saveConflict) && (
+              <SaveIndicator
+                saveStatus={saveStatus}
+                displayMode="compact"
+                lastSaved={editorSaveState.lastSaved}
+                saveConflict={editorSaveState.saveConflict}
+                onReload={onReloadScene}
+                onDiscard={onDiscardDraft}
+              />
+            )}
             <FocusModeToggle
               ref={focusToggleRef}
               isFocusMode={isFocusMode}
@@ -266,8 +277,6 @@ export function WriteModeView({
         onShowBadgesChange={setShowBadges}
         proseUndoState={proseUndoState}
         wordCountState={wordCountState}
-        isFocusMode={isFocusMode}
-        onFocusModeToggle={onFocusModeToggle}
         editorRef={editorRef as RefObject<ProseEditorRef | null>}
       />
 

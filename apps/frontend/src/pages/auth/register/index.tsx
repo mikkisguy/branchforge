@@ -13,7 +13,6 @@ import {
   CardFooter,
   CardHeader,
 } from "@/components/ui/card";
-import { InlineMessage } from "@/components/ui/inline-error";
 import {
   Announcement,
   type AnnouncementHandle,
@@ -22,6 +21,7 @@ import { AmbientBackdrop } from "@/components/ui/AmbientBackdrop";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { BASE_URL } from "@/lib/constants";
 import { APP_NAME } from "../../../lib/version";
+import { AuthErrorAlert } from "../AuthErrorAlert";
 
 interface FormState {
   email: string;
@@ -199,9 +199,7 @@ export function RegisterPage() {
             <CardContent className="space-y-4">
               <Announcement ref={announceRef} politeness="assertive" />
               {state.error && (
-                <div id="register-error">
-                  <InlineMessage variant="error">{state.error}</InlineMessage>
-                </div>
+                <AuthErrorAlert id="register-error" message={state.error} />
               )}
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
