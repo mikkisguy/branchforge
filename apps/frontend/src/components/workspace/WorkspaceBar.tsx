@@ -72,18 +72,20 @@ export function WorkspaceBar({
       <ViewSwitcher
         view={view}
         setView={setView}
-        className="flex-1 flex justify-center"
+        className="absolute left-1/2 -translate-x-1/2"
       />
-      <AccountMenu
-        theme={theme}
-        setTheme={setTheme}
-        themePalettes={themePalettes}
-        isDarkMode={isDarkMode}
-        onToggleDarkMode={onToggleDarkMode}
-        onOpenKeyboardShortcuts={onOpenKeyboardShortcuts}
-        onOpenSettings={onOpenSettings}
-        onLogout={onLogout}
-      />
+      <div className="ml-auto">
+        <AccountMenu
+          theme={theme}
+          setTheme={setTheme}
+          themePalettes={themePalettes}
+          isDarkMode={isDarkMode}
+          onToggleDarkMode={onToggleDarkMode}
+          onOpenKeyboardShortcuts={onOpenKeyboardShortcuts}
+          onOpenSettings={onOpenSettings}
+          onLogout={onLogout}
+        />
+      </div>
     </header>
   );
 }
