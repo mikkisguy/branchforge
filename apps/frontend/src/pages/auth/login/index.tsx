@@ -12,7 +12,6 @@ import {
   CardFooter,
   CardHeader,
 } from "@/components/ui/card";
-import { FormErrorMessage } from "@/components/ui/form-error-message";
 import {
   Announcement,
   type AnnouncementHandle,
@@ -20,6 +19,7 @@ import {
 import { AmbientBackdrop } from "@/components/ui/AmbientBackdrop";
 import { BASE_URL } from "@/lib/constants";
 import { APP_NAME } from "../../../lib/version";
+import { AuthErrorAlert } from "../AuthErrorAlert";
 
 export function LoginPage() {
   const navigate = useNavigate();
@@ -67,7 +67,7 @@ export function LoginPage() {
           <form onSubmit={handleSubmit} noValidate>
             <CardContent className="space-y-4">
               <Announcement ref={announceRef} politeness="assertive" />
-              {error && <FormErrorMessage id="login-error" message={error} />}
+              {error && <AuthErrorAlert id="login-error" message={error} />}
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <Input
