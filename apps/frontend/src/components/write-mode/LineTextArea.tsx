@@ -41,13 +41,13 @@ function deriveLineTextLabels(
   }
   if (speakerId) {
     return {
-      placeholder: isNarrator ? "Narration..." : "Dialogue...",
-      editLabel: "Edit dialogue text",
-      ariaLabel: "Dialogue text",
+      placeholder: isNarrator ? "Type narration..." : "Type dialogue…",
+      editLabel: isNarrator ? "Edit narration text" : "Edit dialogue text",
+      ariaLabel: isNarrator ? "Narration text" : "Dialogue text",
     };
   }
   return {
-    placeholder: "Narration...",
+    placeholder: "Type narration...",
     editLabel: "Edit narration text",
     ariaLabel: "Narration text",
   };
@@ -81,7 +81,7 @@ function RenderedLineOverlay({
       onClick={handleRenderedLineClick}
       data-rendered-line-wrapper="true"
       aria-label={editLabel}
-      className="absolute inset-0 pr-7 cursor-text leading-8 text-left bg-transparent border-0 p-0 outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-color)] focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm overflow-hidden inline-flex items-start"
+      className="absolute inset-0 px-1 pr-7 cursor-text leading-8 text-left bg-transparent hover:bg-muted/30 dark:hover:bg-muted/20 py-0 outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-color)] focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm overflow-hidden inline-flex items-start"
       style={{
         ...editorTypographyStyle,
         fontStyle: speakerFontStyle,
@@ -137,10 +137,10 @@ export function LineTextArea({
         onFocus={() => setIsFocused(true)}
         onBlur={() => setIsFocused(false)}
         placeholder={placeholder}
-        className={`min-h-[2.5rem] w-full resize-none overflow-hidden border-0 bg-transparent p-0 pr-7 font-light tracking-normal leading-8 placeholder:text-muted-foreground/70 outline-none focus-visible:outline-none focus-visible:ring-0 ${
+        className={`min-h-[2.5rem] w-full resize-none overflow-hidden border-0 px-1 py-0 pr-7 font-light tracking-normal leading-8 placeholder:text-muted-foreground/70 outline-none focus-visible:outline-none rounded-sm ${
           isFocused
-            ? "opacity-100 pointer-events-auto"
-            : "opacity-0 pointer-events-none"
+            ? "bg-muted/60 dark:bg-muted/20 opacity-100 pointer-events-auto focus-visible:bg-muted/70 dark:focus-visible:bg-muted/30"
+            : "bg-transparent opacity-0 pointer-events-none focus-visible:ring-0"
         }`}
         aria-label={ariaLabel}
         // The textarea is an editing surface; the rendered-line button is the

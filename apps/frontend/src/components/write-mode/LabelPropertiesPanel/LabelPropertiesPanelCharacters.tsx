@@ -62,18 +62,24 @@ export function LabelPropertiesPanelCharacters({
                     </p>
                   </div>
                   {char.isLoveInterest && (
-                    <Heart
-                      aria-hidden="true"
-                      data-character-role-icon="love-interest"
-                      className="size-4 text-pink-400 fill-pink-400 shrink-0 opacity-70"
-                    />
+                    <>
+                      <Heart
+                        aria-hidden="true"
+                        data-character-role-icon="love-interest"
+                        className="size-4 text-pink-400 fill-pink-400 shrink-0 opacity-70"
+                      />
+                      <span className="sr-only">Love interest</span>
+                    </>
                   )}
                   {char.isNarrator && (
-                    <BookOpen
-                      aria-hidden="true"
-                      data-character-role-icon="narrator"
-                      className="size-4 text-muted-foreground shrink-0 opacity-70"
-                    />
+                    <>
+                      <BookOpen
+                        aria-hidden="true"
+                        data-character-role-icon="narrator"
+                        className="size-4 text-muted-foreground shrink-0 opacity-70"
+                      />
+                      <span className="sr-only">Narrator</span>
+                    </>
                   )}
                 </>
               );

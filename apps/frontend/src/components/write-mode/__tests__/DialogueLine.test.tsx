@@ -154,6 +154,12 @@ describe("DialogueLine", () => {
     expect(
       container.querySelector('[data-character-role-icon="narrator"]')
     ).toBeInTheDocument();
+    expect(
+      screen.getByRole("option", { name: "EileenLove interest" })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("option", { name: "NarratorNarrator" })
+    ).toBeInTheDocument();
   });
 
   it("hides the textarea visually when blurred (default)", () => {
@@ -186,15 +192,19 @@ describe("DialogueLine", () => {
     const editButton = screen.getByRole("button", {
       name: "Edit narration text",
     });
-    expect(editButton).toHaveTextContent("Narration...");
+    expect(editButton).toHaveTextContent("Type narration...");
+    expect(editButton).toHaveClass(
+      "hover:bg-muted/30",
+      "dark:hover:bg-muted/20"
+    );
 
     await user.click(editButton);
     const textarea = screen.getByRole("textbox", {
       name: "Narration text",
     });
-    expect(textarea).toHaveAttribute("placeholder", "Narration...");
+    expect(textarea).toHaveAttribute("placeholder", "Type narration...");
     expect(textarea).toHaveAttribute("tabindex", "0");
-    expect(textarea).toHaveClass("border-0", "bg-transparent", "p-0");
+    expect(textarea).toHaveClass("border-0", "bg-muted/60", "px-1");
 
     await user.type(textarea, "A new line");
 
@@ -218,7 +228,7 @@ describe("DialogueLine", () => {
 
     expect(
       screen.getByRole("button", { name: "Edit dialogue text" })
-    ).toHaveTextContent("Dialogue...");
+    ).toHaveTextContent("Type dialogue…");
   });
 
   it("focuses the textarea when the rendered line is clicked", async () => {
@@ -263,7 +273,8 @@ describe("DialogueLine", () => {
     const { container } = renderDialogueLine(entry);
     const textarea = await focusDialogueTextarea(container);
 
-    expect(textarea).toHaveAttribute("placeholder", "Narration...");
+    expect(textarea).toHaveAccessibleName("Narration text");
+    expect(textarea).toHaveAttribute("placeholder", "Type narration...");
   });
 
   it("hides the textarea visually when blurred again", async () => {
@@ -601,7 +612,9 @@ describe("DialogueLine", () => {
     await userEvent.click(
       screen.getByRole("button", { name: /change speaker: narration/i })
     );
-    await userEvent.click(screen.getByRole("option", { name: "Eileen" }));
+    await userEvent.click(
+      screen.getByRole("option", { name: "EileenLove interest" })
+    );
 
     expect(onChange).toHaveBeenCalledWith({
       id: "entry-1",

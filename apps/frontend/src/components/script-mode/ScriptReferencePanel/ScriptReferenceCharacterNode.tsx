@@ -63,18 +63,24 @@ export function CharacterNode({
 
       {/* Love interest indicator */}
       {character.isLoveInterest && (
-        <Heart
-          aria-hidden="true"
-          data-character-role-icon="love-interest"
-          className="size-2.5 text-pink-400 fill-pink-400 shrink-0 opacity-70"
-        />
+        <>
+          <Heart
+            aria-hidden="true"
+            data-character-role-icon="love-interest"
+            className="size-2.5 text-pink-400 fill-pink-400 shrink-0 opacity-70"
+          />
+          <span className="sr-only">Love interest</span>
+        </>
       )}
       {character.isNarrator && (
-        <BookOpen
-          aria-hidden="true"
-          data-character-role-icon="narrator"
-          className="size-2.5 text-muted-foreground shrink-0 opacity-70"
-        />
+        <>
+          <BookOpen
+            aria-hidden="true"
+            data-character-role-icon="narrator"
+            className="size-2.5 text-muted-foreground shrink-0 opacity-70"
+          />
+          <span className="sr-only">Narrator</span>
+        </>
       )}
     </>
   );
