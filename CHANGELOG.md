@@ -4,6 +4,10 @@ All notable changes to BranchForge will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v1.0.0-beta.6 - 2026-09-19
+
+- Improved dialogue editing and character role cues.
+
 ## v1.0.0-beta.5 - 2026-09-18
 
 - Unified authentication error alerts, enhanced toast and dialog responsiveness, and simplified mobile editor focus behavior

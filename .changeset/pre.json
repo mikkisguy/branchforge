@@ -8,6 +8,7 @@
     "@branchforge/shared": "0.13.0"
   },
   "changesets": [
+    "calm-dialogues-glow",
     "character-export-name-type",
     "dirty-form-guards",
     "fifty-walls-ring",
