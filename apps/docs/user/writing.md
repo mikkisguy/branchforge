@@ -8,7 +8,7 @@ Write Mode provides a distraction-free environment for writing dialogue and narr
 
 ## Entering Write Mode
 
-[screenshot of write mode entry]
+<!-- screenshot: write-mode-entry.png — Write Mode entry, start label, dark theme, docs demo -->
 
 Open your project and click "Write" to enter Write Mode. The editor loads your script and autosaves your changes.
 
@@ -29,7 +29,7 @@ draft.
 
 ## Writing Dialogue
 
-[screenshot of dialogue writing]
+<!-- screenshot: write-mode-dialogue.png — Write Mode dialogue lines, dark theme, docs demo -->
 
 BranchForge uses a simplified syntax for dialogue:
 
@@ -48,7 +48,7 @@ Write Mode saves your work automatically every few seconds. You can also save ma
 
 ## Technical Badges (Display Only)
 
-[screenshot of condition and stat badges]
+<!-- screenshot: write-mode-badges.png — Condition/stat badges on elena_route_start, dark theme -->
 
 Write Mode displays technical badges next to lines to give you at-a-glance context:
 

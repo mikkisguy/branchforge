@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "sync": "node scripts/sync-source-docs.js",
-    "dev": "node scripts/sync-source-docs.js && vitepress dev",
+    "dev": "node scripts/sync-source-docs.js && vitepress dev </dev/null",
     "build": "node scripts/sync-source-docs.js && vitepress build",
     "preview": "node scripts/sync-source-docs.js && vitepress preview",
     "typecheck": "tsc --noEmit",

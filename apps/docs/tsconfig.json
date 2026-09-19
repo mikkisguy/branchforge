@@ -13,5 +13,5 @@
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "types": ["vitepress/client"]
   },
-  "include": ["**/*.ts", "**/*.vue", ".vitepress/**/*.ts"]
+  "include": ["**/*.ts", "**/*.vue", ".vitepress/**/*.ts", "env.d.ts"]
 }

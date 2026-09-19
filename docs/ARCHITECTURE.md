@@ -24,7 +24,7 @@ BranchForge is a full-stack monorepo application designed for visual novel autho
 | Frontend         | React 19, TypeScript, Vite | User interface             |
 | State Management | TanStack Query v5          | Server state, caching      |
 | Backend          | Fastify, TypeScript        | REST API server            |
-| Database         | PostgreSQL 14+             | Persistent storage         |
+| Database         | PostgreSQL 18              | Persistent storage         |
 | ORM              | Drizzle ORM                | Type-safe queries          |
 | Styling          | Tailwind CSS               | Utility-first CSS          |
 | Editor           | CodeMirror 6               | Ren'Py syntax highlighting |
