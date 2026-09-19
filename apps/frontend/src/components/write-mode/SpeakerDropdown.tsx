@@ -1,4 +1,4 @@
-import { ChevronDown, Split } from "lucide-react";
+import { BookOpen, ChevronDown, Heart, Split } from "lucide-react";
 import { withAlpha } from "@/lib/utils";
 import type { Character } from "@branchforge/shared";
 
@@ -186,6 +186,20 @@ export function SpeakerDropdown({
                 style={{ backgroundColor: char.color }}
               />
               <span>{char.displayName}</span>
+              {char.isLoveInterest && (
+                <Heart
+                  aria-hidden="true"
+                  data-character-role-icon="love-interest"
+                  className="size-3 text-pink-400 fill-pink-400 shrink-0"
+                />
+              )}
+              {char.isNarrator && (
+                <BookOpen
+                  aria-hidden="true"
+                  data-character-role-icon="narrator"
+                  className="size-3 text-muted-foreground shrink-0"
+                />
+              )}
             </button>
           ))}
         </div>

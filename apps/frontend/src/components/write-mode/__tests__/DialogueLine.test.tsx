@@ -130,6 +130,27 @@ describe("DialogueLine", () => {
     }
   });
 
+  it("shows role icons beside character names in the speaker dropdown", async () => {
+    const entry: DialogueEntry = {
+      id: "entry-1",
+      speakerId: null,
+      text: "Narration text",
+    };
+
+    const { container } = renderDialogueLine(entry);
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /change speaker: narration/i })
+    );
+
+    expect(
+      container.querySelector('[data-character-role-icon="love-interest"]')
+    ).toBeInTheDocument();
+    expect(
+      container.querySelector('[data-character-role-icon="narrator"]')
+    ).toBeInTheDocument();
+  });
+
   it("hides the textarea visually when blurred (default)", () => {
     const entry: DialogueEntry = {
       id: "entry-1",
@@ -203,6 +224,19 @@ describe("DialogueLine", () => {
     // setSelectionRange(11, 11).
     expect(textarea.selectionStart).toBe(11);
     expect(textarea.selectionEnd).toBe(11);
+  });
+
+  it("uses a narration placeholder when the selected speaker is the narrator", async () => {
+    const entry: DialogueEntry = {
+      id: "entry-1",
+      speakerId: "narr-1",
+      text: "",
+    };
+
+    const { container } = renderDialogueLine(entry);
+    const textarea = await focusDialogueTextarea(container);
+
+    expect(textarea).toHaveAttribute("placeholder", "Narration...");
   });
 
   it("hides the textarea visually when blurred again", async () => {

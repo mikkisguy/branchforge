@@ -228,6 +228,7 @@ export const DialogueLine = memo(function DialogueLine({
           isFocused={isFocused}
           isChoice={isChoice}
           isInitialEmptyLine={isInitialEmptyLine}
+          isNarrator={isNarrator}
           isStacked={isStacked}
           speakerFontStyle={speakerFontStyle}
           renderedTokens={renderedTokens}

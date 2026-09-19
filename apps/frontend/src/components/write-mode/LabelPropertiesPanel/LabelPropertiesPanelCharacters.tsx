@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Heart } from "lucide-react";
+import { BookOpen, Heart } from "lucide-react";
 import { CharacterAvatarChip } from "@/components/ui/CharacterAvatarChip";
 import { CollapsibleSection } from "@/components/ide-shared/CollapsibleSection";
 import type { Character, LabelDetail } from "@branchforge/shared";
@@ -62,7 +62,18 @@ export function LabelPropertiesPanelCharacters({
                     </p>
                   </div>
                   {char.isLoveInterest && (
-                    <Heart className="size-4 text-pink-400 fill-pink-400 shrink-0 opacity-70" />
+                    <Heart
+                      aria-hidden="true"
+                      data-character-role-icon="love-interest"
+                      className="size-4 text-pink-400 fill-pink-400 shrink-0 opacity-70"
+                    />
+                  )}
+                  {char.isNarrator && (
+                    <BookOpen
+                      aria-hidden="true"
+                      data-character-role-icon="narrator"
+                      className="size-4 text-muted-foreground shrink-0 opacity-70"
+                    />
                   )}
                 </>
               );

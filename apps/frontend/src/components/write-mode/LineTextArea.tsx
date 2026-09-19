@@ -11,6 +11,7 @@ interface LineTextAreaProps {
   isFocused: boolean;
   isChoice: boolean;
   isInitialEmptyLine: boolean;
+  isNarrator: boolean;
   isStacked: boolean;
   speakerFontStyle: "italic" | "normal";
   renderedTokens: RenpyToken[];
@@ -27,6 +28,7 @@ export function LineTextArea({
   isFocused,
   isChoice,
   isInitialEmptyLine,
+  isNarrator,
   isStacked,
   speakerFontStyle,
   renderedTokens,
@@ -50,12 +52,14 @@ export function LineTextArea({
         onFocus={() => setIsFocused(true)}
         onBlur={() => setIsFocused(false)}
         placeholder={
-          isInitialEmptyLine
-            ? WRITE_MODE_COPY.line.dialoguePlaceholder
-            : isChoice
-              ? "Choice text..."
-              : entry.speakerId
-                ? "Dialogue..."
+          isChoice
+            ? "Choice text..."
+            : entry.speakerId
+              ? isNarrator
+                ? "Narration..."
+                : "Dialogue..."
+              : isInitialEmptyLine
+                ? WRITE_MODE_COPY.line.dialoguePlaceholder
                 : "Narration..."
         }
         className={`min-h-[2.5rem] w-full resize-none overflow-hidden font-light tracking-normal leading-8 placeholder:text-muted-foreground/70 ${
