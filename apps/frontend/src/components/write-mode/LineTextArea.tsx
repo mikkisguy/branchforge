@@ -21,6 +21,87 @@ interface LineTextAreaProps {
   setIsFocused: (focused: boolean) => void;
 }
 
+interface LineTextLabels {
+  placeholder: string;
+  editLabel: string;
+  ariaLabel: string;
+}
+
+function deriveLineTextLabels(
+  isChoice: boolean,
+  speakerId: string | null | undefined,
+  isNarrator: boolean
+): LineTextLabels {
+  if (isChoice) {
+    return {
+      placeholder: "Choice text...",
+      editLabel: "Edit choice text",
+      ariaLabel: "Choice text",
+    };
+  }
+  if (speakerId) {
+    return {
+      placeholder: isNarrator ? "Narration..." : "Dialogue...",
+      editLabel: "Edit dialogue text",
+      ariaLabel: "Dialogue text",
+    };
+  }
+  return {
+    placeholder: "Narration...",
+    editLabel: "Edit narration text",
+    ariaLabel: "Narration text",
+  };
+}
+
+const editorTypographyStyle = {
+  fontSize: "var(--prose-editor-font-size, 16px)",
+  fontFamily: "var(--prose-editor-font-family, var(--font-sans))",
+} as const;
+
+interface RenderedLineOverlayProps {
+  isEmpty: boolean;
+  placeholder: string;
+  editLabel: string;
+  speakerFontStyle: "italic" | "normal";
+  renderedTokens: RenpyToken[];
+  handleRenderedLineClick: (e: React.MouseEvent<HTMLElement>) => void;
+}
+
+function RenderedLineOverlay({
+  isEmpty,
+  placeholder,
+  editLabel,
+  speakerFontStyle,
+  renderedTokens,
+  handleRenderedLineClick,
+}: RenderedLineOverlayProps) {
+  return (
+    <button
+      type="button"
+      onClick={handleRenderedLineClick}
+      data-rendered-line-wrapper="true"
+      aria-label={editLabel}
+      className="absolute inset-0 pr-7 cursor-text leading-8 text-left bg-transparent border-0 p-0 outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-color)] focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm overflow-hidden inline-flex items-start"
+      style={{
+        ...editorTypographyStyle,
+        fontStyle: speakerFontStyle,
+        color: "hsl(var(--foreground))",
+      }}
+    >
+      {isEmpty ? (
+        <span className="font-light tracking-normal leading-8 text-muted-foreground/70">
+          {placeholder}
+        </span>
+      ) : (
+        <RenderedLine
+          tokens={renderedTokens}
+          className="font-light tracking-normal leading-8"
+        />
+      )}
+    </button>
+  );
+}
+
 export function LineTextArea({
   entry,
   isFocused,
@@ -37,18 +118,11 @@ export function LineTextArea({
   setIsFocused,
 }: LineTextAreaProps) {
   const isEmpty = entry.text.length === 0;
-  const placeholder = isChoice
-    ? "Choice text..."
-    : entry.speakerId
-      ? isNarrator
-        ? "Narration..."
-        : "Dialogue..."
-      : "Narration...";
-  const editLabel = isChoice
-    ? "Edit choice text"
-    : entry.speakerId
-      ? "Edit dialogue text"
-      : "Edit narration text";
+  const { placeholder, editLabel, ariaLabel } = deriveLineTextLabels(
+    isChoice,
+    entry.speakerId,
+    isNarrator
+  );
 
   return (
     <div className={`relative ${isStacked ? "w-full" : "flex-1"}`}>
@@ -68,13 +142,7 @@ export function LineTextArea({
             ? "opacity-100 pointer-events-auto"
             : "opacity-0 pointer-events-none"
         }`}
-        aria-label={
-          isChoice
-            ? "Choice text"
-            : entry.speakerId
-              ? "Dialogue text"
-              : "Narration text"
-        }
+        aria-label={ariaLabel}
         // The textarea is an editing surface; the rendered-line button is the
         // stable, keyboard-accessible entry point while the row is blurred.
         // It remains programmatically focusable so that button can enter edit
@@ -83,37 +151,20 @@ export function LineTextArea({
         aria-hidden={!isFocused}
         tabIndex={isFocused ? 0 : -1}
         style={{
-          fontSize: "var(--prose-editor-font-size, 16px)",
-          fontFamily: "var(--prose-editor-font-family, var(--font-sans))",
+          ...editorTypographyStyle,
           fontStyle: speakerFontStyle,
           color: "hsl(var(--foreground))",
         }}
       />
       {!isFocused && (
-        <button
-          type="button"
-          onClick={handleRenderedLineClick}
-          data-rendered-line-wrapper="true"
-          aria-label={editLabel}
-          className="absolute inset-0 pr-7 cursor-text leading-8 text-left bg-transparent border-0 p-0 outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-color)] focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm overflow-hidden inline-flex items-start"
-          style={{
-            fontSize: "var(--prose-editor-font-size, 16px)",
-            fontFamily: "var(--prose-editor-font-family, var(--font-sans))",
-            fontStyle: speakerFontStyle,
-            color: "hsl(var(--foreground))",
-          }}
-        >
-          {isEmpty ? (
-            <span className="font-light tracking-normal leading-8 text-muted-foreground/70">
-              {placeholder}
-            </span>
-          ) : (
-            <RenderedLine
-              tokens={renderedTokens}
-              className="font-light tracking-normal leading-8"
-            />
-          )}
-        </button>
+        <RenderedLineOverlay
+          isEmpty={isEmpty}
+          placeholder={placeholder}
+          editLabel={editLabel}
+          speakerFontStyle={speakerFontStyle}
+          renderedTokens={renderedTokens}
+          handleRenderedLineClick={handleRenderedLineClick}
+        />
       )}
     </div>
   );

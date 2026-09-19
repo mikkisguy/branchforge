@@ -566,6 +566,52 @@ describe("DialogueLine", () => {
     });
   });
 
+  it("renders a non-interactive choice speaker stub instead of a speaker dropdown", () => {
+    const entry: DialogueEntry = {
+      id: "choice-1",
+      speakerId: null,
+      text: "Go left",
+      contentType: "CHOICE",
+      choiceData: {
+        lineId: "choice-1",
+        optionIndex: 0,
+        targetLabelId: "label-next",
+        targetLabelName: "next_scene",
+      },
+    };
+
+    renderDialogueLine(entry);
+
+    expect(screen.getByText("Choice")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /change speaker/i })
+    ).toBeNull();
+  });
+
+  it("calls onChange when a character is selected from the speaker dropdown", async () => {
+    const onChange = vi.fn();
+    const entry: DialogueEntry = {
+      id: "entry-1",
+      speakerId: null,
+      text: "Hello world",
+    };
+
+    renderDialogueLine(entry, { onChange });
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /change speaker: narration/i })
+    );
+    await userEvent.click(screen.getByRole("option", { name: "Eileen" }));
+
+    expect(onChange).toHaveBeenCalledWith({
+      id: "entry-1",
+      speakerId: "char-1",
+      text: "Hello world",
+      contentType: undefined,
+      choiceData: undefined,
+    });
+  });
+
   it("applies narrator styling (italic + muted color) to speaker button and textarea", async () => {
     const user = userEvent.setup();
     const entry: DialogueEntry = {
