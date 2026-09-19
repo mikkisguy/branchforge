@@ -44,6 +44,19 @@ describe("Select", () => {
     expect(onChange).toHaveBeenCalledWith("b");
   });
 
+  it("prevents the follow-up click after selecting an option", async () => {
+    const user = userEvent.setup();
+
+    render(<Select value="a" onChange={vi.fn()} options={OPTIONS} />);
+
+    await user.click(screen.getByRole("combobox"));
+    const option = screen.getByRole("option", { name: "Beta" });
+
+    // The option unmounts on pointerdown. Cancelling that event prevents the
+    // browser from retargeting its compatibility click to a dialog backdrop.
+    expect(fireEvent.pointerDown(option, { button: 0 })).toBe(false);
+  });
+
   it("selects from a click without pointerdown", async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
