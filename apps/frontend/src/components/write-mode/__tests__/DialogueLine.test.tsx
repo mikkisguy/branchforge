@@ -125,9 +125,9 @@ describe("DialogueLine", () => {
       screen.getByRole("listbox", { name: /select speaker/i })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("option", { name: "Narration" }).querySelector(
-        '[data-character-role-icon="narration"]'
-      )
+      screen
+        .getByRole("option", { name: "Narration" })
+        .querySelector('[data-character-role-icon="narration"]')
     ).toBeInTheDocument();
 
     for (const option of screen.getAllByRole("option")) {
@@ -172,7 +172,7 @@ describe("DialogueLine", () => {
     expect(container.querySelector("[data-rendered-line]")).toBeInTheDocument();
   });
 
-  it("makes the initial empty line visibly editable by keyboard", async () => {
+  it("makes an empty line editable through its consistent keyboard-accessible affordance", async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
     const entry: DialogueEntry = {
@@ -183,10 +183,18 @@ describe("DialogueLine", () => {
 
     renderDialogueLine(entry, { onChange });
 
-    const textarea = screen.getByRole("textbox", { name: "Narration text" });
-    expect(textarea).toHaveAttribute("placeholder", "Type dialogue…");
+    const editButton = screen.getByRole("button", {
+      name: "Edit narration text",
+    });
+    expect(editButton).toHaveTextContent("Narration...");
+
+    await user.click(editButton);
+    const textarea = screen.getByRole("textbox", {
+      name: "Narration text",
+    });
+    expect(textarea).toHaveAttribute("placeholder", "Narration...");
     expect(textarea).toHaveAttribute("tabindex", "0");
-    expect(textarea).toHaveClass("border", "focus-visible:ring-2");
+    expect(textarea).toHaveClass("border-0", "bg-transparent", "p-0");
 
     await user.type(textarea, "A new line");
 
@@ -197,6 +205,20 @@ describe("DialogueLine", () => {
       contentType: undefined,
       choiceData: undefined,
     });
+  });
+
+  it("uses the same empty-row affordance for a non-initial dialogue line", () => {
+    const entry: DialogueEntry = {
+      id: "entry-2",
+      speakerId: "char-1",
+      text: "",
+    };
+
+    renderDialogueLine(entry, { index: 1, totalEntries: 2 });
+
+    expect(
+      screen.getByRole("button", { name: "Edit dialogue text" })
+    ).toHaveTextContent("Dialogue...");
   });
 
   it("focuses the textarea when the rendered line is clicked", async () => {
@@ -327,7 +349,7 @@ describe("DialogueLine", () => {
       expect(onAddLine).not.toHaveBeenCalled();
     });
 
-    it("Backspace on an empty non-choice line deletes when totalEntries > 1", async () => {
+    it("Backspace on an empty non-choice line deletes", async () => {
       const onDelete = vi.fn();
       const entry: DialogueEntry = {
         id: "entry-1",
@@ -498,7 +520,7 @@ describe("DialogueLine", () => {
       expect(onMoveUp).not.toHaveBeenCalled();
     });
 
-    it("Backspace on sole empty non-choice line does not delete", async () => {
+    it("Backspace on sole empty non-choice line deletes", async () => {
       const onDelete = vi.fn();
       const entry: DialogueEntry = {
         id: "entry-1",
@@ -514,7 +536,7 @@ describe("DialogueLine", () => {
 
       fireEvent.keyDown(textarea, { key: "Backspace" });
 
-      expect(onDelete).not.toHaveBeenCalled();
+      expect(onDelete).toHaveBeenCalledTimes(1);
     });
 
     it("Backspace on empty choice line does not delete", async () => {

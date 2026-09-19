@@ -51,6 +51,47 @@ export function areDialogueEntriesEqual(
   return true;
 }
 
+/**
+ * Restores blank prose rows that a server echo cannot represent. The dialogue
+ * API deliberately rejects blank text, so a successful save returns the local
+ * sequence with empty dialogue/narration rows omitted. Preserve those rows
+ * only when every non-empty row still matches in order; otherwise this is a
+ * genuine external update and the server remains authoritative.
+ */
+export function restoreEmptyProseEntries(
+  localEntries: DialogueEntry[],
+  serverEntries: DialogueEntry[]
+): DialogueEntry[] {
+  const merged: DialogueEntry[] = [];
+  let serverIndex = 0;
+
+  for (const localEntry of localEntries) {
+    const isEmptyProse =
+      localEntry.contentType !== "CHOICE" &&
+      localEntry.text.trim().length === 0;
+
+    if (isEmptyProse) {
+      merged.push(localEntry);
+      continue;
+    }
+
+    const serverEntry = serverEntries[serverIndex];
+    if (
+      !serverEntry ||
+      localEntry.speakerId !== serverEntry.speakerId ||
+      localEntry.text !== serverEntry.text ||
+      localEntry.contentType !== serverEntry.contentType
+    ) {
+      return serverEntries;
+    }
+
+    merged.push(serverEntry);
+    serverIndex++;
+  }
+
+  return serverIndex === serverEntries.length ? merged : serverEntries;
+}
+
 // ============================================================================
 // Conversion Functions
 // ============================================================================

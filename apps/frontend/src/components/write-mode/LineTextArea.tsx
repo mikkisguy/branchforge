@@ -1,5 +1,4 @@
 import { RenderedLine } from "./RenderedLine";
-import { WRITE_MODE_COPY } from "@/copy/write-mode";
 import type { RenpyToken } from "@/lib/renpy-tags";
 
 interface LineTextAreaProps {
@@ -10,7 +9,6 @@ interface LineTextAreaProps {
   };
   isFocused: boolean;
   isChoice: boolean;
-  isInitialEmptyLine: boolean;
   isNarrator: boolean;
   isStacked: boolean;
   speakerFontStyle: "italic" | "normal";
@@ -27,7 +25,6 @@ export function LineTextArea({
   entry,
   isFocused,
   isChoice,
-  isInitialEmptyLine,
   isNarrator,
   isStacked,
   speakerFontStyle,
@@ -39,6 +36,20 @@ export function LineTextArea({
   handleRenderedLineClick,
   setIsFocused,
 }: LineTextAreaProps) {
+  const isEmpty = entry.text.length === 0;
+  const placeholder = isChoice
+    ? "Choice text..."
+    : entry.speakerId
+      ? isNarrator
+        ? "Narration..."
+        : "Dialogue..."
+      : "Narration...";
+  const editLabel = isChoice
+    ? "Edit choice text"
+    : entry.speakerId
+      ? "Edit dialogue text"
+      : "Edit narration text";
+
   return (
     <div className={`relative ${isStacked ? "w-full" : "flex-1"}`}>
       <textarea
@@ -51,23 +62,9 @@ export function LineTextArea({
         onKeyDown={handleKeyDown}
         onFocus={() => setIsFocused(true)}
         onBlur={() => setIsFocused(false)}
-        placeholder={
-          isChoice
-            ? "Choice text..."
-            : entry.speakerId
-              ? isNarrator
-                ? "Narration..."
-                : "Dialogue..."
-              : isInitialEmptyLine
-                ? WRITE_MODE_COPY.line.dialoguePlaceholder
-                : "Narration..."
-        }
-        className={`min-h-[2.5rem] w-full resize-none overflow-hidden font-light tracking-normal leading-8 placeholder:text-muted-foreground/70 ${
-          isInitialEmptyLine
-            ? "rounded-md border border-border bg-background px-3 py-2 outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-color)] focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-            : "border-0 bg-transparent p-0 pr-7 outline-none focus-visible:outline-none focus-visible:ring-0"
-        } ${
-          isInitialEmptyLine || isFocused
+        placeholder={placeholder}
+        className={`min-h-[2.5rem] w-full resize-none overflow-hidden border-0 bg-transparent p-0 pr-7 font-light tracking-normal leading-8 placeholder:text-muted-foreground/70 outline-none focus-visible:outline-none focus-visible:ring-0 ${
+          isFocused
             ? "opacity-100 pointer-events-auto"
             : "opacity-0 pointer-events-none"
         }`}
@@ -78,13 +75,13 @@ export function LineTextArea({
               ? "Dialogue text"
               : "Narration text"
         }
-        // aria-hidden and tabIndex are coordinated: except for the initial
-        // empty line, when not focused the textarea is hidden from AT and
-        // removed from tab order. It must remain programmatically focusable
-        // so the rendered-line overlay can call .focus() to enter edit mode.
+        // The textarea is an editing surface; the rendered-line button is the
+        // stable, keyboard-accessible entry point while the row is blurred.
+        // It remains programmatically focusable so that button can enter edit
+        // mode without a layout change.
         // react-doctor-disable-next-line react-doctor/no-aria-hidden-on-focusable
-        aria-hidden={!isInitialEmptyLine && !isFocused}
-        tabIndex={isInitialEmptyLine || isFocused ? 0 : -1}
+        aria-hidden={!isFocused}
+        tabIndex={isFocused ? 0 : -1}
         style={{
           fontSize: "var(--prose-editor-font-size, 16px)",
           fontFamily: "var(--prose-editor-font-family, var(--font-sans))",
@@ -92,18 +89,12 @@ export function LineTextArea({
           color: "hsl(var(--foreground))",
         }}
       />
-      {!isInitialEmptyLine && !isFocused && (
+      {!isFocused && (
         <button
           type="button"
           onClick={handleRenderedLineClick}
           data-rendered-line-wrapper="true"
-          aria-label={
-            isChoice
-              ? "Edit choice text"
-              : entry.speakerId
-                ? "Edit dialogue text"
-                : "Edit narration text"
-          }
+          aria-label={editLabel}
           className="absolute inset-0 pr-7 cursor-text leading-8 text-left bg-transparent border-0 p-0 outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-color)] focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm overflow-hidden inline-flex items-start"
           style={{
             fontSize: "var(--prose-editor-font-size, 16px)",
@@ -112,10 +103,16 @@ export function LineTextArea({
             color: "hsl(var(--foreground))",
           }}
         >
-          <RenderedLine
-            tokens={renderedTokens}
-            className="font-light tracking-normal leading-8"
-          />
+          {isEmpty ? (
+            <span className="font-light tracking-normal leading-8 text-muted-foreground/70">
+              {placeholder}
+            </span>
+          ) : (
+            <RenderedLine
+              tokens={renderedTokens}
+              className="font-light tracking-normal leading-8"
+            />
+          )}
         </button>
       )}
     </div>
