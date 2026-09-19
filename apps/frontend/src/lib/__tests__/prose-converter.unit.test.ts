@@ -3,7 +3,11 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { dialogueToPayload, findDialogueInsertIndex } from "../prose-converter";
+import {
+  dialogueToPayload,
+  findDialogueInsertIndex,
+  restoreEmptyProseEntries,
+} from "../prose-converter";
 import type { DialogueEntry } from "../prose-types";
 
 describe("dialogueToPayload", () => {
@@ -79,6 +83,39 @@ describe("dialogueToPayload", () => {
   it("should handle empty input array", () => {
     const result = dialogueToPayload([]);
     expect(result).toEqual([]);
+  });
+});
+
+describe("restoreEmptyProseEntries", () => {
+  it("restores empty dialogue and narration rows omitted by a server echo", () => {
+    const localEntries: DialogueEntry[] = [
+      { id: "dialogue", speakerId: "a", text: "Hello" },
+      { id: "empty-dialogue", speakerId: "a", text: "" },
+      { id: "empty-narration", speakerId: null, text: "" },
+      { id: "narration", speakerId: null, text: "The room is quiet." },
+    ];
+    const serverEntries: DialogueEntry[] = [
+      { id: "dialogue", speakerId: "a", text: "Hello" },
+      { id: "narration", speakerId: null, text: "The room is quiet." },
+    ];
+
+    expect(restoreEmptyProseEntries(localEntries, serverEntries)).toEqual(
+      localEntries
+    );
+  });
+
+  it("accepts a changed server sequence instead of merging empty local rows", () => {
+    const localEntries: DialogueEntry[] = [
+      { id: "dialogue", speakerId: "a", text: "Hello" },
+      { id: "empty", speakerId: "a", text: "" },
+    ];
+    const serverEntries: DialogueEntry[] = [
+      { id: "dialogue", speakerId: "a", text: "Updated elsewhere" },
+    ];
+
+    expect(restoreEmptyProseEntries(localEntries, serverEntries)).toEqual(
+      serverEntries
+    );
   });
 });
 

@@ -158,7 +158,7 @@ export function ProjectSettingsDialog({
         onOpenChange={handleOpenChange}
         aria-label="Project Settings"
       >
-        <DialogContent className="max-w-3xl w-full max-h-[80vh] min-h-[500px] max-md:min-h-0 p-0 gap-0 flex flex-col overflow-hidden">
+        <DialogContent className="max-w-3xl w-full p-0 gap-0 flex flex-col overflow-hidden md:h-[min(780px,85vh)] max-md:h-[calc(100%-32px)] max-md:max-h-[calc(100%-32px)]">
           {/* Header */}
           <div className="p-6 max-sm:p-4 border-b border-border/30 flex items-start justify-between shrink-0">
             <div>

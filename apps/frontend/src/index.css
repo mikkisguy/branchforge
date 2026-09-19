@@ -57,13 +57,13 @@
     --config-keyword: var(--config-keyword-dark, hsl(258, 60%, 60%));
     --audio-keyword: var(--audio-keyword-dark, hsl(200, 70%, 60%));
 
-    /* Toast tints - dark mode (subtle tint + colored border per variant) */
-    --toast-success-bg: hsl(142 71% 45% / 0.14);
-    --toast-success-border: hsl(142 71% 45% / 0.45);
-    --toast-destructive-bg: hsl(0 72% 51% / 0.14);
-    --toast-destructive-border: hsl(0 72% 51% / 0.45);
-    --toast-info-bg: hsl(217 91% 60% / 0.14);
-    --toast-info-border: hsl(217 91% 60% / 0.45);
+    /* Toast surfaces - opaque tinted panels that stay legible over content */
+    --toast-success-bg: hsl(142 38% 16%);
+    --toast-success-border: hsl(142 60% 42% / 0.75);
+    --toast-destructive-bg: hsl(0 42% 17%);
+    --toast-destructive-border: hsl(0 65% 48% / 0.75);
+    --toast-info-bg: hsl(217 45% 17%);
+    --toast-info-border: hsl(217 75% 58% / 0.75);
   }
 
   .light {
@@ -113,13 +113,13 @@
     --config-keyword: var(--config-keyword-light, hsl(180, 65%, 26%));
     --audio-keyword: var(--audio-keyword-light, hsl(200, 75%, 28%));
 
-    /* Toast tints - light mode (darker hues for good contrast on white) */
-    --toast-success-bg: hsl(142 71% 35% / 0.12);
-    --toast-success-border: hsl(142 71% 35% / 0.4);
-    --toast-destructive-bg: hsl(0 74% 40% / 0.12);
-    --toast-destructive-border: hsl(0 74% 40% / 0.4);
-    --toast-info-bg: hsl(217 91% 45% / 0.12);
-    --toast-info-border: hsl(217 91% 45% / 0.4);
+    /* Toast surfaces - opaque tinted panels that stay legible over content */
+    --toast-success-bg: hsl(142 45% 96%);
+    --toast-success-border: hsl(142 50% 35% / 0.7);
+    --toast-destructive-bg: hsl(0 55% 97%);
+    --toast-destructive-border: hsl(0 62% 45% / 0.7);
+    --toast-info-bg: hsl(217 65% 97%);
+    --toast-info-border: hsl(217 70% 45% / 0.7);
   }
 }
 

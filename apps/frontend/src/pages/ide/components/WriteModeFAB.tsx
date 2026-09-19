@@ -5,7 +5,6 @@ import {
   FABExpandableChoice,
   FABUndoButton,
   FABRedoButton,
-  FABFocusButton,
 } from "@/components/ide-shared";
 import { WritingGoalFABRow } from "@/pages/ide/components/WritingGoalFABRow";
 import type { ProseEditorRef } from "@/components/write-mode";
@@ -30,8 +29,6 @@ interface WriteModeFABProps {
   onShowBadgesChange: Dispatch<SetStateAction<boolean>>;
   proseUndoState: { canUndo: boolean; canRedo: boolean };
   wordCountState: { todayWordCount: number; dailyGoal: number };
-  isFocusMode: boolean;
-  onFocusModeToggle: () => void;
   editorRef: RefObject<ProseEditorRef | null>;
 }
 
@@ -48,8 +45,6 @@ export function WriteModeFAB({
   onShowBadgesChange,
   proseUndoState,
   wordCountState,
-  isFocusMode,
-  onFocusModeToggle,
   editorRef,
 }: WriteModeFABProps) {
   return (
@@ -113,7 +108,6 @@ export function WriteModeFAB({
       {wordCountState.dailyGoal > 0 && (
         <div className="h-px bg-border/30 my-1" />
       )}
-      <FABFocusButton isFocusMode={isFocusMode} onToggle={onFocusModeToggle} />
       <FABUndoButton
         canUndo={proseUndoState.canUndo}
         onUndo={() => editorRef.current?.undo()}

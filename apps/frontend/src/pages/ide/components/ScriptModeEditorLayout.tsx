@@ -28,7 +28,6 @@ import {
   FABToggle,
   FABUndoButton,
   FABRedoButton,
-  FABFocusButton,
   MobileOverflowFAB,
   UndoRedoControls,
 } from "@/components/ide-shared";
@@ -497,15 +496,23 @@ export function ScriptModeEditorLayout({
               </WorkspaceStatusBar>
             }
             focusChrome={
-              <div className="pointer-events-auto fixed top-2 right-2 z-[100] flex items-center gap-2 max-md:hidden">
-                {saveStatus ? (
+              <div className="pointer-events-auto fixed top-2 right-2 z-[100] flex items-center gap-2">
+                {saveStatus === "saving" && (
+                  <span className="flex size-8 items-center justify-center rounded-full bg-card/80 shadow-sm backdrop-blur-sm">
+                    <SaveIndicator
+                      saveStatus={saveStatus}
+                      displayMode="compact"
+                    />
+                  </span>
+                )}
+                {(saveStatus === "error" || saveConflict) && (
                   <SaveIndicator
                     saveStatus={saveStatus}
                     displayMode="compact"
                     saveConflict={saveConflict}
                     onRetry={onSaveRequest}
                   />
-                ) : null}
+                )}
                 <FocusModeToggle
                   ref={focusToggleRef}
                   isFocusMode={isFocusMode}
@@ -582,10 +589,6 @@ export function ScriptModeEditorLayout({
           onClick={() => setShowOverlays((value) => !value)}
         />
         <div className="my-1 h-px bg-border/30" />
-        <FABFocusButton
-          isFocusMode={isFocusMode}
-          onToggle={handleFocusModeToggle}
-        />
         <FABUndoButton canUndo={canUndo} onUndo={onUndo} />
         <FABRedoButton canRedo={canRedo} onRedo={onRedo} />
       </MobileOverflowFAB>

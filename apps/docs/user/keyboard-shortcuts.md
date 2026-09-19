@@ -55,7 +55,8 @@ These apply while a dialogue line editor is focused.
 
 - The line has no text
 - The line is not a menu choice
-- At least one other line exists in the scene
+
+Deleting the final line returns the label to its empty state.
 
 **Move line up** / **Move line down** reorder the focused dialogue line within the scene.
 

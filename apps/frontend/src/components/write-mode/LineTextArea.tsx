@@ -9,6 +9,7 @@ interface LineTextAreaProps {
   };
   isFocused: boolean;
   isChoice: boolean;
+  isNarrator: boolean;
   isStacked: boolean;
   speakerFontStyle: "italic" | "normal";
   renderedTokens: RenpyToken[];
@@ -20,10 +21,92 @@ interface LineTextAreaProps {
   setIsFocused: (focused: boolean) => void;
 }
 
+interface LineTextLabels {
+  placeholder: string;
+  editLabel: string;
+  ariaLabel: string;
+}
+
+function deriveLineTextLabels(
+  isChoice: boolean,
+  speakerId: string | null | undefined,
+  isNarrator: boolean
+): LineTextLabels {
+  if (isChoice) {
+    return {
+      placeholder: "Choice text...",
+      editLabel: "Edit choice text",
+      ariaLabel: "Choice text",
+    };
+  }
+  if (speakerId) {
+    return {
+      placeholder: isNarrator ? "Type narration..." : "Type dialogue…",
+      editLabel: isNarrator ? "Edit narration text" : "Edit dialogue text",
+      ariaLabel: isNarrator ? "Narration text" : "Dialogue text",
+    };
+  }
+  return {
+    placeholder: "Type narration...",
+    editLabel: "Edit narration text",
+    ariaLabel: "Narration text",
+  };
+}
+
+const editorTypographyStyle = {
+  fontSize: "var(--prose-editor-font-size, 16px)",
+  fontFamily: "var(--prose-editor-font-family, var(--font-sans))",
+} as const;
+
+interface RenderedLineOverlayProps {
+  isEmpty: boolean;
+  placeholder: string;
+  editLabel: string;
+  speakerFontStyle: "italic" | "normal";
+  renderedTokens: RenpyToken[];
+  handleRenderedLineClick: (e: React.MouseEvent<HTMLElement>) => void;
+}
+
+function RenderedLineOverlay({
+  isEmpty,
+  placeholder,
+  editLabel,
+  speakerFontStyle,
+  renderedTokens,
+  handleRenderedLineClick,
+}: RenderedLineOverlayProps) {
+  return (
+    <button
+      type="button"
+      onClick={handleRenderedLineClick}
+      data-rendered-line-wrapper="true"
+      aria-label={editLabel}
+      className="absolute inset-0 px-1 pr-7 cursor-text leading-8 text-left bg-transparent hover:bg-muted/30 dark:hover:bg-muted/20 py-0 outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-color)] focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm overflow-hidden inline-flex items-start"
+      style={{
+        ...editorTypographyStyle,
+        fontStyle: speakerFontStyle,
+        color: "hsl(var(--foreground))",
+      }}
+    >
+      {isEmpty ? (
+        <span className="font-light tracking-normal leading-8 text-muted-foreground/70">
+          {placeholder}
+        </span>
+      ) : (
+        <RenderedLine
+          tokens={renderedTokens}
+          className="font-light tracking-normal leading-8"
+        />
+      )}
+    </button>
+  );
+}
+
 export function LineTextArea({
   entry,
   isFocused,
   isChoice,
+  isNarrator,
   isStacked,
   speakerFontStyle,
   renderedTokens,
@@ -34,6 +117,13 @@ export function LineTextArea({
   handleRenderedLineClick,
   setIsFocused,
 }: LineTextAreaProps) {
+  const isEmpty = entry.text.length === 0;
+  const { placeholder, editLabel, ariaLabel } = deriveLineTextLabels(
+    isChoice,
+    entry.speakerId,
+    isNarrator
+  );
+
   return (
     <div className={`relative ${isStacked ? "w-full" : "flex-1"}`}>
       <textarea
@@ -46,64 +136,35 @@ export function LineTextArea({
         onKeyDown={handleKeyDown}
         onFocus={() => setIsFocused(true)}
         onBlur={() => setIsFocused(false)}
-        placeholder={
-          isChoice
-            ? "Choice text..."
-            : entry.speakerId
-              ? "Dialogue..."
-              : "Narration..."
-        }
-        className={`min-h-[2.5rem] w-full p-0 pr-7 resize-none overflow-hidden bg-transparent border-0 outline-none focus-visible:outline-none focus-visible:ring-0 font-light tracking-normal leading-8 placeholder:text-muted-foreground/70 ${
+        placeholder={placeholder}
+        className={`min-h-[2.5rem] w-full resize-none overflow-hidden border-0 px-1 py-0 pr-7 font-light tracking-normal leading-8 placeholder:text-muted-foreground/70 outline-none focus-visible:outline-none rounded-sm ${
           isFocused
-            ? "opacity-100 pointer-events-auto"
-            : "opacity-0 pointer-events-none"
+            ? "bg-muted/60 dark:bg-muted/20 opacity-100 pointer-events-auto focus-visible:bg-muted/70 dark:focus-visible:bg-muted/30"
+            : "bg-transparent opacity-0 pointer-events-none focus-visible:ring-0"
         }`}
-        aria-label={
-          isChoice
-            ? "Choice text"
-            : entry.speakerId
-              ? "Dialogue text"
-              : "Narration text"
-        }
-        // aria-hidden and tabIndex are coordinated: when not focused the
-        // textarea is hidden from AT AND removed from tab order (tabIndex=-1),
-        // yet must stay programmatically focusable so the rendered-line
-        // overlay's click handler can call .focus() to enter edit mode.
+        aria-label={ariaLabel}
+        // The textarea is an editing surface; the rendered-line button is the
+        // stable, keyboard-accessible entry point while the row is blurred.
+        // It remains programmatically focusable so that button can enter edit
+        // mode without a layout change.
         // react-doctor-disable-next-line react-doctor/no-aria-hidden-on-focusable
         aria-hidden={!isFocused}
         tabIndex={isFocused ? 0 : -1}
         style={{
-          fontSize: "var(--prose-editor-font-size, 16px)",
-          fontFamily: "var(--prose-editor-font-family, var(--font-sans))",
+          ...editorTypographyStyle,
           fontStyle: speakerFontStyle,
           color: "hsl(var(--foreground))",
         }}
       />
       {!isFocused && (
-        <button
-          type="button"
-          onClick={handleRenderedLineClick}
-          data-rendered-line-wrapper="true"
-          aria-label={
-            isChoice
-              ? "Edit choice text"
-              : entry.speakerId
-                ? "Edit dialogue text"
-                : "Edit narration text"
-          }
-          className="absolute inset-0 pr-7 cursor-text leading-8 text-left bg-transparent border-0 p-0 outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-color)] focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm overflow-hidden inline-flex items-start"
-          style={{
-            fontSize: "var(--prose-editor-font-size, 16px)",
-            fontFamily: "var(--prose-editor-font-family, var(--font-sans))",
-            fontStyle: speakerFontStyle,
-            color: "hsl(var(--foreground))",
-          }}
-        >
-          <RenderedLine
-            tokens={renderedTokens}
-            className="font-light tracking-normal leading-8"
-          />
-        </button>
+        <RenderedLineOverlay
+          isEmpty={isEmpty}
+          placeholder={placeholder}
+          editLabel={editLabel}
+          speakerFontStyle={speakerFontStyle}
+          renderedTokens={renderedTokens}
+          handleRenderedLineClick={handleRenderedLineClick}
+        />
       )}
     </div>
   );
