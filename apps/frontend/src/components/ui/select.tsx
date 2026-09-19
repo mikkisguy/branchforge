@@ -197,6 +197,10 @@ export function Select<T extends string = string>({
       if (event.button !== 0) {
         return;
       }
+      // Selecting unmounts this portaled listbox immediately. Prevent the
+      // compatibility click that would otherwise be retargeted to the native
+      // dialog backdrop after the option disappears.
+      event.preventDefault();
       event.stopPropagation();
       handleSelect(optionValue);
     },

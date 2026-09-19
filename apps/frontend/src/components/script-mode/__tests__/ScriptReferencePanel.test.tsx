@@ -84,7 +84,7 @@ describe("ScriptReferencePanel - Characters Section", () => {
       color: "#ffd93d",
       avatarUrl: "/avatars/natsuki.png",
       isLoveInterest: false,
-      isNarrator: false,
+      isNarrator: true,
       routeAffiliation: "route-b",
       nameType: "literal",
       notes: "test notes",
@@ -211,6 +211,20 @@ describe("ScriptReferencePanel - Characters Section", () => {
 
     const hearts = container.querySelectorAll(".text-pink-400");
     expect(hearts).toHaveLength(2); // Emily and Sayori are love interests
+  });
+
+  it("shows a book icon only for narrators", () => {
+    const { container } = render(
+      <ScriptReferencePanel
+        projectId={mockProjectId}
+        projectCharacters={mockCharacters}
+      />,
+      { wrapper }
+    );
+
+    expect(
+      container.querySelectorAll('[data-character-role-icon="narrator"]')
+    ).toHaveLength(1);
   });
 
   it("trims variable categories and falls back to Uncategorized", async () => {

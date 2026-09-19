@@ -17,6 +17,7 @@ import type React from "react";
 import {
   areDialogueEntriesEqual,
   findDialogueInsertIndex,
+  restoreEmptyProseEntries,
 } from "@/lib/prose-converter";
 import { useWritingGoals } from "@/hooks/useWritingGoals";
 import { useEntriesUndo } from "@/hooks/useEntriesUndo";
@@ -368,7 +369,10 @@ export function useProseEditorState({
       return;
     }
 
-    const newEntries = convertLabelLinesToEntries(activeLabel);
+    const serverEntries = convertLabelLinesToEntries(activeLabel);
+    const newEntries = hasSwitchedLabel
+      ? serverEntries
+      : restoreEmptyProseEntries(entriesRef.current, serverEntries);
     // Update baseline to latest persisted content from server.
     // Any unsaved local edits remain represented by (wordCount - initialWordCount).
     const newWordCount = countWordsFromEntries(newEntries);

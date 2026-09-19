@@ -139,7 +139,6 @@ export const DialogueLine = memo(function DialogueLine({
       if (
         matchesShortcut(e, "write-delete-empty-line") &&
         internalTextareaRef.current?.value === "" &&
-        totalEntries > 1 &&
         !isChoice
       ) {
         e.preventDefault();
@@ -181,8 +180,7 @@ export const DialogueLine = memo(function DialogueLine({
   const hasSpeaker = Boolean(entry.speakerId);
   const speakerFontStyle = !hasSpeaker || isNarrator ? "italic" : "normal";
   const choiceTargetName = entry.choiceData?.targetLabelName;
-  const showDelete =
-    (isHovered || entry.text === "") && totalEntries > 1 && !isChoice;
+  const showDelete = (isHovered || entry.text === "") && !isChoice;
   const gapClass = isStacked
     ? "flex-col gap-1.5 py-2"
     : "flex-col gap-1 py-1.5";
@@ -225,6 +223,7 @@ export const DialogueLine = memo(function DialogueLine({
           entry={entry}
           isFocused={isFocused}
           isChoice={isChoice}
+          isNarrator={isNarrator}
           isStacked={isStacked}
           speakerFontStyle={speakerFontStyle}
           renderedTokens={renderedTokens}

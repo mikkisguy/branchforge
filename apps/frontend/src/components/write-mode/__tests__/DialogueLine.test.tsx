@@ -124,10 +124,42 @@ describe("DialogueLine", () => {
     expect(
       screen.getByRole("listbox", { name: /select speaker/i })
     ).toBeInTheDocument();
+    expect(
+      screen
+        .getByRole("option", { name: "Narration" })
+        .querySelector('[data-character-role-icon="narration"]')
+    ).toBeInTheDocument();
 
     for (const option of screen.getAllByRole("option")) {
       expect(option).toHaveAttribute("tabindex", "-1");
     }
+  });
+
+  it("shows role icons beside character names in the speaker dropdown", async () => {
+    const entry: DialogueEntry = {
+      id: "entry-1",
+      speakerId: null,
+      text: "Narration text",
+    };
+
+    const { container } = renderDialogueLine(entry);
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /change speaker: narration/i })
+    );
+
+    expect(
+      container.querySelector('[data-character-role-icon="love-interest"]')
+    ).toBeInTheDocument();
+    expect(
+      container.querySelector('[data-character-role-icon="narrator"]')
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("option", { name: "EileenLove interest" })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("option", { name: "NarratorNarrator" })
+    ).toBeInTheDocument();
   });
 
   it("hides the textarea visually when blurred (default)", () => {
@@ -144,6 +176,59 @@ describe("DialogueLine", () => {
 
     // Rendered line overlay is present and keyboard-accessible.
     expect(container.querySelector("[data-rendered-line]")).toBeInTheDocument();
+  });
+
+  it("makes an empty line editable through its consistent keyboard-accessible affordance", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    const entry: DialogueEntry = {
+      id: "entry-1",
+      speakerId: null,
+      text: "",
+    };
+
+    renderDialogueLine(entry, { onChange });
+
+    const editButton = screen.getByRole("button", {
+      name: "Edit narration text",
+    });
+    expect(editButton).toHaveTextContent("Type narration...");
+    expect(editButton).toHaveClass(
+      "hover:bg-muted/30",
+      "dark:hover:bg-muted/20"
+    );
+
+    await user.click(editButton);
+    const textarea = screen.getByRole("textbox", {
+      name: "Narration text",
+    });
+    expect(textarea).toHaveAttribute("placeholder", "Type narration...");
+    expect(textarea).toHaveAttribute("tabindex", "0");
+    expect(textarea).toHaveClass("border-0", "bg-muted/60", "px-1");
+
+    await user.type(textarea, "A new line");
+
+    expect(onChange).toHaveBeenLastCalledWith({
+      id: "entry-1",
+      speakerId: null,
+      text: "A new line",
+      contentType: undefined,
+      choiceData: undefined,
+    });
+  });
+
+  it("uses the same empty-row affordance for a non-initial dialogue line", () => {
+    const entry: DialogueEntry = {
+      id: "entry-2",
+      speakerId: "char-1",
+      text: "",
+    };
+
+    renderDialogueLine(entry, { index: 1, totalEntries: 2 });
+
+    expect(
+      screen.getByRole("button", { name: "Edit dialogue text" })
+    ).toHaveTextContent("Type dialogue…");
   });
 
   it("focuses the textarea when the rendered line is clicked", async () => {
@@ -176,6 +261,20 @@ describe("DialogueLine", () => {
     // setSelectionRange(11, 11).
     expect(textarea.selectionStart).toBe(11);
     expect(textarea.selectionEnd).toBe(11);
+  });
+
+  it("uses a narration placeholder when the selected speaker is the narrator", async () => {
+    const entry: DialogueEntry = {
+      id: "entry-1",
+      speakerId: "narr-1",
+      text: "",
+    };
+
+    const { container } = renderDialogueLine(entry);
+    const textarea = await focusDialogueTextarea(container);
+
+    expect(textarea).toHaveAccessibleName("Narration text");
+    expect(textarea).toHaveAttribute("placeholder", "Type narration...");
   });
 
   it("hides the textarea visually when blurred again", async () => {
@@ -261,7 +360,7 @@ describe("DialogueLine", () => {
       expect(onAddLine).not.toHaveBeenCalled();
     });
 
-    it("Backspace on an empty non-choice line deletes when totalEntries > 1", async () => {
+    it("Backspace on an empty non-choice line deletes", async () => {
       const onDelete = vi.fn();
       const entry: DialogueEntry = {
         id: "entry-1",
@@ -432,7 +531,7 @@ describe("DialogueLine", () => {
       expect(onMoveUp).not.toHaveBeenCalled();
     });
 
-    it("Backspace on sole empty non-choice line does not delete", async () => {
+    it("Backspace on sole empty non-choice line deletes", async () => {
       const onDelete = vi.fn();
       const entry: DialogueEntry = {
         id: "entry-1",
@@ -448,7 +547,7 @@ describe("DialogueLine", () => {
 
       fireEvent.keyDown(textarea, { key: "Backspace" });
 
-      expect(onDelete).not.toHaveBeenCalled();
+      expect(onDelete).toHaveBeenCalledTimes(1);
     });
 
     it("Backspace on empty choice line does not delete", async () => {
@@ -475,6 +574,54 @@ describe("DialogueLine", () => {
       fireEvent.keyDown(textarea, { key: "Backspace" });
 
       expect(onDelete).not.toHaveBeenCalled();
+    });
+  });
+
+  it("renders a non-interactive choice speaker stub instead of a speaker dropdown", () => {
+    const entry: DialogueEntry = {
+      id: "choice-1",
+      speakerId: null,
+      text: "Go left",
+      contentType: "CHOICE",
+      choiceData: {
+        lineId: "choice-1",
+        optionIndex: 0,
+        targetLabelId: "label-next",
+        targetLabelName: "next_scene",
+      },
+    };
+
+    renderDialogueLine(entry);
+
+    expect(screen.getByText("Choice")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /change speaker/i })
+    ).toBeNull();
+  });
+
+  it("calls onChange when a character is selected from the speaker dropdown", async () => {
+    const onChange = vi.fn();
+    const entry: DialogueEntry = {
+      id: "entry-1",
+      speakerId: null,
+      text: "Hello world",
+    };
+
+    renderDialogueLine(entry, { onChange });
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /change speaker: narration/i })
+    );
+    await userEvent.click(
+      screen.getByRole("option", { name: "EileenLove interest" })
+    );
+
+    expect(onChange).toHaveBeenCalledWith({
+      id: "entry-1",
+      speakerId: "char-1",
+      text: "Hello world",
+      contentType: undefined,
+      choiceData: undefined,
     });
   });
 
