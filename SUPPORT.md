@@ -9,6 +9,7 @@ There are several ways to get help with BranchForge:
 First, check the documentation:
 
 - [README.md](README.md) - Quick start guide
+- [User documentation](apps/docs/user/getting-started.md) - VitePress site (`pnpm docs:dev`)
 - [CONTRIBUTING.md](CONTRIBUTING.md) - How to contribute
 - [FEATURE_ROADMAP.md](docs/FEATURE_ROADMAP.md) - What's being built
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md) - System design
@@ -46,11 +47,20 @@ General questions are best handled via GitHub issues.
 
 #### Is BranchForge stable enough for my project?
 
-**No.** BranchForge is currently in **alpha**. It's a work-in-progress with incomplete features and potential bugs. Back up your work frequently. Use it for experimentation and feedback only.
+**Not yet.** BranchForge is in **beta**. The solo writing loop is usable, but
+expect bugs, incomplete features, and breaking changes. Back up your work
+frequently.
 
 #### How do I export my project?
 
-Use GitLab export (`/api/projects/:id/gitlab/export`) or wait for zip export (planned).
+Use **ZIP export** from the project menu or push to GitLab when configured.
+See the [import & export guide](apps/docs/user/import-export.md).
+
+#### Is there a demo project for trying BranchForge?
+
+In local development, run `pnpm db:seed:docs-demo` and sign in with
+`docs-demo@branchforge.test` / `docsdemo123`. This command is dev-only and
+refuses production or staging environments.
 
 #### Can I collaborate with other writers?
 

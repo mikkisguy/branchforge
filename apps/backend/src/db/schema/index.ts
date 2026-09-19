@@ -1,7 +1,7 @@
 /**
  * BranchForge Database Schema
  *
- * Complete Drizzle ORM schema for the Visual Novel IDE.
+ * Complete Drizzle ORM schema for the Visual Novel Studio.
  * This module re-exports all tables, enums, and types from their respective modules.
  *
  * Based on DATABASE_SCHEMAS.md specification.

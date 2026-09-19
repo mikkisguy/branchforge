@@ -6,6 +6,7 @@ node_modules/
 dist/
 dist-schema/
 build/
+apps/docs/.vitepress/dist/
 *.tsbuildinfo
 
 # Database migrations

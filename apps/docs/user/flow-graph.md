@@ -12,31 +12,31 @@ BranchForge offers three layout modes for different visualization needs:
 
 ### Flow Mode (Default)
 
-[screenshot of flow mode]
+<!-- screenshot: flow-mode.png — FLOW layout with split/rejoin graph, dark theme, docs demo -->
 
 Hierarchical layout showing the narrative as a directed tree. Good for understanding the overall structure.
 
 ### Route Mode
 
-[screenshot of route mode]
+<!-- screenshot: route-mode.png — ROUTE layout with Elena/Marcus columns, dark theme -->
 
 Columns organized by route. Good for comparing parallel paths side-by-side.
 
 ### File Mode
 
-[screenshot of file mode]
+<!-- screenshot: file-mode.png — FILE layout with two file columns, dark theme -->
 
 Columns organized by source file. Good when your script is split across multiple RPY files.
 
 ## Dragging Nodes
 
-[screenshot of node dragging]
+<!-- screenshot: flow-node-drag.png — Node mid-drag in FLOW layout, dark theme -->
 
 Drag nodes to reorganize the graph. This does not change your script — it only changes the visual layout for exploration.
 
 ## Filtering
 
-[screenshot of filter controls]
+<!-- screenshot: flow-filters.png — Route filter applied (Elena), dark theme -->
 
 Filter the graph by:
 

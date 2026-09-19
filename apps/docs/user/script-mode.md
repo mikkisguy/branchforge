@@ -22,7 +22,7 @@ When you switch back to Write Mode, BranchForge re-parses the source and the [te
 
 ## The Editor
 
-[screenshot of Script Mode]
+<!-- screenshot: script-mode-editor.png — Script Mode with game/script.rpy open, dark theme -->
 
 Script Mode uses CodeMirror 6 with custom Ren'Py syntax highlighting:
 
@@ -33,7 +33,7 @@ Script Mode uses CodeMirror 6 with custom Ren'Py syntax highlighting:
 
 ## File Tree
 
-[screenshot of file tree]
+<!-- screenshot: script-mode-file-tree.png — File tree with script.rpy and epilogue.rpy, dark theme -->
 
 The file tree on the left shows all `.rpy` files in your project, organized by source (imported from zip, synced from GitLab, etc.). Click a file to open it in the editor.
 

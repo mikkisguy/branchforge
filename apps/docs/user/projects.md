@@ -29,7 +29,7 @@ You can import into an existing project to merge new files, or create a brand-ne
 
 ## Project List View
 
-[screenshot of project list]
+<!-- screenshot: project-list.png — Project list after login, dark theme, docs demo project visible -->
 
 Once imported, your project appears in the project list. From here you can:
 

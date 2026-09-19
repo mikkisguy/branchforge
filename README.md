@@ -4,7 +4,7 @@
 
 # BranchForge
 
-**A creative workspace for Ren'Py visual novel writers**
+**A creative studio for Ren’Py visual novels**
 
 [![Version](https://img.shields.io/badge/version-1.0.0--beta.5-yellowgreen)](CHANGELOG.md)
 ![Beta](https://img.shields.io/badge/status-beta-yellowgreen)
@@ -178,7 +178,8 @@ Backend runs at `http://localhost:3000`, frontend at `http://localhost:5173`.
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md) - System design
 - [DATABASE_SCHEMAS.md](docs/DATABASE_SCHEMAS.md) - Database structure
 - [GitHub Issues](https://github.com/mikkisguy/branchforge/issues) - Remaining work (v1.0 tracker: [#141](https://github.com/mikkisguy/branchforge/issues/141))
-- Docs site: `pnpm docs:dev` (VitePress in `apps/docs`)
+- Docs site: `pnpm docs:dev` (VitePress in `apps/docs`; set `VITEPRESS_SITE_URL` when building for a public hostname)
+- Docs demo seed (dev only): `pnpm db:seed:docs-demo` → `docs-demo@branchforge.test` / `docsdemo123`
 
 ### Project Structure
 
@@ -228,6 +229,7 @@ pnpm typecheck  # Type check all packages
 pnpm docs:dev   # VitePress docs site
 pnpm docs:build # Build docs
 pnpm docs:preview  # Preview built docs
+pnpm db:seed:docs-demo  # Seed docs demo project (dev only)
 
 # Backend
 pnpm --filter @branchforge/backend dev          # Start backend

@@ -59,7 +59,6 @@ describe("useFileTabs", () => {
       {
         id: "file-1",
         title: "act_1.rpy",
-        meta: "Story",
         closeLabel: "Close act_1.rpy",
       },
     ]);
