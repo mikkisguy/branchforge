@@ -50,6 +50,10 @@ html.dark .bf-home {
   --link: #b8bcff;
 }
 
+html.dark .bf-home .bf-button-primary {
+  color: #1b1b1f;
+}
+
 .bf-home * {
   box-sizing: border-box;
 }
@@ -168,7 +172,9 @@ html.dark .bf-home {
 .bf-button:focus-visible,
 .bf-secondary-action:focus-visible,
 .bf-text-link:focus-visible,
-.bf-screenshot a:focus-visible {
+.bf-screenshot a:focus-visible,
+.bf-supporting a:focus-visible,
+.bf-screenshot figcaption a:focus-visible {
   outline: 3px solid var(--accent);
   outline-offset: 3px;
   border-radius: 0.25rem;
@@ -239,11 +245,11 @@ html.dark .bf-home {
 }
 
 .bf-screenshot-toggle:hover {
-  color: var(--brand);
+  color: var(--accent);
 }
 
 .bf-screenshot-toggle:focus-visible {
-  outline: 2px solid var(--brand);
+  outline: 3px solid var(--accent);
   outline-offset: 3px;
   border-radius: 1px;
 }
@@ -254,35 +260,12 @@ html.dark .bf-home {
 }
 
 .bf-section {
-  padding-top: clamp(4rem, 8vw, 6.5rem);
+  padding-top: clamp(3rem, 6vw, 4.5rem);
 }
 
 .bf-section h2 {
   max-width: 30ch;
   font-size: clamp(1.8rem, 3.4vw, 2.75rem);
-}
-
-.bf-lifecycle {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0;
-  margin: 1.5rem 0 0;
-  padding: 0;
-  list-style: none;
-}
-
-.bf-lifecycle li {
-  position: relative;
-  flex: 1 1 11rem;
-  padding: 1rem 1.25rem 1rem 1.5rem;
-  border-left: 1px solid var(--border);
-  color: var(--text);
-  font-weight: 600;
-}
-
-.bf-lifecycle li:first-child {
-  border-left: none;
-  padding-left: 0;
 }
 
 .bf-modes {
@@ -296,6 +279,14 @@ html.dark .bf-home {
   margin: 0 0 0.5rem;
   font-size: 1.2rem;
   letter-spacing: -0.02em;
+}
+
+.bf-mode-column {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding-top: 1.25rem;
+  border-top: 2px solid var(--accent);
 }
 
 .bf-mode-column p {
@@ -330,9 +321,15 @@ html.dark .bf-home {
   height: 0.9rem;
 }
 
+.bf-mode-column .bf-text-link {
+  margin-top: auto;
+  padding-top: 0.75rem;
+}
+
 .bf-supporting {
-  max-width: 44rem;
   margin: 2rem 0 0;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border);
   color: var(--muted);
   font-size: 0.95rem;
 }
@@ -343,26 +340,42 @@ html.dark .bf-home {
   text-underline-offset: 0.15em;
 }
 
-.bf-status {
+.bf-status-section {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 1.5rem;
-  margin-top: 2rem;
-  padding-top: 1.5rem;
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.35fr);
+  gap: clamp(2rem, 6vw, 5rem);
+  align-items: start;
+  padding-top: clamp(5rem, 9vw, 7rem);
+}
+
+.bf-status {
   border-top: 1px solid var(--border);
 }
 
-.bf-status-column h3 {
-  margin: 0 0 0.5rem;
+.bf-status-row {
+  display: grid;
+  grid-template-columns: minmax(7rem, 0.42fr) minmax(0, 1fr);
+  column-gap: 1.5rem;
+  padding: 1.25rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.bf-status-row h3 {
+  margin: 0;
   font-size: 1.05rem;
   letter-spacing: -0.02em;
 }
 
-.bf-status-column p {
-  margin: 0 0 0.75rem;
+.bf-status-row p {
+  margin: 0;
   color: var(--muted);
   font-size: 0.9rem;
   line-height: 1.6;
+}
+
+.bf-status-row .bf-text-link {
+  grid-column: 2;
+  margin-top: 0.75rem;
 }
 
 .bf-docker {
@@ -371,7 +384,9 @@ html.dark .bf-home {
   gap: clamp(1.5rem, 5vw, 3rem);
   align-items: center;
   margin-top: clamp(4rem, 8vw, 6.5rem);
-  padding-block: clamp(2.5rem, 5vw, 3.5rem);
+  padding: clamp(2rem, 4.5vw, 3.25rem);
+  border-block: 1px solid var(--border);
+  background: var(--panel);
 }
 
 .bf-docker h2 {
@@ -386,6 +401,7 @@ html.dark .bf-home {
 }
 
 .bf-docker pre {
+  max-width: 100%;
   margin: 0;
   padding: 1.35rem;
   overflow-x: auto;
@@ -407,7 +423,7 @@ html.dark .bf-home {
   text-align: center;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 760px) {
   .bf-hero,
   .bf-section,
   .bf-docker,
@@ -421,28 +437,21 @@ html.dark .bf-home {
   }
 
   .bf-modes,
-  .bf-status {
+  .bf-status-section {
     grid-template-columns: 1fr;
   }
 
-  .bf-status {
-    gap: 1.25rem;
+  .bf-status-section {
+    gap: 1.75rem;
   }
 
-  .bf-lifecycle {
-    flex-direction: column;
+  .bf-status-row {
+    grid-template-columns: 1fr;
+    row-gap: 0.45rem;
   }
 
-  .bf-lifecycle li {
-    flex: none;
-    border-left: none;
-    border-top: 1px solid var(--border);
-    padding: 1rem 0;
-  }
-
-  .bf-lifecycle li:first-child {
-    border-top: none;
-    padding-top: 0;
+  .bf-status-row .bf-text-link {
+    grid-column: 1;
   }
 }
 
@@ -478,6 +487,7 @@ html.dark .bf-home {
   }
 
   .bf-docker pre {
+    width: 100%;
     padding: 1rem;
   }
 }

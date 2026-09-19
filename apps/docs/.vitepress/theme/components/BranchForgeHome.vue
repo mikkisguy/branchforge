@@ -129,7 +129,8 @@ onBeforeUnmount(() => {
         <p class="bf-lead">
           Creative studio for Ren'Py visual novels. Bring in your Ren'Py
           project, write dialogue in a focused workspace, edit the source when
-          you need to, and trace branching paths without losing context.
+          you need to, and trace branching paths without losing context. Export
+          a ZIP or sync with GitLab when you're ready to share.
         </p>
         <div class="bf-actions">
           <a class="bf-button bf-button-primary" :href="installAnchor"
@@ -185,16 +186,6 @@ onBeforeUnmount(() => {
       </figcaption>
     </figure>
 
-    <section class="bf-section" aria-labelledby="lifecycle-title">
-      <h2 id="lifecycle-title">Your project stays a Ren'Py project.</h2>
-      <ol class="bf-lifecycle">
-        <li>Import existing project</li>
-        <li>Write or edit</li>
-        <li>Inspect branches</li>
-        <li>Export ZIP or sync GitLab</li>
-      </ol>
-    </section>
-
     <section class="bf-section" aria-labelledby="modes-title">
       <h2 id="modes-title">Write prose. Edit the script. See the structure.</h2>
       <div class="bf-modes">
@@ -238,17 +229,20 @@ onBeforeUnmount(() => {
       </p>
     </section>
 
-    <section class="bf-section" aria-labelledby="status-title">
+    <section
+      class="bf-section bf-status-section"
+      aria-labelledby="status-title"
+    >
       <h2 id="status-title">Self-hosted, open source, and in beta.</h2>
       <div class="bf-status">
-        <div class="bf-status-column">
+        <div class="bf-status-row">
           <h3>Self-hosted</h3>
           <p>
             Run BranchForge on your own machine with Docker. You control the
             data, the domain, and the environment.
           </p>
         </div>
-        <div class="bf-status-column">
+        <div class="bf-status-row">
           <h3>Open source</h3>
           <p>
             BranchForge is licensed under GPL v3. Contributions, bug reports,
@@ -263,7 +257,7 @@ onBeforeUnmount(() => {
             <svg aria-hidden="true"><use href="#bf-arrow" /></svg
           ></a>
         </div>
-        <div class="bf-status-column">
+        <div class="bf-status-row">
           <h3>Beta</h3>
           <p>
             GitLab conflict review is read-only, so conflicts still need to be
