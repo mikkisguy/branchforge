@@ -124,6 +124,11 @@ describe("DialogueLine", () => {
     expect(
       screen.getByRole("listbox", { name: /select speaker/i })
     ).toBeInTheDocument();
+    expect(
+      screen.getByRole("option", { name: "Narration" }).querySelector(
+        '[data-character-role-icon="narration"]'
+      )
+    ).toBeInTheDocument();
 
     for (const option of screen.getAllByRole("option")) {
       expect(option).toHaveAttribute("tabindex", "-1");

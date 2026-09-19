@@ -151,7 +151,7 @@ export function SpeakerDropdown({
             aria-selected={!speakerId}
             onClick={() => handleSpeakerSelect(null)}
             tabIndex={-1}
-            className={`w-full text-left px-3 py-2 text-sm transition-colors duration-150 ${
+            className={`w-full text-left px-3 py-2 text-sm transition-colors duration-150 flex items-center gap-2 ${
               focusedOptionIndex === 0 ? "bg-muted" : "hover:bg-muted"
             }`}
             style={{
@@ -159,7 +159,12 @@ export function SpeakerDropdown({
               fontWeight: !speakerId ? "600" : "normal",
             }}
           >
-            Narration
+            <span>Narration</span>
+            <BookOpen
+              aria-hidden="true"
+              data-character-role-icon="narration"
+              className="size-3 text-muted-foreground shrink-0"
+            />
           </button>
 
           <hr className="my-1 border-t border-border" />
