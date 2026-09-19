@@ -170,12 +170,10 @@ export function useFileTabs({
       const file = fileMap.get(tabId);
       if (file !== undefined) {
         const fileName = file.filePath.split("/").pop() || file.filePath;
-        const fileKind = file.fileType === "SETTINGS" ? "Settings" : "Story";
 
         items.push({
           id: file.id,
           title: fileName,
-          meta: fileKind,
           closeLabel: `Close ${fileName}`,
         });
       }

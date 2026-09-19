@@ -304,11 +304,6 @@ export function ProjectFileTree({
                         <span className="truncate" title={file.filePath}>
                           {getFileName(file.filePath)}
                         </span>
-                        {file.fileType === "SETTINGS" && (
-                          <span className="text-[10px] text-muted-foreground/80 ml-auto shrink-0">
-                            Settings
-                          </span>
-                        )}
                       </button>
                       {fileActions && !isProtected ? (
                         <FileRowMenu
