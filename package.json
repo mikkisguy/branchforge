@@ -2,7 +2,7 @@
   "name": "branchforge",
   "version": "1.0.0-beta.4",
   "private": true,
-  "description": "Visual Novel IDE for Ren'Py",
+  "description": "Visual Novel Studio for Ren'Py",
   "scripts": {
     "changeset": "changeset",
     "changeset:version": "changeset version",

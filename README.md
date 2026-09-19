@@ -4,7 +4,7 @@
 
 # BranchForge
 
-**A creative workspace for Ren'Py visual novel writers**
+**A creative studio for Ren’Py visual novels**
 
 [![Version](https://img.shields.io/badge/version-1.0.0--beta.4-yellowgreen)](CHANGELOG.md)
 ![Beta](https://img.shields.io/badge/status-beta-yellowgreen)
