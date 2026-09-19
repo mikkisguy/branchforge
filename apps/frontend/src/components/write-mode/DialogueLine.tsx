@@ -43,6 +43,8 @@ export const DialogueLine = memo(function DialogueLine({
   const previousTextRef = useRef(entry.text);
   const measureRef = useRef<HTMLSpanElement>(null);
   const isChoice = entry.contentType === "CHOICE";
+  const isInitialEmptyLine =
+    index === 0 && totalEntries === 1 && entry.text === "" && !isChoice;
 
   const speaker = useDialogueLineSpeaker(entry, characters, onChange);
 
@@ -225,6 +227,7 @@ export const DialogueLine = memo(function DialogueLine({
           entry={entry}
           isFocused={isFocused}
           isChoice={isChoice}
+          isInitialEmptyLine={isInitialEmptyLine}
           isStacked={isStacked}
           speakerFontStyle={speakerFontStyle}
           renderedTokens={renderedTokens}

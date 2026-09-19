@@ -146,6 +146,33 @@ describe("DialogueLine", () => {
     expect(container.querySelector("[data-rendered-line]")).toBeInTheDocument();
   });
 
+  it("makes the initial empty line visibly editable by keyboard", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    const entry: DialogueEntry = {
+      id: "entry-1",
+      speakerId: null,
+      text: "",
+    };
+
+    renderDialogueLine(entry, { onChange });
+
+    const textarea = screen.getByRole("textbox", { name: "Narration text" });
+    expect(textarea).toHaveAttribute("placeholder", "Type dialogue…");
+    expect(textarea).toHaveAttribute("tabindex", "0");
+    expect(textarea).toHaveClass("border", "focus-visible:ring-2");
+
+    await user.type(textarea, "A new line");
+
+    expect(onChange).toHaveBeenLastCalledWith({
+      id: "entry-1",
+      speakerId: null,
+      text: "A new line",
+      contentType: undefined,
+      choiceData: undefined,
+    });
+  });
+
   it("focuses the textarea when the rendered line is clicked", async () => {
     const user = userEvent.setup();
     const entry: DialogueEntry = {

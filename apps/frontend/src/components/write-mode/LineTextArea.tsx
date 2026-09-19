@@ -1,4 +1,5 @@
 import { RenderedLine } from "./RenderedLine";
+import { WRITE_MODE_COPY } from "@/copy/write-mode";
 import type { RenpyToken } from "@/lib/renpy-tags";
 
 interface LineTextAreaProps {
@@ -9,6 +10,7 @@ interface LineTextAreaProps {
   };
   isFocused: boolean;
   isChoice: boolean;
+  isInitialEmptyLine: boolean;
   isStacked: boolean;
   speakerFontStyle: "italic" | "normal";
   renderedTokens: RenpyToken[];
@@ -24,6 +26,7 @@ export function LineTextArea({
   entry,
   isFocused,
   isChoice,
+  isInitialEmptyLine,
   isStacked,
   speakerFontStyle,
   renderedTokens,
@@ -47,14 +50,20 @@ export function LineTextArea({
         onFocus={() => setIsFocused(true)}
         onBlur={() => setIsFocused(false)}
         placeholder={
-          isChoice
-            ? "Choice text..."
-            : entry.speakerId
-              ? "Dialogue..."
-              : "Narration..."
+          isInitialEmptyLine
+            ? WRITE_MODE_COPY.line.dialoguePlaceholder
+            : isChoice
+              ? "Choice text..."
+              : entry.speakerId
+                ? "Dialogue..."
+                : "Narration..."
         }
-        className={`min-h-[2.5rem] w-full p-0 pr-7 resize-none overflow-hidden bg-transparent border-0 outline-none focus-visible:outline-none focus-visible:ring-0 font-light tracking-normal leading-8 placeholder:text-muted-foreground/70 ${
-          isFocused
+        className={`min-h-[2.5rem] w-full resize-none overflow-hidden font-light tracking-normal leading-8 placeholder:text-muted-foreground/70 ${
+          isInitialEmptyLine
+            ? "rounded-md border border-border bg-background px-3 py-2 outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-color)] focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            : "border-0 bg-transparent p-0 pr-7 outline-none focus-visible:outline-none focus-visible:ring-0"
+        } ${
+          isInitialEmptyLine || isFocused
             ? "opacity-100 pointer-events-auto"
             : "opacity-0 pointer-events-none"
         }`}
@@ -65,13 +74,13 @@ export function LineTextArea({
               ? "Dialogue text"
               : "Narration text"
         }
-        // aria-hidden and tabIndex are coordinated: when not focused the
-        // textarea is hidden from AT AND removed from tab order (tabIndex=-1),
-        // yet must stay programmatically focusable so the rendered-line
-        // overlay's click handler can call .focus() to enter edit mode.
+        // aria-hidden and tabIndex are coordinated: except for the initial
+        // empty line, when not focused the textarea is hidden from AT and
+        // removed from tab order. It must remain programmatically focusable
+        // so the rendered-line overlay can call .focus() to enter edit mode.
         // react-doctor-disable-next-line react-doctor/no-aria-hidden-on-focusable
-        aria-hidden={!isFocused}
-        tabIndex={isFocused ? 0 : -1}
+        aria-hidden={!isInitialEmptyLine && !isFocused}
+        tabIndex={isInitialEmptyLine || isFocused ? 0 : -1}
         style={{
           fontSize: "var(--prose-editor-font-size, 16px)",
           fontFamily: "var(--prose-editor-font-family, var(--font-sans))",
@@ -79,7 +88,7 @@ export function LineTextArea({
           color: "hsl(var(--foreground))",
         }}
       />
-      {!isFocused && (
+      {!isInitialEmptyLine && !isFocused && (
         <button
           type="button"
           onClick={handleRenderedLineClick}
