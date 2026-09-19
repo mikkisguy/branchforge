@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useData, withBase } from "vitepress";
 
 const repoUrl = "https://github.com/mikkisguy/branchforge";
@@ -13,12 +13,106 @@ const scriptMode = withBase("/user/script-mode");
 const flowGraph = withBase("/user/flow-graph");
 const characters = withBase("/user/characters");
 const { isDark } = useData();
-const darkScreenshot = withBase("/images/branchforge-write-mode.png");
-const lightScreenshot = withBase("/images/branchforge-write-mode-light.png");
+
+const screenshots = [
+  {
+    label: "Write",
+    alt: "BranchForge Write mode showing a Ren'Py project loaded in the editor",
+    dark: withBase("/images/branchforge-write-mode.png"),
+    light: withBase("/images/branchforge-write-mode-light.png"),
+  },
+  {
+    label: "Script",
+    alt: "BranchForge Script mode showing the Ren'Py source editor",
+    dark: withBase("/images/branchforge-script-mode.png"),
+    light: withBase("/images/branchforge-script-mode-light.png"),
+  },
+  {
+    label: "Flow",
+    alt: "BranchForge Flow mode showing a Ren'Py story graph",
+    dark: withBase("/images/branchforge-flow-view.png"),
+    light: withBase("/images/branchforge-flow-view-light.png"),
+  },
+];
+
+const activeModeIndex = ref(0);
+const isPaused = ref(false);
+const isInView = ref(true);
+const reducedMotion = ref(false);
+const screenshotFigure = ref<HTMLElement | null>(null);
+const activeMode = computed(() => screenshots[activeModeIndex.value]);
 const screenshot = computed(() =>
-  isDark.value ? darkScreenshot : lightScreenshot
+  isDark.value ? activeMode.value.dark : activeMode.value.light
 );
-const screenshotHeight = computed(() => (isDark.value ? 1085 : 1088));
+
+let rotationTimer: ReturnType<typeof setTimeout> | undefined;
+let observer: IntersectionObserver | undefined;
+let motionQuery: MediaQueryList | undefined;
+let updateMotionPreference: (() => void) | undefined;
+
+const clearRotation = () => {
+  if (rotationTimer) {
+    clearTimeout(rotationTimer);
+    rotationTimer = undefined;
+  }
+};
+
+const scheduleRotation = () => {
+  clearRotation();
+
+  if (isPaused.value || !isInView.value || reducedMotion.value) {
+    return;
+  }
+
+  rotationTimer = setTimeout(() => {
+    activeModeIndex.value = (activeModeIndex.value + 1) % screenshots.length;
+    scheduleRotation();
+  }, 5000);
+};
+
+const togglePause = () => {
+  isPaused.value = !isPaused.value;
+};
+
+watch([isPaused, isInView, reducedMotion], scheduleRotation);
+
+onMounted(() => {
+  motionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+  updateMotionPreference = () => {
+    reducedMotion.value = motionQuery?.matches ?? false;
+  };
+
+  updateMotionPreference();
+  motionQuery.addEventListener("change", updateMotionPreference);
+
+  for (const mode of screenshots) {
+    for (const source of [mode.dark, mode.light]) {
+      const image = new Image();
+      image.src = source;
+    }
+  }
+
+  observer = new IntersectionObserver(
+    ([entry]) => {
+      isInView.value = entry.isIntersecting;
+    },
+    { threshold: 0.25 }
+  );
+
+  if (screenshotFigure.value) {
+    observer.observe(screenshotFigure.value);
+  }
+
+  scheduleRotation();
+});
+
+onBeforeUnmount(() => {
+  clearRotation();
+  observer?.disconnect();
+  if (updateMotionPreference) {
+    motionQuery?.removeEventListener("change", updateMotionPreference);
+  }
+});
 </script>
 
 <template>
@@ -50,25 +144,44 @@ const screenshotHeight = computed(() => (isDark.value ? 1085 : 1088));
       </div>
     </section>
 
-    <figure class="bf-screenshot" aria-labelledby="screenshot-caption">
+    <figure
+      ref="screenshotFigure"
+      class="bf-screenshot"
+      aria-labelledby="screenshot-caption"
+    >
       <a
         :href="screenshot"
         target="_blank"
         rel="noopener noreferrer"
-        aria-label="Open full-resolution screenshot"
+        :aria-label="`Open full-resolution ${activeMode.label} mode screenshot`"
       >
-        <img
-          :src="screenshot"
-          alt="BranchForge Write mode showing a Ren'Py project loaded in the editor"
-          width="1917"
-          :height="screenshotHeight"
-        />
+        <Transition name="bf-screenshot-fade">
+          <img
+            :key="screenshot"
+            :src="screenshot"
+            :alt="activeMode.alt"
+            width="1920"
+            height="1090"
+          />
+        </Transition>
       </a>
       <figcaption id="screenshot-caption">
-        Demo project
-        <a :href="demoProjectUrl" target="_blank" rel="noopener noreferrer"
-          >Ren'Py Examples by remarkablegames</a
-        >, MIT.
+        <span>{{ activeMode.label }} mode</span>
+        <button
+          v-if="!reducedMotion"
+          type="button"
+          class="bf-screenshot-toggle"
+          :aria-pressed="isPaused"
+          @click="togglePause"
+        >
+          {{ isPaused ? "Play sequence" : "Pause sequence" }}
+        </button>
+        <span>
+          Demo project
+          <a :href="demoProjectUrl" target="_blank" rel="noopener noreferrer"
+            >Ren'Py Examples by remarkablegames</a
+          >, MIT.
+        </span>
       </figcaption>
     </figure>
 

@@ -185,7 +185,7 @@ html.dark .bf-home {
 }
 
 .bf-screenshot > a {
-  display: block;
+  display: grid;
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: 0.75rem;
@@ -194,10 +194,22 @@ html.dark .bf-home {
 }
 
 .bf-screenshot img {
+  grid-area: 1 / 1;
   width: 100%;
   height: auto;
   display: block;
   transition: opacity 180ms ease;
+}
+
+.bf-screenshot-fade-enter-active,
+.bf-screenshot-fade-leave-active {
+  transition: opacity 480ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: opacity;
+}
+
+.bf-screenshot-fade-enter-from,
+.bf-screenshot-fade-leave-to {
+  opacity: 0;
 }
 
 .bf-screenshot a:hover img,
@@ -206,10 +218,34 @@ html.dark .bf-home {
 }
 
 .bf-screenshot figcaption {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.35rem 0.75rem;
   margin-top: 0.75rem;
   color: var(--muted);
   font-size: 0.78rem;
   text-align: center;
+}
+
+.bf-screenshot-toggle {
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid currentColor;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.bf-screenshot-toggle:hover {
+  color: var(--brand);
+}
+
+.bf-screenshot-toggle:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 3px;
+  border-radius: 1px;
 }
 
 .bf-screenshot figcaption a {
@@ -450,7 +486,9 @@ html.dark .bf-home {
   .bf-button,
   .bf-button svg,
   .bf-text-link svg,
-  .bf-screenshot img {
+  .bf-screenshot img,
+  .bf-screenshot-fade-enter-active,
+  .bf-screenshot-fade-leave-active {
     transition: none;
   }
 }
