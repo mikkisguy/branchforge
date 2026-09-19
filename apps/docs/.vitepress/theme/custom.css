@@ -355,6 +355,15 @@ body {
   counter-reset: step;
   list-style: none;
 }
+.bf-workflow-label {
+  margin: 2.75rem 0 1rem;
+  color: #a9b0ff;
+  font-family: var(--bf-mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
 .bf-workflow li {
   position: relative;
   padding: 1.25rem;

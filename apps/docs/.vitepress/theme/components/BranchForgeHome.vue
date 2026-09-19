@@ -61,16 +61,16 @@ const importExport = withBase("/user/import-export");
 
     <section class="bf-hero">
       <div>
-        <p class="bf-eyebrow">A workspace for existing Ren'Py projects</p>
-        <h1>Keep the story readable. Keep the source in reach.</h1>
+        <p class="bf-eyebrow">Creative studio for Ren'Py visual novels</p>
+        <h1>Write the story without losing sight of the script.</h1>
         <p class="bf-lead">
-          BranchForge imports your <code>.rpy</code> files, lets you write
-          dialogue without losing technical context, and maps every branch back
-          to the script.
+          Bring in your Ren'Py project, write dialogue in a focused workspace,
+          edit the source when you need to, and trace branching paths without
+          losing context.
         </p>
         <div class="bf-actions">
           <a class="bf-button bf-button-primary" :href="installAnchor"
-            >Run with Docker
+            >Run BranchForge with Docker
             <svg aria-hidden="true"><use href="#bf-arrow" /></svg
           ></a>
           <a class="bf-button bf-button-secondary" :href="firstProject"
@@ -78,45 +78,49 @@ const importExport = withBase("/user/import-export");
           >
         </div>
         <p class="bf-quiet">
-          Self-hosted · ZIP import and export · GitLab sync
+          Self-hosted · ZIP import and export · GitLab sync · Beta
         </p>
       </div>
       <div
         class="bf-proof"
         aria-label="How BranchForge connects a Ren'Py story"
       >
-        <p class="bf-proof-label">One project, three useful views</p>
+        <p class="bf-proof-label">One project, three ways to work</p>
         <div class="bf-proof-row">
           <span class="bf-proof-tag">WRITE</span>
           <p>
-            <strong>Dialogue</strong><br />Technical context stays beside the
-            prose.
+            <strong>Focus on the dialogue</strong><br />Write the prose while
+            conditions, variables, stats, and visual cues stay close at hand.
           </p>
         </div>
         <div class="bf-proof-row">
           <span class="bf-proof-tag">SCRIPT</span>
           <p>
-            <strong>Ren'Py source</strong><br />Conditions, menus, jumps, and
-            variables remain editable.
+            <strong>Edit the Ren'Py source</strong><br />Switch to the actual
+            <code>.rpy</code> when you need to work with conditions, menus,
+            jumps, or variables.
           </p>
         </div>
         <div class="bf-proof-row">
           <span class="bf-proof-tag">FLOW</span>
           <p>
-            <strong>Branch structure</strong><br />Follow labels, routes, and
-            shared endings without changing code.
+            <strong>See the branch structure</strong><br />Trace labels, routes,
+            and connections across your story without changing the script.
           </p>
         </div>
       </div>
     </section>
 
     <section class="bf-release" aria-labelledby="release-title">
-      <p class="bf-eyebrow">Latest release</p>
+      <p class="bf-eyebrow">Recently added</p>
       <div>
         <h2 id="release-title">
-          File management is now available in Write and Script.
+          Manage Ren'Py files without leaving the workspace.
         </h2>
-        <p>Create, rename, move, and delete Ren'Py files from the workspace.</p>
+        <p>
+          Create, rename, move, and delete project files directly from Write and
+          Script modes.
+        </p>
       </div>
       <a class="bf-text-link" :href="changelog"
         >Read the changelog
@@ -126,86 +130,84 @@ const importExport = withBase("/user/import-export");
 
     <section class="bf-section" aria-labelledby="views-title">
       <div class="bf-section-heading">
-        <p class="bf-eyebrow">Work from the right level of detail</p>
-        <h2 id="views-title">
-          Choose the view that answers your next question.
-        </h2>
+        <p class="bf-eyebrow">One workspace, three ways to work</p>
+        <h2 id="views-title">Write, inspect, and export from one workspace.</h2>
+        <p>
+          BranchForge works with the Ren'Py project you already have and gives
+          it back in a Ren'Py-ready format.
+        </p>
       </div>
       <div class="bf-mode-grid">
         <a class="bf-mode-card" :href="writing"
           ><svg aria-hidden="true"><use href="#bf-book" /></svg
           ><span>Write mode</span>
-          <h3>Draft dialogue and narration</h3>
+          <h3>Stay focused on the prose</h3>
           <p>
-            Write in a focused editor with source-derived badges for the details
-            that matter.
+            Draft dialogue and narration in a focused editor while
+            source-derived context stays visible around your writing.
           </p></a
         >
         <a class="bf-mode-card" :href="scriptMode"
           ><svg aria-hidden="true"><use href="#bf-code" /></svg
           ><span>Script mode</span>
-          <h3>Edit the actual <code>.rpy</code></h3>
+          <h3>Work directly in the <code>.rpy</code></h3>
           <p>
-            Use syntax highlighting and a file tree when you need conditions,
-            menus, and jumps.
+            Edit Ren'Py source with syntax highlighting and a file tree when the
+            story logic needs attention.
           </p></a
         >
         <a class="bf-mode-card" :href="flowGraph"
           ><svg aria-hidden="true"><use href="#bf-flow" /></svg
           ><span>Flow graph</span>
-          <h3>Check where a choice leads</h3>
+          <h3>Trace where the story leads</h3>
           <p>
-            Explore FLOW, ROUTE, and FILE layouts without changing your script.
+            Explore FLOW, ROUTE, and FILE layouts to understand labels and
+            connections without editing the script.
           </p></a
         >
       </div>
-    </section>
-
-    <section class="bf-section" aria-labelledby="loop-title">
-      <div class="bf-section-heading">
-        <p class="bf-eyebrow">A reversible writing loop</p>
-        <h2 id="loop-title">Import, write, inspect, export.</h2>
-        <p>
-          BranchForge works with the project you already have and gives it back
-          in a Ren'Py-ready format.
-        </p>
-      </div>
+      <p class="bf-workflow-label">How it fits into your workflow</p>
       <ol class="bf-workflow">
         <li>
           <svg aria-hidden="true"><use href="#bf-box" /></svg
           ><strong>Import</strong
-          ><span>Open a ZIP archive or pull a project from GitLab.</span>
+          ><span>Open an existing project from a ZIP archive or GitLab.</span>
         </li>
         <li>
           <svg aria-hidden="true"><use href="#bf-book" /></svg
           ><strong>Write</strong
-          ><span>Shape dialogue or edit the source directly.</span>
+          ><span
+            >Focus on dialogue or switch to the Ren'Py source when you need
+            it.</span
+          >
         </li>
         <li>
           <svg aria-hidden="true"><use href="#bf-flow" /></svg
           ><strong>Inspect</strong
-          ><span>Follow routes, labels, and pair endings.</span>
+          ><span>Trace labels, routes, jumps, and shared endings.</span>
         </li>
         <li>
           <svg aria-hidden="true"><use href="#bf-git" /></svg
           ><strong>Export</strong
-          ><span>Download a ZIP or push your changes to GitLab.</span>
+          ><span
+            >Download a ZIP archive or push your changes back to GitLab.</span
+          >
         </li>
       </ol>
     </section>
 
     <section class="bf-section" aria-labelledby="tools-title">
       <div class="bf-section-heading">
-        <p class="bf-eyebrow">Beyond the script editor</p>
-        <h2 id="tools-title">Keep project context close.</h2>
+        <p class="bf-eyebrow">More than a script editor</p>
+        <h2 id="tools-title">Keep the rest of the story close, too.</h2>
       </div>
       <div class="bf-capability-grid">
         <a class="bf-capability" :href="characters"
           ><svg aria-hidden="true"><use href="#bf-users" /></svg>
           <h3>Characters and story state</h3>
           <p>
-            Track characters, variables, stats, world details, and pair groups
-            alongside your project.
+            Keep characters, variables, stats, world details, and pair groups
+            alongside the project they belong to.
           </p>
           <span
             >Explore story tools
@@ -215,8 +217,8 @@ const importExport = withBase("/user/import-export");
           ><svg aria-hidden="true"><use href="#bf-git" /></svg>
           <h3>Import and sync</h3>
           <p>
-            Bring in existing scripts with ZIP or GitLab, then export a
-            Ren'Py-compatible archive when you are ready.
+            Bring in an existing project with ZIP or GitLab, then export a
+            Ren'Py-compatible archive or push your changes back.
           </p>
           <span
             >Read import and export
@@ -230,10 +232,11 @@ const importExport = withBase("/user/import-export");
         <svg class="bf-docker-icon" aria-hidden="true">
           <use href="#bf-terminal" />
         </svg>
-        <h2 id="docker-title">Try BranchForge with Docker.</h2>
+        <h2 id="docker-title">Run BranchForge on your own machine.</h2>
         <p>
-          PostgreSQL, backend, and frontend run together. The installation guide
-          covers environment variables and ports.
+          Start PostgreSQL, the backend, and the frontend together with Docker.
+          The installation guide covers configuration, environment variables,
+          and ports.
         </p>
         <a class="bf-button bf-button-primary" :href="installAnchor"
           >Open installation guide
@@ -252,24 +255,25 @@ docker compose up -d</code></pre>
     >
       <div class="bf-section-heading">
         <p class="bf-eyebrow">Project status</p>
-        <h2 id="status-title">What to expect from the beta.</h2>
+        <h2 id="status-title">BranchForge is still in beta.</h2>
       </div>
       <div class="bf-status-grid">
         <article>
           <svg aria-hidden="true"><use href="#bf-alert" /></svg>
           <h3>What is not ready yet</h3>
           <p>
-            GitLab conflict review is read-only. Resolve conflicts in GitLab or
-            locally before pulling again. Beta reader management, snippets, and
-            the definitions import wizard are still planned.
+            GitLab conflict review is read-only, so conflicts still need to be
+            resolved in GitLab or locally before pulling again. Beta reader
+            management, snippets, and the definitions import wizard are also
+            still planned.
           </p>
         </article>
         <article>
           <svg aria-hidden="true"><use href="#bf-git" /></svg>
           <h3>Open source by design</h3>
           <p>
-            BranchForge is GPL v3. Contributions, issues, and feedback are
-            welcome on GitHub.
+            BranchForge is licensed under GPL v3. Contributions, bug reports,
+            ideas, and feedback are welcome on GitHub.
           </p>
           <a
             class="bf-text-link"
@@ -284,11 +288,11 @@ docker compose up -d</code></pre>
     </section>
 
     <section class="bf-cta">
-      <p class="bf-eyebrow">Start with the project you have</p>
-      <h2>Bring in your Ren'Py project and keep writing.</h2>
+      <p class="bf-eyebrow">Start with the project you already have</p>
+      <h2>Bring in your Ren'Py project. Keep writing.</h2>
       <p>
-        Learn what BranchForge imports, how it reads your scripts, and how to
-        make your first project.
+        Learn how BranchForge reads your scripts, what it imports, and how to
+        get your first project into the workspace.
       </p>
       <a class="bf-button bf-button-primary" :href="firstProject"
         >Import your first project
@@ -296,7 +300,7 @@ docker compose up -d</code></pre>
       ></a>
     </section>
     <footer class="bf-footer">
-      <p>BranchForge documentation · GPL v3 · beta software</p>
+      <p>BranchForge documentation · GPL v3 · Beta software</p>
     </footer>
   </div>
 </template>
