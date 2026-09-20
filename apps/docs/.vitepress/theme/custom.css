@@ -267,21 +267,36 @@ html.dark .bf-screenshot .bf-screenshot-image-dark {
 .bf-screenshot figcaption {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   justify-content: center;
-  gap: 0.35rem 0.75rem;
+  gap: 0.35rem 0;
   margin-top: 0.75rem;
   color: var(--muted);
   font-size: 0.78rem;
   text-align: center;
 }
 
+.bf-screenshot-caption-item,
+.bf-screenshot-toggle,
+.bf-screenshot figcaption > span:last-child {
+  line-height: 1.4;
+}
+
+.bf-screenshot figcaption > :not(:first-child) {
+  margin-left: 0.85rem;
+  padding-left: 0.85rem;
+  border-left: 1px solid var(--border);
+}
+
 .bf-screenshot-toggle {
   padding: 0;
   border: 0;
-  border-bottom: 1px solid currentColor;
   background: transparent;
   color: inherit;
   font: inherit;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.35em;
   cursor: pointer;
 }
 
@@ -515,6 +530,20 @@ html.dark .bf-screenshot .bf-screenshot-image-dark {
     max-height: 50vh;
     object-fit: cover;
     object-position: top center;
+  }
+
+  .bf-screenshot figcaption {
+    flex-direction: column;
+    align-items: center;
+    gap: 0.4rem;
+  }
+
+  .bf-screenshot figcaption > :not(:first-child) {
+    margin-left: 0;
+    padding-top: 0.4rem;
+    padding-left: 0;
+    border-top: 1px solid var(--border);
+    border-left: 0;
   }
 
   .bf-actions {

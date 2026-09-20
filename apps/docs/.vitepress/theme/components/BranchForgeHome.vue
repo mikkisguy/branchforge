@@ -177,7 +177,9 @@ onBeforeUnmount(() => {
         </Transition>
       </a>
       <figcaption id="screenshot-caption">
-        <span>{{ activeMode.label }} mode</span>
+        <span class="bf-screenshot-caption-item"
+          >{{ activeMode.label }} mode</span
+        >
         <button
           v-if="!reducedMotion"
           type="button"
