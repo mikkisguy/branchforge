@@ -1,30 +1,4 @@
 {
   "mode": "pre",
-  "tag": "beta",
-  "initialVersions": {
-    "@branchforge/backend": "0.13.0",
-    "@branchforge/docs": "0.12.1",
-    "@branchforge/frontend": "0.13.0",
-    "@branchforge/shared": "0.13.0"
-  },
-  "changesets": [
-    "calm-dialogues-glow",
-    "character-export-name-type",
-    "dirty-form-guards",
-    "fifty-walls-ring",
-    "first-1-0-beta",
-    "icy-eggs-make",
-    "keyboard-shortcuts-docs",
-    "light-carrots-act",
-    "major-cooks-ask",
-    "pink-cycles-sneeze",
-    "pink-paths-stick",
-    "project-file-manegement",
-    "shy-taxis-hide",
-    "spotty-books-notice",
-    "strict-pugs-hug",
-    "tangy-emus-cut",
-    "tidy-project-controls",
-    "visual-preview-images"
-  ]
+  "tag": "beta"
 }
