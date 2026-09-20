@@ -223,12 +223,29 @@ html.dark .bf-home .bf-button-primary {
   line-height: 0;
 }
 
+.bf-screenshot-images {
+  display: grid;
+  grid-area: 1 / 1;
+}
+
 .bf-screenshot img {
   grid-area: 1 / 1;
   width: 100%;
   height: auto;
   display: block;
   transition: opacity 180ms ease;
+}
+
+.bf-screenshot .bf-screenshot-image-dark {
+  display: none;
+}
+
+html.dark .bf-screenshot .bf-screenshot-image-light {
+  display: none;
+}
+
+html.dark .bf-screenshot .bf-screenshot-image-dark {
+  display: block;
 }
 
 .bf-screenshot-fade-enter-active,
