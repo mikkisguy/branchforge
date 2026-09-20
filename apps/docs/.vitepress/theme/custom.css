@@ -21,6 +21,30 @@ body {
   padding: 0 !important;
 }
 
+/*
+ * VitePress makes the home nav transparent at the top, which exposes the
+ * default docs canvas rather than the landing page canvas beneath it. Give
+ * that resting state the same surface as the hero; VitePress restores its
+ * standard solid navigation treatment as soon as the page is scrolled.
+ */
+.branchforge-home .VPNavBar.home.top {
+  background-color: #ffffff;
+}
+
+.branchforge-home .VPNavBar.home.top .divider {
+  opacity: 0;
+}
+
+html.dark .branchforge-home .VPNavBar.home.top {
+  background-color: #0d0d0e;
+}
+
+@media (min-width: 960px) {
+  .branchforge-home .VPNavBar .container {
+    max-width: 1120px;
+  }
+}
+
 .bf-home {
   --bf-font: "DM Sans", ui-sans-serif, system-ui, sans-serif;
   --bf-mono: "Fira Code", ui-monospace, monospace;
