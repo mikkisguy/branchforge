@@ -90,20 +90,11 @@ export function CharacterList({
                       Love Interest
                     </span>
                   )}
-                  {character.routeAffiliation && (
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground">
-                      {character.routeAffiliation}
-                    </span>
-                  )}
                 </div>
                 <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
                   <span className="font-mono">
                     {character.renpyTag || "(no tag)"}
                   </span>
-
-                  {character.conditionalPrefix && (
-                    <span>Prefix: {character.conditionalPrefix}</span>
-                  )}
                 </div>
               </div>
             </div>

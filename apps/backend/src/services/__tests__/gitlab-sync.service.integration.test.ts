@@ -131,7 +131,6 @@ describe("GitLabSyncService (Integration)", () => {
     name: "Sylvie",
     displayName: "Sylvie",
     renpyTag: "s",
-    routeAffiliation: "SHARED" as const,
     isLoveInterest: true,
     color: "#c8ffc8",
   };

@@ -21,7 +21,6 @@ export interface ImportCharacter {
   color: string;
   isLoveInterest?: boolean;
   isNarrator?: boolean;
-  routeAffiliation?: string;
   nameType?: CharacterNameType;
 }
 
@@ -70,11 +69,9 @@ export interface CreateCharacterBody {
   displayName: string;
   renpyTag: string;
   color: string;
-  routeAffiliation?: string;
   isLoveInterest?: boolean;
   isNarrator?: boolean;
   notes?: string;
-  conditionalPrefix?: string;
   nameType?: CharacterNameType;
 }
 
@@ -82,11 +79,9 @@ export interface UpdateCharacterBody {
   name?: string;
   displayName?: string;
   color?: string;
-  routeAffiliation?: string;
   isLoveInterest?: boolean;
   isNarrator?: boolean;
   notes?: string;
-  conditionalPrefix?: string;
   nameType?: CharacterNameType;
 }
 

@@ -25,11 +25,9 @@ interface CreateCharacterInput {
   displayName: string;
   renpyTag: string;
   color: string;
-  routeAffiliation?: string;
   isLoveInterest?: boolean;
   isNarrator?: boolean;
   notes?: string;
-  conditionalPrefix?: string;
   nameType?: CharacterNameType;
 }
 
@@ -37,11 +35,9 @@ interface UpdateCharacterInput {
   name?: string;
   displayName?: string;
   color?: string;
-  routeAffiliation?: string;
   isLoveInterest?: boolean;
   isNarrator?: boolean;
   notes?: string;
-  conditionalPrefix?: string;
   nameType?: CharacterNameType;
 }
 

@@ -135,9 +135,7 @@ interface CharacterForm {
   displayName: string;
   renpyTag: string;
   color: string;
-  routeAffiliation: string;
   dialogueStyle: string;
-  conditionalPrefix: string;
   isLoveInterest: boolean;
   avatarUrl?: string; // existing from server
   avatarFile?: File; // new upload

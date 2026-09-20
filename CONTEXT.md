@@ -40,7 +40,7 @@ Boolean flag for branching logic (e.g., `met_villain = True`). Variables gate li
 
 ### Character
 
-A speaking entity in the story. Has a name, display name, Ren'Py tag, color, and optional avatar. Auto-detected from RPY `define` statements on import, or created manually. Characters can be tagged as love interests and have route affiliations.
+A speaking entity in the story. Has a name, display name, Ren'Py tag, color, and optional avatar. Auto-detected from RPY `define` statements on import, or created manually. Characters can be tagged as love interests.
 
 ### Label Line
 

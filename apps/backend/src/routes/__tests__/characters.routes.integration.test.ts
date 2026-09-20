@@ -88,10 +88,8 @@ describe("CharactersRoutes (Integration)", () => {
     displayName: "Eileen",
     renpyTag: "a",
     color: "#FF6B6B",
-    routeAffiliation: "EILEEN",
     isLoveInterest: true,
     notes: "casual notes",
-    conditionalPrefix: null,
   };
 
   const testCharacter2: NewCharacter = {
@@ -100,10 +98,8 @@ describe("CharactersRoutes (Integration)", () => {
     displayName: "Lucas",
     renpyTag: "l",
     color: "#4ECDC4",
-    routeAffiliation: "LUCAS",
     isLoveInterest: true,
     notes: "formal notes",
-    conditionalPrefix: "lucas_",
   };
 
   const otherProjectCharacter: NewCharacter = {
@@ -112,10 +108,8 @@ describe("CharactersRoutes (Integration)", () => {
     displayName: "Other Char",
     renpyTag: "other",
     color: "#95E1D3",
-    routeAffiliation: null,
     isLoveInterest: false,
     notes: null,
-    conditionalPrefix: null,
   };
 
   // Helper to clean up all test data
@@ -329,7 +323,6 @@ describe("CharactersRoutes (Integration)", () => {
         displayName: "Eileen",
         renpyTag: "a",
         color: "#FF6B6B",
-        routeAffiliation: "EILEEN",
         isLoveInterest: true,
       });
       expect(json.characters[1]).toMatchObject({
@@ -337,7 +330,6 @@ describe("CharactersRoutes (Integration)", () => {
         displayName: "Lucas",
         renpyTag: "l",
         color: "#4ECDC4",
-        routeAffiliation: "LUCAS",
         isLoveInterest: true,
       });
     });
@@ -419,10 +411,8 @@ describe("CharactersRoutes (Integration)", () => {
         displayName: "Eileen",
         renpyTag: "a",
         color: "#FF6B6B",
-        routeAffiliation: "EILEEN",
         isLoveInterest: true,
         notes: "casual notes",
-        conditionalPrefix: null,
       });
     });
   });
@@ -447,10 +437,8 @@ describe("CharactersRoutes (Integration)", () => {
         displayName: testCharacter1.displayName,
         renpyTag: testCharacter1.renpyTag,
         color: testCharacter1.color,
-        routeAffiliation: testCharacter1.routeAffiliation,
         isLoveInterest: testCharacter1.isLoveInterest,
         notes: testCharacter1.notes,
-        // Don't include conditionalPrefix since it's null
       };
 
       const response = await fastify.inject({
@@ -478,10 +466,8 @@ describe("CharactersRoutes (Integration)", () => {
         displayName: "New Char",
         renpyTag: "new_char",
         color: "#123456",
-        routeAffiliation: "EILEEN",
         isLoveInterest: true,
         notes: "casual notes",
-        conditionalPrefix: "new_",
       };
 
       const response = await fastify.inject({
@@ -500,10 +486,8 @@ describe("CharactersRoutes (Integration)", () => {
         displayName: "New Char",
         renpyTag: "new_char",
         color: "#123456",
-        routeAffiliation: "EILEEN",
         isLoveInterest: true,
         notes: "casual notes",
-        conditionalPrefix: "new_",
       });
       expect(json.character.id).toBeDefined();
 
@@ -599,10 +583,8 @@ describe("CharactersRoutes (Integration)", () => {
         displayName: "Minimal",
         renpyTag: "minimal",
         color: "#ABCDEF",
-        routeAffiliation: null,
         isLoveInterest: false,
         notes: null,
-        conditionalPrefix: null,
       });
     });
   });
@@ -694,10 +676,8 @@ describe("CharactersRoutes (Integration)", () => {
         displayName: "Updated Display",
         renpyTag: "a", // Unchanged
         color: "#00FF00",
-        routeAffiliation: "EILEEN", // Unchanged
         isLoveInterest: false,
         notes: "casual notes", // Unchanged
-        conditionalPrefix: null, // Unchanged
       });
     });
 
