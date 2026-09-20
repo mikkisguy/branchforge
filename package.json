@@ -60,5 +60,5 @@
       "pnpm exec prettier --write"
     ]
   },
-  "packageManager": "pnpm@12.5.1"
+  "packageManager": "pnpm@12.5.1+sha512-4/MFvHhKK8ifWtO2E4iJRw+ujSr182thIW7JHCw9ZAiXdfneOKrDMQROpA8kXLDVZmOS399lgk4ZB+9qLGLeXw=="
 }

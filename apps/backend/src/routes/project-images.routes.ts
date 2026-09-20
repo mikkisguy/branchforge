@@ -89,10 +89,7 @@ function isMultipartFilesLimitError(error: unknown): boolean {
   return (
     message.includes("reach files limit") ||
     message.includes("files limit") ||
-    message.includes("parts limit") ||
-    // Busboy can surface its files-limit shutdown from a file stream as a
-    // generic premature-close error instead of the original limit error.
-    message.includes("premature close")
+    message.includes("parts limit")
   );
 }
 

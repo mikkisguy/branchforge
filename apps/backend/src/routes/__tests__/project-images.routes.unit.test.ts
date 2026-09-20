@@ -165,7 +165,41 @@ describe("ProjectImagesRoutes", () => {
     });
   });
 
-  it("POST /projects/:projectId/images returns 400 when too many files", async () => {
+  it("POST /projects/:projectId/images propagates unrelated premature close errors", async () => {
+    const prematureCloseError = new Error("premature close");
+    const testFastify = Fastify();
+
+    await testFastify.register(multipart, {
+      limits: {
+        fileSize: 5 * 1024 * 1024,
+        files: 1,
+      },
+    });
+
+    testFastify.addHook("onRequest", async (request) => {
+      const originalParts = request.parts.bind(request);
+      request.parts = function (options) {
+        const parts = originalParts(options);
+
+        async function* wrappedParts() {
+          for await (const part of parts) {
+            if (part.type === "file" && part.fieldname === "tooltip") {
+              part.toBuffer = async () => {
+                throw prematureCloseError;
+              };
+            }
+            yield part;
+          }
+        }
+
+        return wrappedParts();
+      };
+    });
+
+    await projectImagesRoutes(testFastify);
+    testFastify.setErrorHandler(globalErrorHandler);
+    await testFastify.ready();
+
     const formData = new FormData();
     formData.append("originalFilename", "test.png");
     formData.append(
@@ -178,13 +212,72 @@ describe("ProjectImagesRoutes", () => {
       new Blob([minimalPng], { type: "image/png" }),
       "modal.png"
     );
+
+    const response = await testFastify.inject({
+      method: "POST",
+      url: `/projects/${PROJECT_ID}/images`,
+      payload: formData as any,
+    });
+
+    expect(response.statusCode).toBe(500);
+    expect(response.json()).toMatchObject({
+      error: "InternalServerError",
+      message: "premature close",
+    });
+    expect(projectImagesService.uploadProjectImage).not.toHaveBeenCalled();
+
+    await testFastify.close();
+  });
+
+  it("POST /projects/:projectId/images returns 400 when too many files", async () => {
+    const filesLimitError = Object.assign(new Error("reach files limit"), {
+      code: "FST_FILES_LIMIT",
+    });
+    const testFastify = Fastify();
+
+    await testFastify.register(multipart, {
+      limits: {
+        fileSize: 5 * 1024 * 1024,
+        files: 1,
+      },
+    });
+
+    testFastify.addHook("onRequest", async (request) => {
+      const originalParts = request.parts.bind(request);
+      request.parts = function (options) {
+        const parts = originalParts(options);
+
+        async function* wrappedParts() {
+          for await (const part of parts) {
+            yield part;
+            if (part.type === "file" && part.fieldname === "modal") {
+              throw filesLimitError;
+            }
+          }
+        }
+
+        return wrappedParts();
+      };
+    });
+
+    await projectImagesRoutes(testFastify);
+    testFastify.setErrorHandler(globalErrorHandler);
+    await testFastify.ready();
+
+    const formData = new FormData();
+    formData.append("originalFilename", "test.png");
     formData.append(
-      "extra",
+      "tooltip",
       new Blob([minimalPng], { type: "image/png" }),
-      "extra.png"
+      "tooltip.png"
+    );
+    formData.append(
+      "modal",
+      new Blob([minimalPng], { type: "image/png" }),
+      "modal.png"
     );
 
-    const response = await fastify.inject({
+    const response = await testFastify.inject({
       method: "POST",
       url: `/projects/${PROJECT_ID}/images`,
       payload: formData as any,
@@ -194,6 +287,9 @@ describe("ProjectImagesRoutes", () => {
     expect(response.json()).toMatchObject({
       error: "ValidationError",
     });
+    expect(projectImagesService.uploadProjectImage).not.toHaveBeenCalled();
+
+    await testFastify.close();
   });
 
   it("PUT /project-images/:imageId replaces image", async () => {
