@@ -8,6 +8,11 @@ All notable changes to BranchForge will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v1.0.0-beta.7 - 2026-09-20
+
+- Added platform-specific icons to the app
+- Removed legacy character route fields for route affiliation and conditional prefix.
+
 ## v1.0.0-beta.6 - 2026-09-19
 
 - Improved dialogue editing and character role cues.

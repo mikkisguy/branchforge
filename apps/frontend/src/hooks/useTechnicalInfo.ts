@@ -80,14 +80,34 @@ function buildLineInfo(
   }
 }
 
+/** The subset of LabelLine fields that influence the technicalInfo source key */
+type SourceKeyLine = Pick<
+  LabelLine,
+  "menuOptions" | "contentType" | "content" | "conditions" | "visualStatements"
+>;
+
 /**
  * Compute a stability key from the line fields that affect technicalInfo.
  * When the key matches the cached key, the previously-built object is
  * returned so shallow-reference equality is preserved and memoized
  * children are not forced to re-render.
+ *
+ * Both forward-adjacent structural lines and backward-adjacent VISUAL
+ * neighbors influence the resolved technicalInfo, so both groups are
+ * included in the key.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function buildSourceKey(line: any, adjacentLines?: any[]): string {
+function buildSourceKey(
+  line: SourceKeyLine,
+  adjacentLines?: SourceKeyLine[],
+  backwardLines?: SourceKeyLine[]
+): string {
+  const mapLine = (l: SourceKeyLine) => ({
+    menuOptions: l.menuOptions,
+    contentType: l.contentType,
+    content: l.content,
+    conditions: l.conditions,
+    visualStatements: l.visualStatements,
+  });
   const main = {
     menuOptions: line.menuOptions,
     contentType: line.contentType,
@@ -96,19 +116,17 @@ function buildSourceKey(line: any, adjacentLines?: any[]): string {
     visualStatements: line.visualStatements,
   };
 
-  if (!adjacentLines || adjacentLines.length === 0) {
+  const hasForward = !!adjacentLines && adjacentLines.length > 0;
+  const hasBackward = !!backwardLines && backwardLines.length > 0;
+
+  if (!hasForward && !hasBackward) {
     return JSON.stringify(main);
   }
 
   return JSON.stringify({
     main,
-    adjacent: adjacentLines.map((l) => ({
-      menuOptions: l.menuOptions,
-      contentType: l.contentType,
-      content: l.content,
-      conditions: l.conditions,
-      visualStatements: l.visualStatements,
-    })),
+    adjacent: hasForward ? adjacentLines!.map(mapLine) : undefined,
+    backwardVisuals: hasBackward ? backwardLines!.map(mapLine) : undefined,
   });
 }
 
@@ -116,10 +134,22 @@ function buildSourceKey(line: any, adjacentLines?: any[]): string {
  * Hook to extract technical info from label lines and transform into badge data format.
  * This hook processes LabelLine objects and returns technicalInfo matching the DialogueEntry type.
  *
- * For DIALOGUE/NARRATION lines, it also aggregates technical info from adjacent structural
- * lines (MENU, JUMP, CHOICE) that immediately follow, until the next DIALOGUE/NARRATION line.
- * This allows technical badges (choices, jumps, conditions, visuals) to appear on the
- * dialogue line they logically belong to, even though the backend stores them as separate lines.
+ * Technical metadata is attached in two intentional directions:
+ *
+ * - Forward: For DIALOGUE/NARRATION lines, it aggregates technical info from adjacent
+ *   structural lines (MENU, JUMP, CHOICE) that immediately follow, until the next
+ *   DIALOGUE/NARRATION line. JUMP targets, menu choices and conditions are authored on
+ *   separate rows but logically belong to the prose line they precede, so they surface
+ *   as badges on the preceding dialogue/narration line.
+ * - Backward: VISUAL rows emitted by the parser/database precede the prose line they
+ *   affect. A contiguous block of VISUAL rows immediately before a DIALOGUE/NARRATION
+ *   line attaches to that following prose line. VISUAL rows are therefore excluded
+ *   from the forward structural scan so they are never attached to the preceding
+ *   prose line (which would otherwise double-count or mis-attach scene/show/hide
+ *   badges).
+ *
+ * Inline visualStatements authored directly on the prose line itself are still
+ * resolved on that same line.
  *
  * Results are cached per entryId and returned with stable reference identity
  * across renders as long as the underlying line data hasn't changed,
@@ -170,9 +200,12 @@ export function useTechnicalInfo(
 
       // Collect adjacent structural lines (MENU, JUMP, CHOICE) that follow
       // this line until we hit another DIALOGUE/NARRATION line. These carry
-      // technical metadata (menuOptions, jump targets, conditions, visuals)
-      // that should be displayed as badges on the preceding dialogue line.
+      // technical metadata (menuOptions, jump targets, conditions) that
+      // should be displayed as badges on the preceding dialogue line.
+      // VISUAL rows are intentionally skipped here: they precede (not follow)
+      // the prose they affect and are collected in the backward scan below.
       const adjacentStructural: LabelLine[] = [];
+      const backwardVisuals: LabelLine[] = [];
       const lineIndex = lineIndexMap.get(entryId);
       if (lineIndex !== undefined) {
         for (let i = lineIndex + 1; i < linesArray.length; i++) {
@@ -183,11 +216,36 @@ export function useTechnicalInfo(
           ) {
             break;
           }
+          if (nextLine.contentType === "VISUAL") {
+            continue;
+          }
           adjacentStructural.push(nextLine);
+        }
+
+        // Backward scan (prose lines only): a contiguous block of VISUAL rows
+        // immediately before this dialogue/narration line describes the
+        // scene/show/hide statements in effect for it, so attach them here
+        // instead of to the preceding line.
+        if (
+          line.contentType === "DIALOGUE" ||
+          line.contentType === "NARRATION"
+        ) {
+          for (let i = lineIndex - 1; i >= 0; i--) {
+            const prevLine = linesArray[i];
+            if (prevLine.contentType !== "VISUAL") {
+              break;
+            }
+            // Walked in reverse; unshift preserves the original source order.
+            backwardVisuals.unshift(prevLine);
+          }
         }
       }
 
-      const sourceKey = buildSourceKey(line, adjacentStructural);
+      const sourceKey = buildSourceKey(
+        line,
+        adjacentStructural,
+        backwardVisuals
+      );
       const cached = cacheRef.current!.get(entryId);
 
       // Return cached object reference when source data is semantically identical
@@ -206,6 +264,11 @@ export function useTechnicalInfo(
       // Skip menu choices here too since they're inline entries
       for (const adjLine of adjacentStructural) {
         buildLineInfo(adjLine, info, true);
+      }
+
+      // Aggregate from the VISUAL rows immediately preceding this prose line
+      for (const visualLine of backwardVisuals) {
+        buildLineInfo(visualLine, info, true);
       }
 
       const result = Object.keys(info).length > 0 ? info : undefined;
