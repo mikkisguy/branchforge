@@ -75,7 +75,6 @@ export default defineConfig({
       { text: "Changelog", link: "/changelog" },
       { text: "User Guide", link: "/user/getting-started" },
       { text: "Developer Guide", link: "/dev/architecture" },
-      { text: "GitHub", link: REPO_URL },
     ],
     sidebar: {
       "/user/": [

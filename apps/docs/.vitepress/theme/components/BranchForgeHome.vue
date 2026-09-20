@@ -157,17 +157,29 @@ onBeforeUnmount(() => {
         :aria-label="`Open full-resolution ${activeMode.label} mode screenshot`"
       >
         <Transition name="bf-screenshot-fade">
-          <img
-            :key="screenshot"
-            :src="screenshot"
-            :alt="activeMode.alt"
-            width="1920"
-            height="1090"
-          />
+          <span :key="activeMode.label" class="bf-screenshot-images">
+            <img
+              class="bf-screenshot-image bf-screenshot-image-light"
+              :src="activeMode.light"
+              :alt="activeMode.alt"
+              width="1920"
+              height="1090"
+            />
+            <img
+              class="bf-screenshot-image bf-screenshot-image-dark"
+              :src="activeMode.dark"
+              alt=""
+              aria-hidden="true"
+              width="1920"
+              height="1090"
+            />
+          </span>
         </Transition>
       </a>
       <figcaption id="screenshot-caption">
-        <span>{{ activeMode.label }} mode</span>
+        <span class="bf-screenshot-caption-item"
+          >{{ activeMode.label }} mode</span
+        >
         <button
           v-if="!reducedMotion"
           type="button"
