@@ -70,7 +70,9 @@ jobs:
             PR_TITLE="chore: version packages to v$VERSION [skip-coderabbit]"
 
             git checkout -B "$BRANCH"
-            git add -u
+            # Changesets v3 moves consumed prerelease notes into
+            # .changeset/pre/, so stage newly created archive files as well.
+            git add -A
             if git diff --cached --quiet; then
               echo "No changes detected after version bump"
               exit 0
