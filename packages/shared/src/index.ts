@@ -928,11 +928,9 @@ export interface Character {
   renpyTag: string;
   color: string;
   avatarUrl: string | null;
-  routeAffiliation: string | null;
   isLoveInterest: boolean;
   isNarrator: boolean;
   notes: string | null;
-  conditionalPrefix: string | null;
   createdAt: string;
   updatedAt: string;
 }

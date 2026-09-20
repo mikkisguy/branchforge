@@ -12,7 +12,6 @@ export interface EditableCharacter extends DetectedCharacter {
   excluded: boolean;
   isLoveInterest?: boolean;
   isNarrator?: boolean;
-  routeAffiliation?: string;
 }
 
 export interface NewCharacterDraft {
@@ -87,7 +86,6 @@ function groupCharacters(
       excluded: excludedTagSet.has(char.tag) || (isSpecial && !isConflict),
       isLoveInterest: false,
       isNarrator: narratorTagSet.has(char.tag),
-      routeAffiliation: undefined,
     };
 
     if (isConflict) {

@@ -1179,10 +1179,8 @@ describe("Character Schemas", () => {
         displayName: "Jane",
         renpyTag: "jane",
         color: "#ABC123",
-        routeAffiliation: "EILEEN",
         isLoveInterest: true,
         notes: "casual",
-        conditionalPrefix: "jane_",
       };
 
       const result = createCharacterSchema.safeParse(validData);
@@ -1228,11 +1226,26 @@ describe("Character Schemas", () => {
         displayName: "Display Name",
         renpyTag: "char",
         color: "#FF5733",
-        routeAffiliation: "SHARED",
+        isLoveInterest: true,
       };
 
       const result = createCharacterSchema.safeParse(validData);
       expect(result.success).toBe(true);
+    });
+
+    it("should reject removed legacy fields routeAffiliation and conditionalPrefix", () => {
+      const invalidData = {
+        projectId: "550e8400-e29b-41d4-a716-446655440000",
+        name: "Character Name",
+        displayName: "Display Name",
+        renpyTag: "char",
+        color: "#FF5733",
+        routeAffiliation: "EILEEN",
+        conditionalPrefix: "jane_",
+      };
+
+      const result = createCharacterSchema.safeParse(invalidData);
+      expect(result.success).toBe(false);
     });
 
     it("should reject missing required field: projectId", () => {
@@ -1404,11 +1417,18 @@ describe("Character Schemas", () => {
   });
 
   describe("updateCharacterSchema", () => {
-    it("should accept conditionalPrefix updates", () => {
+    it("should reject removed legacy field conditionalPrefix", () => {
       const result = updateCharacterSchema.safeParse({
         conditionalPrefix: "x_",
       });
-      expect(result.success).toBe(true);
+      expect(result.success).toBe(false);
+    });
+
+    it("should reject removed legacy field routeAffiliation", () => {
+      const result = updateCharacterSchema.safeParse({
+        routeAffiliation: "EILEEN",
+      });
+      expect(result.success).toBe(false);
     });
 
     it("should accept nameType updates", () => {

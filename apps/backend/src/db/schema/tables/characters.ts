@@ -1,7 +1,7 @@
 /**
  * Characters Table
  *
- * Character definitions with route affiliations and sprite info.
+ * Character definitions with sprite info.
  */
 
 import {
@@ -33,14 +33,12 @@ export const characters = pgTable(
      */
     nameType: text("name_type").notNull().default("literal"),
     renpyTag: text("renpy_tag").notNull(),
-    routeAffiliation: text("route_affiliation"),
     isLoveInterest: boolean("is_love_interest").default(false).notNull(),
     isNarrator: boolean("is_narrator").default(false).notNull(),
     // Note: Foreign key to pair_groups.id added manually in migration 0007
     // due to circular dependency (pair_groups also references characters)
     pairGroupId: uuid("pair_group_id"),
     notes: text("notes"),
-    conditionalPrefix: text("conditional_prefix"),
     color: text("color").notNull(),
     avatarUrl: text("avatar_url"), // Path to avatar image file
     createdAt: timestamp("created_at").defaultNow().notNull(),

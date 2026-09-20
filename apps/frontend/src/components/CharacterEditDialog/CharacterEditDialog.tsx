@@ -47,8 +47,6 @@ interface CharacterSnapshot {
   displayName: string;
   renpyTag: string;
   color: string;
-  routeAffiliation: string;
-  conditionalPrefix: string;
   notes: string;
   isLoveInterest: boolean;
   isNarrator: boolean;
@@ -62,8 +60,6 @@ function buildSnapshot(f: CharacterFormState): CharacterSnapshot {
     displayName: f.displayName,
     renpyTag: f.renpyTag,
     color: f.color,
-    routeAffiliation: f.routeAffiliation,
-    conditionalPrefix: f.conditionalPrefix,
     notes: f.notes,
     isLoveInterest: f.isLoveInterest,
     isNarrator: f.isNarrator,
@@ -78,8 +74,6 @@ function buildSnapshotFromChar(char: Character): CharacterSnapshot {
     displayName: char.displayName,
     renpyTag: char.renpyTag,
     color: char.color,
-    routeAffiliation: char.routeAffiliation ?? "",
-    conditionalPrefix: char.conditionalPrefix ?? "",
     notes: char.notes ?? "",
     isLoveInterest: char.isLoveInterest,
     isNarrator: char.isNarrator,
@@ -253,11 +247,9 @@ export function CharacterEditDialog({
         displayName: form.displayName.trim(),
         renpyTag: form.renpyTag.trim(),
         color: form.color,
-        routeAffiliation: form.routeAffiliation.trim() || undefined,
         isLoveInterest: form.isLoveInterest,
         isNarrator: form.isNarrator,
         notes: form.notes.trim() || undefined,
-        conditionalPrefix: form.conditionalPrefix.trim() || undefined,
       };
 
       let targetCharId = characterId ?? createdCharIdRef.current;
@@ -267,11 +259,9 @@ export function CharacterEditDialog({
           name: payload.name,
           displayName: payload.displayName,
           color: payload.color,
-          routeAffiliation: payload.routeAffiliation,
           isLoveInterest: payload.isLoveInterest,
           isNarrator: payload.isNarrator,
           notes: payload.notes,
-          conditionalPrefix: payload.conditionalPrefix,
         });
       } else {
         const created = await createCharacter(payload);

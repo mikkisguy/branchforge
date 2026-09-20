@@ -9,9 +9,7 @@ export interface CharacterFormState {
   displayName: string;
   renpyTag: string;
   color: string;
-  routeAffiliation: string;
   notes: string;
-  conditionalPrefix: string;
   isLoveInterest: boolean;
   isNarrator: boolean;
   avatarUrl?: string;
@@ -43,9 +41,7 @@ export const INITIAL_EMPTY: CharacterFormState = {
   displayName: "",
   renpyTag: "",
   color: "#FF6B6B",
-  routeAffiliation: "",
   notes: "",
-  conditionalPrefix: "",
   isLoveInterest: false,
   isNarrator: false,
   avatarUrl: undefined,
@@ -72,9 +68,7 @@ export function formReducer(
         displayName: char.displayName,
         renpyTag: char.renpyTag,
         color: char.color,
-        routeAffiliation: char.routeAffiliation ?? "",
         notes: char.notes ?? "",
-        conditionalPrefix: char.conditionalPrefix ?? "",
         isLoveInterest: char.isLoveInterest,
         isNarrator: char.isNarrator,
         avatarUrl: char.avatarUrl ?? undefined,

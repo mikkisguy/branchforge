@@ -45,7 +45,6 @@ export const createCharacterSchema = z
     displayName: requiredString(200, "Display name is too long"),
     renpyTag: renpyTagSchema,
     color: colorHexSchema,
-    routeAffiliation: optionalString(50),
     isLoveInterest: z.boolean().default(false),
     isNarrator: z.boolean().default(false),
     nameType: z
@@ -60,7 +59,6 @@ export const createCharacterSchema = z
       ])
       .optional(),
     notes: optionalString(10000),
-    conditionalPrefix: optionalString(50),
   })
   .strict();
 
@@ -74,7 +72,6 @@ export const updateCharacterSchema = z
     name: requiredString(200, "Name is too long").optional(),
     displayName: requiredString(200, "Display name is too long").optional(),
     color: colorHexSchema.optional(),
-    routeAffiliation: optionalString(50),
     isLoveInterest: z.boolean().optional(),
     isNarrator: z.boolean().optional(),
     nameType: z
@@ -89,7 +86,6 @@ export const updateCharacterSchema = z
       ])
       .optional(),
     notes: optionalString(10000),
-    conditionalPrefix: optionalString(50),
   })
   .strict()
   .partial();
@@ -110,7 +106,6 @@ export const importCharactersSchema = z
           color: colorHexSchema,
           isLoveInterest: z.boolean().optional(),
           isNarrator: z.boolean().optional(),
-          routeAffiliation: optionalString(50),
           nameType: z
             .enum([
               "literal",

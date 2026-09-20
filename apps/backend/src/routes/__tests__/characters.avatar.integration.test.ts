@@ -87,10 +87,8 @@ const testCharacter: NewCharacter = {
   displayName: "Eileen",
   renpyTag: "a",
   color: "#FF6B6B",
-  routeAffiliation: "EILEEN",
   isLoveInterest: true,
   notes: "casual",
-  conditionalPrefix: null,
 };
 
 // Minimal 1x1 PNG for testing

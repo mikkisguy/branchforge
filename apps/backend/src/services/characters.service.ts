@@ -59,11 +59,9 @@ export interface CharacterDetail {
   nameType: CharacterNameType;
   renpyTag: string;
   color: string;
-  routeAffiliation: string | null;
   isLoveInterest: boolean;
   isNarrator: boolean;
   notes: string | null;
-  conditionalPrefix: string | null;
   avatarUrl: string | null;
 }
 /** Result of character detection */
@@ -107,11 +105,9 @@ type CharacterFields = Pick<
   | "nameType"
   | "renpyTag"
   | "color"
-  | "routeAffiliation"
   | "isLoveInterest"
   | "isNarrator"
   | "notes"
-  | "conditionalPrefix"
   | "avatarUrl"
 >;
 
@@ -125,11 +121,9 @@ function toCharacterDetail(character: CharacterFields): CharacterDetail {
     displayName: character.displayName,
     renpyTag: character.renpyTag,
     color: character.color,
-    routeAffiliation: character.routeAffiliation,
     isLoveInterest: character.isLoveInterest,
     isNarrator: character.isNarrator,
     notes: character.notes,
-    conditionalPrefix: character.conditionalPrefix,
     avatarUrl: buildAvatarUrl(character.avatarUrl),
   };
 }
@@ -450,7 +444,6 @@ export class CharactersService {
             displayName: charData.displayName,
             nameType: resolvedNameType,
             color: charData.color,
-            routeAffiliation: charData.routeAffiliation,
             updatedAt: new Date(),
           };
           if (charData.isLoveInterest !== undefined) {
@@ -486,7 +479,6 @@ export class CharactersService {
             displayName: charData.displayName,
             renpyTag: charData.tag,
             color: charData.color,
-            routeAffiliation: charData.routeAffiliation,
             isLoveInterest: charData.isLoveInterest ?? false,
             isNarrator: charData.isNarrator ?? false,
           })
@@ -548,11 +540,9 @@ export class CharactersService {
         nameType: characters.nameType,
         renpyTag: characters.renpyTag,
         color: characters.color,
-        routeAffiliation: characters.routeAffiliation,
         isLoveInterest: characters.isLoveInterest,
         isNarrator: characters.isNarrator,
         notes: characters.notes,
-        conditionalPrefix: characters.conditionalPrefix,
         avatarUrl: characters.avatarUrl,
       })
       .from(characters)
@@ -591,11 +581,9 @@ export class CharactersService {
         nameType: input.nameType ?? inferNameTypeFromStoredName(input.name),
         renpyTag: input.renpyTag,
         color: input.color,
-        routeAffiliation: input.routeAffiliation,
         isLoveInterest: input.isLoveInterest,
         isNarrator: input.isNarrator,
         notes: input.notes,
-        conditionalPrefix: input.conditionalPrefix,
       })
       .onConflictDoNothing({
         target: [characters.projectId, characters.renpyTag],

@@ -100,7 +100,6 @@ export function CharacterImportWizard({
             confidence: 1,
             nameType: "literal",
             isLoveInterest: false,
-            routeAffiliation: undefined,
             excluded: false,
           });
         }
@@ -115,7 +114,6 @@ export function CharacterImportWizard({
         color: c.color,
         isLoveInterest: c.isLoveInterest ?? false,
         isNarrator: c.isNarrator ?? false,
-        routeAffiliation: c.routeAffiliation,
         nameType: c.nameType,
       }));
       const newExcludedTags = new Set(excludedTags);
