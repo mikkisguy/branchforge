@@ -28,6 +28,14 @@ export function WritingGoalSettings() {
   // Explicit state: null = use server value, string = user is editing
   const [localGoalInput, setLocalGoalInput] = useState<string | null>(null);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const updateGoalRef = useRef(updateGoal);
+
+  // The hook's mutation state can re-render this component while a save is
+  // pending. Keep the latest callback without treating that render as a new
+  // input change, which would otherwise restart the debounce indefinitely.
+  useEffect(() => {
+    updateGoalRef.current = updateGoal;
+  }, [updateGoal]);
 
   const isDisabled = isLoading || isSaving || isResetting;
 
@@ -68,8 +76,11 @@ export function WritingGoalSettings() {
     const clamped = Math.max(MIN_GOAL, Math.min(MAX_GOAL, num));
 
     debounceTimerRef.current = setTimeout(() => {
-      updateGoal({ dailyWritingGoal: clamped });
-      debounceTimerRef.current = null; // Clear ref after debounce completes
+      // Mark this edit as handled before the mutation changes its state.
+      // This prevents a mutation re-render from treating it as fresh input.
+      setLocalGoalInput(null);
+      debounceTimerRef.current = null;
+      updateGoalRef.current({ dailyWritingGoal: clamped });
     }, 500); // 500ms debounce
 
     return () => {
@@ -78,7 +89,7 @@ export function WritingGoalSettings() {
         debounceTimerRef.current = null; // Clear ref on cleanup
       }
     };
-  }, [localGoalInput, updateGoal]);
+  }, [localGoalInput]);
 
   // Sync local state with server state when settings change
   useEffect(() => {
