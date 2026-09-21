@@ -192,21 +192,6 @@ export function Select<T extends string = string>({
     [onChange, close]
   );
 
-  const handleOptionPointerDown = useCallback(
-    (optionValue: T) => (event: React.PointerEvent<HTMLDivElement>) => {
-      if (event.button !== 0) {
-        return;
-      }
-      // Selecting unmounts this portaled listbox immediately. Prevent the
-      // compatibility click that would otherwise be retargeted to the native
-      // dialog backdrop after the option disappears.
-      event.preventDefault();
-      event.stopPropagation();
-      handleSelect(optionValue);
-    },
-    [handleSelect]
-  );
-
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       switch (e.key) {
@@ -332,12 +317,15 @@ export function Select<T extends string = string>({
               {/* eslint-disable jsx-a11y/click-events-have-key-events -- Listbox handles keyboard navigation via aria-activedescendant */}
               {options.map((option, index) => (
                 // react-doctor-disable-next-line react-doctor/click-events-have-key-events, react-doctor/prefer-tag-over-role -- Parent listbox handles keys via aria-activedescendant; option role is required for listbox pattern
+                // Select on click rather than pointerdown. A pointerdown
+                // selection unmounts this menu before the browser dispatches
+                // its click, which can retarget that click to a native dialog
+                // backdrop and close the containing dialog.
                 <div
                   key={option.value}
                   id={`select-option-${index}`}
                   role="option"
                   aria-selected={option.value === value}
-                  onPointerDown={handleOptionPointerDown(option.value)}
                   onClick={() => handleSelect(option.value)}
                   tabIndex={-1}
                   className={cn(

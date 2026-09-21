@@ -8,6 +8,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Select } from "@/components/ui/select";
 
 const OPTIONS = [
@@ -44,17 +45,38 @@ describe("Select", () => {
     expect(onChange).toHaveBeenCalledWith("b");
   });
 
-  it("prevents the follow-up click after selecting an option", async () => {
+  it("waits for click before selecting an option", async () => {
     const user = userEvent.setup();
+    const onChange = vi.fn();
 
-    render(<Select value="a" onChange={vi.fn()} options={OPTIONS} />);
+    render(<Select value="a" onChange={onChange} options={OPTIONS} />);
 
     await user.click(screen.getByRole("combobox"));
     const option = screen.getByRole("option", { name: "Beta" });
 
-    // The option unmounts on pointerdown. Cancelling that event prevents the
-    // browser from retargeting its compatibility click to a dialog backdrop.
-    expect(fireEvent.pointerDown(option, { button: 0 })).toBe(false);
+    expect(fireEvent.pointerDown(option, { button: 0 })).toBe(true);
+    expect(onChange).not.toHaveBeenCalled();
+
+    fireEvent.click(option);
+    expect(onChange).toHaveBeenCalledWith("b");
+  });
+
+  it("keeps its containing dialog open when an option is selected", async () => {
+    const user = userEvent.setup();
+    const onOpenChange = vi.fn();
+
+    render(
+      <Dialog open onOpenChange={onOpenChange}>
+        <DialogContent>
+          <Select value="a" onChange={vi.fn()} options={OPTIONS} />
+        </DialogContent>
+      </Dialog>
+    );
+
+    await user.click(screen.getByRole("combobox"));
+    await user.click(screen.getByRole("option", { name: "Beta" }));
+
+    expect(onOpenChange).not.toHaveBeenCalledWith(false);
   });
 
   it("selects from a click without pointerdown", async () => {
