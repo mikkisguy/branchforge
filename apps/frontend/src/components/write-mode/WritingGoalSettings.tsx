@@ -18,97 +18,148 @@ import { Button } from "@/components/ui/button";
 // Writing goal constraints
 const MIN_GOAL = 1;
 const MAX_GOAL = 100000;
+const HOUR_OPTIONS = Array.from({ length: 24 }, (_, hour) => {
+  const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+  const ampm = hour < 12 ? "AM" : "PM";
+  return { value: String(hour), label: `${displayHour} ${ampm}` };
+});
 
 export function WritingGoalSettings() {
   const { settings, isLoading, isSaving, updateGoal, resetStats } =
     useWritingGoals();
   const { error: toastError } = useToast();
-  const [showResetConfirmDialog, setShowResetConfirmDialog] = useState(false);
-  const [isResetting, setIsResetting] = useState(false);
-  // Null draft values use the server setting. A non-null value is an unsaved
-  // change that is applied only when the user chooses Save.
-  const [localGoalInput, setLocalGoalInput] = useState<string | null>(null);
-  const [localResetHour, setLocalResetHour] = useState<string | null>(null);
+  const isEnabled = settings?.dailyWritingGoal != null;
+  const dailyGoal = settings?.dailyWritingGoal ?? 500;
+  const resetHour = settings?.dailyWordResetHour ?? 0;
+  const currentTimezone = useWritingGoalTimezone(settings, updateGoal);
+  const draft = useWritingGoalDraft({
+    isEnabled,
+    dailyGoal,
+    resetHour,
+    updateGoal,
+  });
+  const reset = useWritingStatsReset(resetStats, toastError);
 
-  const isDisabled = isLoading || isSaving || isResetting;
+  return (
+    <>
+      <WritingGoalForm
+        isEnabled={isEnabled}
+        isDisabled={isLoading || isSaving || reset.isResetting}
+        goalInput={draft.goalInput}
+        selectedResetHour={draft.selectedResetHour}
+        currentTimezone={currentTimezone}
+        canSave={draft.canSave}
+        showClearHistory={(settings?.dailyWordCounts.length ?? 0) > 0}
+        onToggleEnabled={(checked) =>
+          updateGoal({ dailyWritingGoal: checked ? dailyGoal : null })
+        }
+        onGoalChange={draft.setGoalInput}
+        onResetHourChange={draft.setResetHour}
+        onSave={draft.save}
+        onClearHistory={reset.openConfirmation}
+      />
+      <ConfirmDialog
+        open={reset.isConfirmationOpen}
+        onOpenChange={reset.setConfirmationOpen}
+        onConfirm={reset.confirm}
+        title="Clear word count history?"
+        description="This will clear your word count history from the last 7 days, including daily totals and per-label tracking. Your daily goal settings will remain unchanged."
+        cancelLabel="Cancel"
+        confirmLabel="Clear history"
+        isLoading={reset.isResetting}
+        loadingLabel="Clearing..."
+      />
+    </>
+  );
+}
 
-  // Detect timezone during render instead of effect chain
+type WritingGoalUpdate = Parameters<
+  ReturnType<typeof useWritingGoals>["updateGoal"]
+>[0];
+
+function useWritingGoalTimezone(
+  settings: ReturnType<typeof useWritingGoals>["settings"],
+  updateGoal: (params: WritingGoalUpdate) => void
+) {
   const detectedTimezone = useMemo(
     () => Intl.DateTimeFormat().resolvedOptions().timeZone,
     []
   );
 
-  // Save detected timezone if user has none set
   useEffect(() => {
     if (settings && !settings.timezone && detectedTimezone) {
+      // react-doctor-disable-next-line react-doctor/no-pass-data-to-parent -- Persisting a missing timezone is this settings hook's one-time initialization responsibility.
       updateGoal({ timezone: detectedTimezone });
     }
   }, [settings, detectedTimezone, updateGoal]);
 
-  const isEnabled = settings?.dailyWritingGoal != null;
-  const dailyGoal = settings?.dailyWritingGoal ?? 500;
-  const resetHour = settings?.dailyWordResetHour ?? 0;
-  const currentTimezone = settings?.timezone ?? detectedTimezone ?? "UTC";
+  return settings?.timezone ?? detectedTimezone ?? "UTC";
+}
+
+function useWritingGoalDraft({
+  isEnabled,
+  dailyGoal,
+  resetHour,
+  updateGoal,
+}: {
+  isEnabled: boolean;
+  dailyGoal: number;
+  resetHour: number;
+  updateGoal: (params: WritingGoalUpdate) => void;
+}) {
+  const [localGoalInput, setLocalGoalInput] = useState<string | null>(null);
+  const [localResetHour, setLocalResetHour] = useState<string | null>(null);
   const goalInput = localGoalInput ?? String(dailyGoal);
   const selectedResetHour = localResetHour ?? String(resetHour);
-  const parsedGoal = parseInt(goalInput, 10);
-  const hasValidGoal = !isNaN(parsedGoal);
-  const clampedGoal = hasValidGoal
-    ? Math.max(MIN_GOAL, Math.min(MAX_GOAL, parsedGoal))
-    : null;
-  const parsedResetHour = parseInt(selectedResetHour, 10);
-  const hasValidResetHour =
-    !isNaN(parsedResetHour) && parsedResetHour >= 0 && parsedResetHour <= 23;
-  const hasUnsavedChanges = localGoalInput !== null || localResetHour !== null;
+  const clampedGoal = parseClampedGoal(goalInput);
+  const parsedResetHour = parseResetHour(selectedResetHour);
   const canSave =
-    hasUnsavedChanges &&
-    (!isEnabled || (clampedGoal !== null && hasValidResetHour));
+    (localGoalInput !== null || localResetHour !== null) &&
+    (!isEnabled || (clampedGoal !== null && parsedResetHour !== null));
 
-  const handleToggleEnabled = (checked: boolean) => {
-    updateGoal({ dailyWritingGoal: checked ? dailyGoal : null });
-  };
-
-  const handleGoalChange = (value: string) => {
-    setLocalGoalInput(value);
-  };
-
-  const handleResetHourChange = (value: string) => {
-    const hour = parseInt(value, 10);
-    if (!isNaN(hour) && hour >= 0 && hour <= 23) {
+  const setResetHour = (value: string) => {
+    if (parseResetHour(value) !== null) {
       setLocalResetHour(value);
     }
   };
 
-  const handleSave = () => {
+  const save = () => {
     if (!canSave) return;
 
-    const changes: {
-      dailyWritingGoal?: number | null;
-      dailyWordResetHour?: number;
-    } = {};
-
-    if (localGoalInput !== null) {
-      changes.dailyWritingGoal = clampedGoal;
-    }
-
-    if (localResetHour !== null && hasValidResetHour) {
-      changes.dailyWordResetHour = parsedResetHour;
-    }
-
-    updateGoal(changes);
+    updateGoal(
+      createWritingGoalChanges(
+        localGoalInput,
+        localResetHour,
+        clampedGoal,
+        parsedResetHour
+      )
+    );
     setLocalGoalInput(null);
     setLocalResetHour(null);
   };
 
-  const handleResetStats = useCallback(() => {
-    setShowResetConfirmDialog(true);
-  }, []);
+  return {
+    goalInput,
+    selectedResetHour,
+    canSave,
+    setGoalInput: setLocalGoalInput,
+    setResetHour,
+    save,
+  };
+}
 
-  const handleResetConfirmed = useCallback(async () => {
+function useWritingStatsReset(
+  resetStats: () => Promise<void>,
+  toastError: (message: string) => void
+) {
+  const [isConfirmationOpen, setConfirmationOpen] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
+  const openConfirmation = useCallback(() => setConfirmationOpen(true), []);
+  const confirm = useCallback(async () => {
     setIsResetting(true);
     try {
       await resetStats();
-      setShowResetConfirmDialog(false);
+      setConfirmationOpen(false);
     } catch (error) {
       console.error("Failed to reset writing statistics:", error);
       toastError(
@@ -119,27 +170,79 @@ export function WritingGoalSettings() {
     }
   }, [resetStats, toastError]);
 
-  // Generate options for reset hour (0-23)
-  const hourOptions = Array.from({ length: 24 }, (_, i) => {
-    const hour = i;
-    const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
-    const ampm = hour < 12 ? "AM" : "PM";
-    return { value: hour, label: `${displayHour} ${ampm}` };
-  });
+  return {
+    isConfirmationOpen,
+    setConfirmationOpen,
+    isResetting,
+    openConfirmation,
+    confirm,
+  };
+}
 
+function parseClampedGoal(value: string): number | null {
+  const parsed = parseInt(value, 10);
+  return isNaN(parsed) ? null : Math.max(MIN_GOAL, Math.min(MAX_GOAL, parsed));
+}
+
+function parseResetHour(value: string): number | null {
+  const parsed = parseInt(value, 10);
+  return !isNaN(parsed) && parsed >= 0 && parsed <= 23 ? parsed : null;
+}
+
+function createWritingGoalChanges(
+  localGoalInput: string | null,
+  localResetHour: string | null,
+  clampedGoal: number | null,
+  parsedResetHour: number | null
+): WritingGoalUpdate {
+  const changes: WritingGoalUpdate = {};
+  if (localGoalInput !== null) changes.dailyWritingGoal = clampedGoal;
+  if (localResetHour !== null && parsedResetHour !== null) {
+    changes.dailyWordResetHour = parsedResetHour;
+  }
+  return changes;
+}
+
+interface WritingGoalFormProps {
+  isEnabled: boolean;
+  isDisabled: boolean;
+  goalInput: string;
+  selectedResetHour: string;
+  currentTimezone: string;
+  canSave: boolean;
+  showClearHistory: boolean;
+  onToggleEnabled: (checked: boolean) => void;
+  onGoalChange: (value: string) => void;
+  onResetHourChange: (value: string) => void;
+  onSave: () => void;
+  onClearHistory: () => void;
+}
+
+function WritingGoalForm({
+  isEnabled,
+  isDisabled,
+  goalInput,
+  selectedResetHour,
+  currentTimezone,
+  canSave,
+  showClearHistory,
+  onToggleEnabled,
+  onGoalChange,
+  onResetHourChange,
+  onSave,
+  onClearHistory,
+}: WritingGoalFormProps) {
   return (
     <div className="space-y-6">
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <div className="space-y-0.5">
-            <div className="flex items-center gap-2">
-              <label
-                htmlFor="writing-goal-toggle"
-                className="text-sm font-medium"
-              >
-                Daily Writing Goal
-              </label>
-            </div>
+            <label
+              htmlFor="writing-goal-toggle"
+              className="text-sm font-medium"
+            >
+              Daily Writing Goal
+            </label>
             <p className="text-xs text-muted-foreground">
               Track your daily word count to build a consistent writing habit
             </p>
@@ -147,14 +250,13 @@ export function WritingGoalSettings() {
           <Switch
             id="writing-goal-toggle"
             checked={isEnabled}
-            onCheckedChange={handleToggleEnabled}
+            onCheckedChange={onToggleEnabled}
             disabled={isDisabled}
           />
         </div>
 
         {isEnabled && (
           <div className="space-y-4 pl-6">
-            {/* Daily Goal Input */}
             <div className="space-y-2">
               <label
                 htmlFor="daily-goal-input"
@@ -170,7 +272,7 @@ export function WritingGoalSettings() {
                   max={MAX_GOAL}
                   step="100"
                   value={goalInput}
-                  onChange={(e) => handleGoalChange(e.target.value)}
+                  onChange={(event) => onGoalChange(event.target.value)}
                   disabled={isDisabled}
                   className="w-32"
                 />
@@ -181,25 +283,19 @@ export function WritingGoalSettings() {
               </p>
             </div>
 
-            {/* Reset Hour Select */}
             <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <label
-                  htmlFor="reset-hour-select"
-                  className="text-sm text-muted-foreground"
-                >
-                  Daily reset time
-                </label>
-              </div>
+              <label
+                htmlFor="reset-hour-select"
+                className="text-sm text-muted-foreground"
+              >
+                Daily reset time
+              </label>
               <Select
                 id="reset-hour-select"
                 value={selectedResetHour}
-                onChange={(value) => handleResetHourChange(value)}
+                onChange={onResetHourChange}
                 disabled={isDisabled}
-                options={hourOptions.map((opt) => ({
-                  value: String(opt.value),
-                  label: opt.label,
-                }))}
+                options={HOUR_OPTIONS}
                 className="w-40"
               />
               <p className="text-xs text-muted-foreground">
@@ -212,21 +308,20 @@ export function WritingGoalSettings() {
 
         {isEnabled && (
           <div className="flex justify-end gap-2 pl-6">
-            {settings?.dailyWordCounts &&
-              settings.dailyWordCounts.length > 0 && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handleResetStats}
-                  disabled={isDisabled}
-                >
-                  <RotateCcw className="size-4" />
-                  <span>Clear recent word count history</span>
-                </Button>
-              )}
+            {showClearHistory && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onClearHistory}
+                disabled={isDisabled}
+              >
+                <RotateCcw className="size-4" />
+                <span>Clear recent word count history</span>
+              </Button>
+            )}
             <Button
               type="button"
-              onClick={handleSave}
+              onClick={onSave}
               disabled={isDisabled || !canSave}
             >
               Save changes
@@ -237,27 +332,14 @@ export function WritingGoalSettings() {
         {isEnabled && (
           <div className="rounded-lg border border-border bg-muted/50 p-3">
             <p className="text-xs text-muted-foreground">
-              <span className="font-medium">How it works:</span> Only new
-              words you write count toward your daily goal. Editing and
-              re-saving existing content won't inflate your count. Your
-              progress is tracked for the last 7 days.
+              <span className="font-medium">How it works:</span> Only new words
+              you write count toward your daily goal. Editing and re-saving
+              existing content won't inflate your count. Your progress is
+              tracked for the last 7 days.
             </p>
           </div>
         )}
       </div>
-
-      {/* Reset Confirmation Dialog */}
-      <ConfirmDialog
-        open={showResetConfirmDialog}
-        onOpenChange={setShowResetConfirmDialog}
-        onConfirm={handleResetConfirmed}
-        title="Clear word count history?"
-        description="This will clear your word count history from the last 7 days, including daily totals and per-label tracking. Your daily goal settings will remain unchanged."
-        cancelLabel="Cancel"
-        confirmLabel="Clear history"
-        isLoading={isResetting}
-        loadingLabel="Clearing..."
-      />
     </div>
   );
 }
