@@ -5,7 +5,7 @@
  * Includes enable/disable toggle, daily goal input, and reset time selection.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Switch } from "@/components/ui/switch";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Select } from "@/components/ui/select";
@@ -25,17 +25,10 @@ export function WritingGoalSettings() {
   const { error: toastError } = useToast();
   const [showResetConfirmDialog, setShowResetConfirmDialog] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
-  // Explicit state: null = use server value, string = user is editing
+  // Null draft values use the server setting. A non-null value is an unsaved
+  // change that is applied only when the user chooses Save.
   const [localGoalInput, setLocalGoalInput] = useState<string | null>(null);
-  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const updateGoalRef = useRef(updateGoal);
-
-  // The hook's mutation state can re-render this component while a save is
-  // pending. Keep the latest callback without treating that render as a new
-  // input change, which would otherwise restart the debounce indefinitely.
-  useEffect(() => {
-    updateGoalRef.current = updateGoal;
-  }, [updateGoal]);
+  const [localResetHour, setLocalResetHour] = useState<string | null>(null);
 
   const isDisabled = isLoading || isSaving || isResetting;
 
@@ -56,6 +49,20 @@ export function WritingGoalSettings() {
   const dailyGoal = settings?.dailyWritingGoal ?? 500;
   const resetHour = settings?.dailyWordResetHour ?? 0;
   const currentTimezone = settings?.timezone ?? detectedTimezone ?? "UTC";
+  const goalInput = localGoalInput ?? String(dailyGoal);
+  const selectedResetHour = localResetHour ?? String(resetHour);
+  const parsedGoal = parseInt(goalInput, 10);
+  const hasValidGoal = !isNaN(parsedGoal);
+  const clampedGoal = hasValidGoal
+    ? Math.max(MIN_GOAL, Math.min(MAX_GOAL, parsedGoal))
+    : null;
+  const parsedResetHour = parseInt(selectedResetHour, 10);
+  const hasValidResetHour =
+    !isNaN(parsedResetHour) && parsedResetHour >= 0 && parsedResetHour <= 23;
+  const hasUnsavedChanges = localGoalInput !== null || localResetHour !== null;
+  const canSave =
+    hasUnsavedChanges &&
+    (!isEnabled || (clampedGoal !== null && hasValidResetHour));
 
   const handleToggleEnabled = (checked: boolean) => {
     updateGoal({ dailyWritingGoal: checked ? dailyGoal : null });
@@ -65,47 +72,32 @@ export function WritingGoalSettings() {
     setLocalGoalInput(value);
   };
 
-  // Persist debounced goal changes to server
-  useEffect(() => {
-    // Only persist if we have a local value different from server
-    if (localGoalInput === null) return;
-
-    const num = parseInt(localGoalInput, 10);
-    if (isNaN(num)) return;
-
-    const clamped = Math.max(MIN_GOAL, Math.min(MAX_GOAL, num));
-
-    debounceTimerRef.current = setTimeout(() => {
-      // Mark this edit as handled before the mutation changes its state.
-      // This prevents a mutation re-render from treating it as fresh input.
-      setLocalGoalInput(null);
-      debounceTimerRef.current = null;
-      updateGoalRef.current({ dailyWritingGoal: clamped });
-    }, 500); // 500ms debounce
-
-    return () => {
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current);
-        debounceTimerRef.current = null; // Clear ref on cleanup
-      }
-    };
-  }, [localGoalInput]);
-
-  // Sync local state with server state when settings change
-  useEffect(() => {
-    // Skip resetting if a debounce is pending (user is still typing)
-    if (debounceTimerRef.current) return;
-
-    if (settings?.dailyWritingGoal != null) {
-      setLocalGoalInput(null);
-    }
-  }, [settings?.dailyWritingGoal]);
-
   const handleResetHourChange = (value: string) => {
     const hour = parseInt(value, 10);
     if (!isNaN(hour) && hour >= 0 && hour <= 23) {
-      updateGoal({ dailyWordResetHour: hour });
+      setLocalResetHour(value);
     }
+  };
+
+  const handleSave = () => {
+    if (!canSave) return;
+
+    const changes: {
+      dailyWritingGoal?: number | null;
+      dailyWordResetHour?: number;
+    } = {};
+
+    if (localGoalInput !== null) {
+      changes.dailyWritingGoal = clampedGoal;
+    }
+
+    if (localResetHour !== null && hasValidResetHour) {
+      changes.dailyWordResetHour = parsedResetHour;
+    }
+
+    updateGoal(changes);
+    setLocalGoalInput(null);
+    setLocalResetHour(null);
   };
 
   const handleResetStats = useCallback(() => {
@@ -177,7 +169,7 @@ export function WritingGoalSettings() {
                   min={MIN_GOAL}
                   max={MAX_GOAL}
                   step="100"
-                  value={localGoalInput ?? dailyGoal}
+                  value={goalInput}
                   onChange={(e) => handleGoalChange(e.target.value)}
                   disabled={isDisabled}
                   className="w-32"
@@ -201,7 +193,7 @@ export function WritingGoalSettings() {
               </div>
               <Select
                 id="reset-hour-select"
-                value={String(resetHour)}
+                value={selectedResetHour}
                 onChange={(value) => handleResetHourChange(value)}
                 disabled={isDisabled}
                 options={hourOptions.map((opt) => ({
@@ -217,35 +209,42 @@ export function WritingGoalSettings() {
             </div>
           </div>
         )}
-      </div>
 
-      {/* Info Box */}
-      {isEnabled && (
-        <div className="rounded-lg bg-muted/50 border border-border p-3">
-          <p className="text-xs text-muted-foreground">
-            <span className="font-medium">How it works:</span> Only new words
-            you write count toward your daily goal. Editing and re-saving
-            existing content won't inflate your count. Your progress is tracked
-            for the last 7 days.
-          </p>
-        </div>
-      )}
-
-      {/* Reset Stats Button */}
-      {isEnabled &&
-        settings?.dailyWordCounts &&
-        settings.dailyWordCounts.length > 0 && (
-          <Button
-            type="button"
-            variant="outline"
-            onClick={handleResetStats}
-            className="w-full"
-            disabled={isDisabled}
-          >
-            <RotateCcw className="size-4" />
-            <span>Clear recent word count history</span>
-          </Button>
+        {isEnabled && (
+          <div className="flex justify-end gap-2 pl-6">
+            {settings?.dailyWordCounts &&
+              settings.dailyWordCounts.length > 0 && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleResetStats}
+                  disabled={isDisabled}
+                >
+                  <RotateCcw className="size-4" />
+                  <span>Clear recent word count history</span>
+                </Button>
+              )}
+            <Button
+              type="button"
+              onClick={handleSave}
+              disabled={isDisabled || !canSave}
+            >
+              Save changes
+            </Button>
+          </div>
         )}
+
+        {isEnabled && (
+          <div className="rounded-lg border border-border bg-muted/50 p-3">
+            <p className="text-xs text-muted-foreground">
+              <span className="font-medium">How it works:</span> Only new
+              words you write count toward your daily goal. Editing and
+              re-saving existing content won't inflate your count. Your
+              progress is tracked for the last 7 days.
+            </p>
+          </div>
+        )}
+      </div>
 
       {/* Reset Confirmation Dialog */}
       <ConfirmDialog

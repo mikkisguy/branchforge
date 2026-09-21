@@ -1,5 +1,6 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { WritingGoalSettings } from "../WritingGoalSettings";
 
 const updateGoalMock = vi.fn();
@@ -30,33 +31,35 @@ vi.mock("@/contexts/ToastContext", () => ({
 
 describe("WritingGoalSettings", () => {
   beforeEach(() => {
-    vi.useFakeTimers();
     updateGoalMock.mockClear();
   });
 
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
-  it("saves a spinner value once when the save re-renders the settings", () => {
-    const { rerender } = render(<WritingGoalSettings />);
+  it("keeps goal and reset-time edits local until changes are saved", async () => {
+    const user = userEvent.setup();
+    render(<WritingGoalSettings />);
 
     fireEvent.change(screen.getByLabelText("Daily word goal"), {
       target: { value: "600" },
     });
+    await user.click(screen.getByRole("combobox", { name: "Daily reset time" }));
+    await user.click(screen.getByRole("option", { name: "1 AM" }));
 
-    act(() => {
-      vi.advanceTimersByTime(500);
+    expect(updateGoalMock).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+
+    expect(updateGoalMock).toHaveBeenCalledWith({
+      dailyWritingGoal: 600,
+      dailyWordResetHour: 1,
     });
+  });
 
-    // A TanStack Query mutation re-renders the component after it begins.
-    rerender(<WritingGoalSettings />);
+  it("saves toggling the goal immediately", async () => {
+    const user = userEvent.setup();
+    render(<WritingGoalSettings />);
 
-    act(() => {
-      vi.advanceTimersByTime(1_500);
-    });
+    await user.click(screen.getByRole("switch", { name: "Daily Writing Goal" }));
 
-    expect(updateGoalMock).toHaveBeenCalledTimes(1);
-    expect(updateGoalMock).toHaveBeenCalledWith({ dailyWritingGoal: 600 });
+    expect(updateGoalMock).toHaveBeenCalledWith({ dailyWritingGoal: null });
   });
 });

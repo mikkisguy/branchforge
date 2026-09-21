@@ -2,4 +2,4 @@
 "@branchforge/frontend": patch
 ---
 
-Fixed daily word-goal number input causing repeated saves
+Fixed bugs in daily word-goal settings
