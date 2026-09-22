@@ -15,6 +15,7 @@ import { useToast } from "@/contexts/ToastContext";
 import { useLabels } from "@/hooks/useLabels";
 import { useGitLabPendingChanges } from "@/hooks/useGitLabPendingChanges";
 import { characterKeys, projectFilesKeys } from "@/lib/query-keys";
+import { formatGitLabSyncError } from "@/lib/format-gitlab-sync-error";
 import { CharacterImportWizard } from "@/components/CharacterImportWizard/CharacterImportWizard.lazy";
 import { charactersApi } from "@/lib/api/characters";
 import { Button } from "@/components/ui/button";
@@ -161,7 +162,12 @@ export function GitLabSyncDialog({
         onOpenChange(false);
       }, 1000);
     } else if (result?.status === "FAILED") {
-      error(result.errorMessage || "Operation failed");
+      error(
+        formatGitLabSyncError(
+          result.errorMessage || "Operation failed",
+          operationType
+        )
+      );
     } else {
       console.warn("Unexpected sync result:", result);
       error("Failed to complete sync operation");

@@ -68,7 +68,10 @@ import { requireProjectOwnership } from "../authz.service.js";
 import { lockProject } from "../project-files-operations.service.js";
 import { localContentBaselineHash } from "../project-file-baseline.js";
 import { logWarn } from "../../lib/logger.js";
-import { NotFoundError } from "../../middleware/error-handler.middleware.js";
+import {
+  NotFoundError,
+  RepositoryNotLinkedError,
+} from "../../middleware/error-handler.middleware.js";
 import type { Transaction } from "../../db/types.js";
 
 type PendingOpRow = typeof projectFilePendingOperations.$inferSelect;
@@ -173,6 +176,96 @@ function buildPlannedActions(
   }
 
   return { actions, operations, contentUpdatedFiles };
+}
+
+interface GeneratedExportData {
+  variables: Array<{
+    key: string;
+    description: string | null;
+    category: string | null;
+  }>;
+  stats: Array<{
+    key: string;
+    name: string;
+    minValue: number;
+    maxValue: number;
+    description: string | null;
+  }>;
+  characters: Array<{
+    renpyTag: string;
+    name: string;
+    nameType: string;
+    color: string;
+    isNarrator: boolean;
+    displayName: string;
+  }>;
+}
+
+/**
+ * Generated files are not tracked in project_files, so GitLab needs an
+ * explicit create action on their first export and an update thereafter.
+ */
+async function buildGeneratedActions(
+  projectId: string,
+  userId: string,
+  branch: string,
+  fileDirPrefix: string,
+  generated: GeneratedExportData
+): Promise<PlannedAction[]> {
+  const candidates: Array<{ filePath: string; content: string }> = [];
+
+  if (generated.variables.length > 0) {
+    candidates.push({
+      filePath: `${fileDirPrefix}branchforge_variables.rpy`,
+      content: generateVariablesFile(generated.variables),
+    });
+  }
+  if (generated.stats.length > 0) {
+    candidates.push({
+      filePath: `${fileDirPrefix}branchforge_stats.rpy`,
+      content: generateStatsFile(generated.stats),
+    });
+  }
+  if (generated.characters.length > 0) {
+    candidates.push({
+      filePath: `${fileDirPrefix}branchforge_definitions.rpy`,
+      content: generateCharacterDefinitionsFile(
+        generated.characters.map((character) => ({
+          ...character,
+          nameType: normalizeCharacterNameType(character.nameType),
+        }))
+      ),
+    });
+  }
+
+  return Promise.all(
+    candidates.map(async ({ filePath, content }) => {
+      // A 404 (including for a new branch) is represented as content: null.
+      const remoteFile = await getFileContentWithMetadata(
+        projectId,
+        userId,
+        filePath,
+        branch
+      );
+      return {
+        action: remoteFile.content === null ? "create" : "update",
+        filePath,
+        content,
+      };
+    })
+  );
+}
+
+function toUserFacingExportError(error: unknown): string {
+  if (error instanceof RepositoryNotLinkedError) {
+    return "Export failed. Link a GitLab repository in project settings, then try again.";
+  }
+
+  if (error instanceof Error && error.message.startsWith("Conflict:")) {
+    return error.message;
+  }
+
+  return "Export failed. Check your GitLab connection, branch name, and permissions, then try again.";
 }
 
 /**
@@ -620,8 +713,6 @@ export async function exportToGitlab(
       activeFiles.map((f) => f.filePath)
     );
 
-    // Generated files share the single atomic commit.
-    const generatedActions: PlannedAction[] = [];
     const [projectVariables, projectStats, projectCharacters] =
       await Promise.all([
         db
@@ -656,32 +747,18 @@ export async function exportToGitlab(
           .where(eq(characters.projectId, projectId)),
       ]);
 
-    if (projectVariables.length > 0) {
-      generatedActions.push({
-        action: "update",
-        filePath: `${fileDirPrefix}branchforge_variables.rpy`,
-        content: generateVariablesFile(projectVariables),
-      });
-    }
-    if (projectStats.length > 0) {
-      generatedActions.push({
-        action: "update",
-        filePath: `${fileDirPrefix}branchforge_stats.rpy`,
-        content: generateStatsFile(projectStats),
-      });
-    }
-    if (projectCharacters.length > 0) {
-      generatedActions.push({
-        action: "update",
-        filePath: `${fileDirPrefix}branchforge_definitions.rpy`,
-        content: generateCharacterDefinitionsFile(
-          projectCharacters.map((c) => ({
-            ...c,
-            nameType: normalizeCharacterNameType(c.nameType),
-          }))
-        ),
-      });
-    }
+    // Generated files share the single atomic commit.
+    const generatedActions = await buildGeneratedActions(
+      projectId,
+      userId,
+      targetBranch,
+      fileDirPrefix,
+      {
+        variables: projectVariables,
+        stats: projectStats,
+        characters: projectCharacters,
+      }
+    );
 
     const allActions = [...plan.actions, ...generatedActions];
 
@@ -762,8 +839,7 @@ export async function exportToGitlab(
       conflictCount: 0,
     };
   } catch (error) {
-    const errorMessage =
-      error instanceof Error ? error.message : "Unknown error";
+    const errorMessage = toUserFacingExportError(error);
     await updateSyncOperation(operation.id, {
       status: "FAILED",
       errorMessage,
