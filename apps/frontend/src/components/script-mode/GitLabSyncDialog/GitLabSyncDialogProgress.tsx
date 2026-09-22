@@ -71,7 +71,7 @@ export function GitLabSyncDialogProgress({
       )}
 
       {/* Conflict Warning */}
-      {Boolean(operation?.conflictCount && operation.conflictCount > 0) && (
+      {operation !== null && (operation.conflictCount ?? 0) > 0 && (
         <div className="p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200 rounded-md text-sm">
           {operation.conflictCount} conflict(s) detected. Manual review may be
           required.
