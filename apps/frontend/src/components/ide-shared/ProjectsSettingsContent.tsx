@@ -6,10 +6,11 @@ import {
   Info,
   Download,
   History,
+  ExternalLink,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { formatDate } from "@/lib/utils";
+import { cn, formatDate } from "@/lib/utils";
 import {
   Table,
   TableBody,
@@ -56,6 +57,39 @@ function ProjectTitle({ project }: { project: Project }) {
         <span className="sr-only">{project.description}</span>
       ) : null}
     </div>
+  );
+}
+
+function gitlabPathFromUrl(url: string): string {
+  try {
+    return decodeURIComponent(new URL(url).pathname.replace(/^\/+/, ""));
+  } catch {
+    return url;
+  }
+}
+
+function GitlabProjectLink({
+  url,
+  className,
+}: {
+  url: string;
+  className?: string;
+}) {
+  const path = gitlabPathFromUrl(url);
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label={`Open ${path} on GitLab`}
+      className={cn(
+        "inline-flex min-w-0 max-w-full items-center gap-1 rounded-sm text-sm text-muted-foreground hover:text-foreground focus-ring",
+        className
+      )}
+    >
+      <span className="truncate">{path}</span>
+      <ExternalLink className="size-3.5 shrink-0" aria-hidden="true" />
+    </a>
   );
 }
 
@@ -280,16 +314,24 @@ export function ProjectsSettingsContent({
                 className="align-top hover:bg-muted/35 max-[539px]:block"
               >
                 <TableCell className="min-w-0 py-4 align-top max-[539px]:block max-[539px]:px-4 max-[539px]:pb-2 max-[539px]:pt-4">
-                  <div className="flex items-start justify-between gap-3 min-[540px]:flex-col">
-                    <ProjectTitle project={project} />
+                  <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-2 min-[540px]:grid-cols-[auto_minmax(0,1fr)]">
+                    <div className="col-start-1 row-start-1 min-w-0 min-[540px]:col-span-2">
+                      <ProjectTitle project={project} />
+                    </div>
                     <Badge
-                      className="w-fit shrink-0"
+                      className="col-start-2 row-start-1 w-fit shrink-0 min-[540px]:col-start-1 min-[540px]:row-start-2"
                       variant={
                         project.source === "GITLAB" ? "default" : "secondary"
                       }
                     >
                       {project.source === "GITLAB" ? "GitLab" : "ZIP"}
                     </Badge>
+                    {project.gitlabWebUrl ? (
+                      <GitlabProjectLink
+                        url={project.gitlabWebUrl}
+                        className="col-span-2 row-start-2 min-[540px]:col-span-1 min-[540px]:col-start-2 min-[540px]:row-start-2"
+                      />
+                    ) : null}
                   </div>
                 </TableCell>
                 <TableCell className="py-4 align-top text-sm text-muted-foreground max-[539px]:block max-[539px]:px-4 max-[539px]:py-0 min-[540px]:w-[8.5rem] min-[540px]:whitespace-nowrap">

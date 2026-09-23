@@ -163,6 +163,9 @@ export async function linkRepository(
 
   await requireProjectOwnership(projectId, userId);
 
+  const integration = await getGitlabIntegration(userId);
+  const gitlabUrl = validateGitLabUrl(integration?.gitlabUrl || undefined);
+
   try {
     await db.transaction(async (tx) => {
       // Check if this GitLab repository is already linked to a different project
@@ -197,6 +200,7 @@ export async function linkRepository(
           gitlabProjectId,
           repositoryName,
           defaultBranch,
+          gitlabUrl,
         })
         .onConflictDoUpdate({
           target: gitlabRepositories.projectId,
@@ -204,6 +208,7 @@ export async function linkRepository(
             gitlabProjectId,
             repositoryName,
             defaultBranch,
+            gitlabUrl,
           },
         });
     });

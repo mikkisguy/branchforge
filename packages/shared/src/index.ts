@@ -1182,6 +1182,11 @@ export interface PublicProject {
   visibility?: UserRole;
   duoEndingEnabled: boolean;
   source: SourceOrigin;
+  /**
+   * HTTPS URL of the linked GitLab repository, when one is stored.
+   * Omitted for projects that are not linked to a repository.
+   */
+  gitlabWebUrl?: string;
   createdAt: string;
   updatedAt: string;
 }

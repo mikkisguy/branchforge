@@ -46,6 +46,7 @@ function renderList() {
           name: longTitle,
           description: "A story that keeps going",
           source: "GITLAB",
+          gitlabWebUrl: "https://gitlab.com/group/repo",
         }),
         makeProject({
           id: "short",
@@ -89,6 +90,14 @@ describe("ProjectsSettingsContent", () => {
     expect(
       screen.getByRole("button", { name: `About ${longTitle}` })
     ).toBeInTheDocument();
+
+    const gitlabLink = screen.getByRole("link", {
+      name: "Open group/repo on GitLab",
+    });
+    expect(gitlabLink).toHaveAttribute("href", "https://gitlab.com/group/repo");
+    expect(gitlabLink).toHaveAttribute("target", "_blank");
+    expect(gitlabLink).toHaveAttribute("rel", "noopener noreferrer");
+    expect(screen.getAllByRole("link")).toHaveLength(1);
 
     const table = screen.getByRole("table");
     expect(table).toHaveClass("max-[539px]:block");

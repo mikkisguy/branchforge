@@ -15,6 +15,8 @@ import {
   users,
   projects,
   projectUsers,
+  gitlabIntegrations,
+  gitlabRepositories,
   type NewUser,
   type NewProject,
 } from "../../db/schema/index.js";
@@ -142,6 +144,59 @@ describe("ProjectsService (Integration)", () => {
       expect(projects[0].updatedAt).toBeDefined();
       expect(typeof projects[0].createdAt).toBe("string");
       expect(typeof projects[0].updatedAt).toBe("string");
+      expect(projects[0].gitlabWebUrl).toBeUndefined();
+    });
+
+    it("returns a GitLab web URL for a linked project and omits unsafe paths", async () => {
+      const gitlabProjectId = testUuid("12000000", 3);
+      const unsafeProjectId = testUuid("12000000", 4);
+
+      await db.insert(gitlabIntegrations).values({
+        userId: testUserId,
+        encryptedToken: "encrypted-token",
+        gitlabUrl: "https://gitlab.com",
+        username: "owner",
+      });
+
+      await db.insert(projects).values([
+        {
+          id: gitlabProjectId,
+          userId: testUserId,
+          name: "GitLab Project",
+          source: "GITLAB",
+        },
+        {
+          id: unsafeProjectId,
+          userId: testUserId,
+          name: "Unsafe Path",
+          source: "GITLAB",
+        },
+      ]);
+
+      await db.insert(gitlabRepositories).values([
+        {
+          projectId: gitlabProjectId,
+          gitlabProjectId: 4242,
+          repositoryName: "group/repo",
+          // A different allowed host must lose to the owner's integration URL.
+          gitlabUrl: "https://self.gitlab.com",
+        },
+        {
+          projectId: unsafeProjectId,
+          gitlabProjectId: 4243,
+          repositoryName: "group/../evil",
+          gitlabUrl: "https://gitlab.com",
+        },
+      ]);
+
+      const listed = await listProjects(testUserId);
+      const zip = listed.find((project) => project.id === ownedProjectId);
+      const linked = listed.find((project) => project.id === gitlabProjectId);
+      const unsafe = listed.find((project) => project.id === unsafeProjectId);
+
+      expect(zip?.gitlabWebUrl).toBeUndefined();
+      expect(linked?.gitlabWebUrl).toBe("https://gitlab.com/group/repo");
+      expect(unsafe?.gitlabWebUrl).toBeUndefined();
     });
 
     it("should return both owned and shared projects", async () => {

@@ -12,6 +12,8 @@ import {
   projectFilePendingOperations,
   labels,
   labelLines,
+  gitlabRepositories,
+  gitlabIntegrations,
 } from "../db/schema/index.js";
 import { eq, and, asc, inArray, isNull } from "drizzle-orm";
 import type { NewProject } from "../db/schema/tables/projects.js";
@@ -43,6 +45,7 @@ import { calculateContentHash } from "../lib/hash.js";
 import { isUniqueConstraintViolation } from "../lib/db.js";
 import { parseRPYFileWithLabels } from "./rpy-parser.service.js";
 import { assertCaseInsensitiveUnique } from "./project-files-operations.service.js";
+import { validateGitLabUrl } from "./encryption.service.js";
 
 /**
  * Project row type from database queries (with optional role for shared projects)
@@ -155,6 +158,33 @@ type LabelForGrouping = {
   projectFileId: string;
 };
 
+/** A single GitLab path segment. `.` and `..` are rejected. */
+const GITLAB_PATH_SEGMENT = /^(?!\.\.?$)[A-Za-z0-9._-]{1,255}$/;
+
+/**
+ * Build an HTTPS GitLab project URL from a stored path and instance host.
+ * Returns undefined when the path is not a slash-separated repository path.
+ * The host is the owner's integration URL when present, otherwise the
+ * repository row's URL, and is always passed through validateGitLabUrl.
+ */
+function buildGitlabWebUrl(
+  repositoryName: string,
+  integrationUrl: string | null | undefined,
+  repositoryUrl: string | null | undefined
+): string | undefined {
+  const segments = repositoryName.split("/");
+  if (
+    segments.length === 0 ||
+    segments.some((segment) => !GITLAB_PATH_SEGMENT.test(segment))
+  ) {
+    return undefined;
+  }
+
+  const host = validateGitLabUrl(integrationUrl || repositoryUrl || undefined);
+  const path = segments.map((segment) => encodeURIComponent(segment)).join("/");
+  return `${host}/${path}`;
+}
+
 /**
  * List all projects for a user
  * @param userId - The user ID to fetch projects for
@@ -210,6 +240,49 @@ export async function listProjects(userId: string): Promise<PublicProject[]> {
         );
       }
       result.push(toPublicProject(shared, shared.role));
+    }
+  }
+
+  if (result.length === 0) {
+    return result;
+  }
+
+  const links = await db
+    .select({
+      projectId: gitlabRepositories.projectId,
+      repositoryName: gitlabRepositories.repositoryName,
+      repositoryUrl: gitlabRepositories.gitlabUrl,
+      integrationUrl: gitlabIntegrations.gitlabUrl,
+    })
+    .from(gitlabRepositories)
+    .innerJoin(projects, eq(gitlabRepositories.projectId, projects.id))
+    .leftJoin(
+      gitlabIntegrations,
+      eq(gitlabIntegrations.userId, projects.userId)
+    )
+    .where(
+      inArray(
+        gitlabRepositories.projectId,
+        result.map((project) => project.id)
+      )
+    );
+
+  const webUrls = new Map<string, string>();
+  for (const link of links) {
+    const webUrl = buildGitlabWebUrl(
+      link.repositoryName,
+      link.integrationUrl,
+      link.repositoryUrl
+    );
+    if (webUrl) {
+      webUrls.set(link.projectId, webUrl);
+    }
+  }
+
+  for (const project of result) {
+    const webUrl = webUrls.get(project.id);
+    if (webUrl) {
+      project.gitlabWebUrl = webUrl;
     }
   }
 
