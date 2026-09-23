@@ -6,7 +6,7 @@
  */
 
 import { useReducer, useCallback, useRef, useEffect, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Download, FilePenLine, Upload } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
@@ -14,7 +14,8 @@ import { useGitLabSync } from "@/hooks/useGitLabSync";
 import { useToast } from "@/contexts/ToastContext";
 import { useLabels } from "@/hooks/useLabels";
 import { useGitLabPendingChanges } from "@/hooks/useGitLabPendingChanges";
-import { characterKeys, projectFilesKeys } from "@/lib/query-keys";
+import { gitlabApi } from "@/lib/api/gitlab";
+import { characterKeys, gitlabKeys, projectFilesKeys } from "@/lib/query-keys";
 import { formatGitLabSyncError } from "@/lib/format-gitlab-sync-error";
 import { CharacterImportWizard } from "@/components/CharacterImportWizard/CharacterImportWizard.lazy";
 import { charactersApi } from "@/lib/api/characters";
@@ -29,6 +30,10 @@ import {
   createInitialSyncFormState,
   type SyncOperationType,
 } from "./GitLabSyncDialogReducer";
+import {
+  branchAfterCreateNewToggle,
+  gitBranchNameError,
+} from "./git-branch-name";
 
 // Types
 // ============================================================================
@@ -60,6 +65,11 @@ export function GitLabSyncDialog({
   const pendingChanges = useGitLabPendingChanges(projectId, {
     enabled: open && operationType === "export",
   });
+  const branchesQuery = useQuery({
+    queryKey: gitlabKeys.branches(projectId),
+    queryFn: () => gitlabApi.getBranches(projectId),
+    enabled: open && operationType === "export",
+  });
   const [discardConfirmationOpen, setDiscardConfirmationOpen] = useState(false);
 
   // Check if this is a first sync (no local labels)
@@ -72,6 +82,17 @@ export function GitLabSyncDialog({
     createInitialSyncFormState
   );
   const branch = formState.userBranch ?? defaultBranch;
+  const trimmedBranch = branch.trim();
+  const creatingNewBranch =
+    operationType === "export" && formState.createNewBranch;
+  const branchNameError =
+    creatingNewBranch && trimmedBranch
+      ? gitBranchNameError(trimmedBranch)
+      : null;
+  const branchAlreadyExists =
+    creatingNewBranch &&
+    branchNameError === null &&
+    (branchesQuery.data ?? []).includes(trimmedBranch);
 
   // Ref to track the timeout so we can clear it on unmount
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(
@@ -201,9 +222,13 @@ export function GitLabSyncDialog({
       show: false,
       characters: null,
     });
+    dispatch({ type: "SET_CREATE_NEW_BRANCH", value: false });
+    if (formState.userBranch === "") {
+      dispatch({ type: "SET_USER_BRANCH", value: null });
+    }
     reset();
     onOpenChange(false);
-  }, [clearAutoCloseTimeout, reset, onOpenChange]);
+  }, [clearAutoCloseTimeout, formState.userBranch, reset, onOpenChange]);
 
   const handleDialogOpenChange = useCallback(
     (nextOpen: boolean) => {
@@ -300,6 +325,20 @@ export function GitLabSyncDialog({
                   dispatch({ type: "SET_CONFLICT_RESOLUTION", value })
                 }
                 defaultBranch={defaultBranch}
+                createNewBranch={formState.createNewBranch}
+                onCreateNewBranchChange={(value) => {
+                  dispatch({ type: "SET_CREATE_NEW_BRANCH", value });
+                  dispatch({
+                    type: "SET_USER_BRANCH",
+                    value: branchAfterCreateNewToggle(
+                      value,
+                      formState.userBranch,
+                      defaultBranch
+                    ),
+                  });
+                }}
+                branchNameError={branchNameError}
+                branchAlreadyExists={branchAlreadyExists}
               />
             </>
           )}
@@ -310,6 +349,7 @@ export function GitLabSyncDialog({
           hasOperation={!!state.operation}
           operationStatus={state.operation?.status}
           branch={branch}
+          branchInvalid={branchNameError !== null}
           operationType={operationType}
           onSync={handleSync}
           onClose={handleClose}

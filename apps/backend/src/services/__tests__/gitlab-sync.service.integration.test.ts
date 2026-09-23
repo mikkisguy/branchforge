@@ -37,6 +37,7 @@ import {
   gitlabSyncOperations,
 } from "../../db/schema/index.js";
 import { eq } from "drizzle-orm";
+import { NotFoundError } from "../../middleware/error-handler.middleware.js";
 import {
   detectConflicts,
   exportToGitlab,
@@ -171,6 +172,9 @@ describe("GitLabSyncService (Integration)", () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
+    vi.spyOn(gitlabRepoService, "getBranchCommitSha").mockResolvedValue(
+      "existing-sha"
+    );
     nock.cleanAll();
     nock.disableNetConnect();
     projectFileFixtureCounter = 2; // Reset counter (1 is used by testGitlabFile)
@@ -799,6 +803,98 @@ describe("GitLabSyncService (Integration)", () => {
         .where(eq(projectFiles.id, testGitlabFileId));
       expect(file?.lastPushedContentHash).toBe("hash123");
       expect(file?.remoteFilePath).toBe("game/script.rpy");
+    });
+
+    it("preflights a missing branch against the default branch and commits to the new name", async () => {
+      vi.spyOn(gitlabRepoService, "getBranchCommitSha").mockImplementation(
+        async (_projectId, _userId, branch) => {
+          if (branch === "feature/labels") {
+            throw new NotFoundError("Branch 'feature/labels'");
+          }
+          return "base-sha";
+        }
+      );
+      vi.spyOn(gitlabRepoService, "getRepositoryLink").mockResolvedValue({
+        id: 1,
+        projectId: testProjectId,
+        gitlabProjectId: 42,
+        repositoryName: "test/repo",
+        defaultBranch: "main",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      } as never);
+      vi.spyOn(gitlabFileService, "batchCommitFiles").mockResolvedValue(
+        "commit-new-branch"
+      );
+      await makeFileContentModified(testGitlabFileId);
+      const contentSpy = vi
+        .spyOn(gitlabRepoService, "getFileContentWithMetadata")
+        .mockResolvedValue({
+          content: testGitlabFile.content,
+          lastCommitId: "remote-rev-1",
+          contentSha256: null,
+          blobId: null,
+        });
+
+      const result = await exportToGitlab(
+        testProjectId,
+        testUserId,
+        "feature/labels",
+        "Create branch"
+      );
+
+      expect(result).toMatchObject({
+        status: "COMPLETED",
+        branch: "feature/labels",
+        commitId: "commit-new-branch",
+      });
+      expect(contentSpy).toHaveBeenCalledWith(
+        testProjectId,
+        testUserId,
+        testGitlabFile.filePath,
+        "main"
+      );
+      expect(gitlabFileService.batchCommitFiles).toHaveBeenCalledWith(
+        testProjectId,
+        testUserId,
+        "feature/labels",
+        "Create branch",
+        [
+          {
+            action: "update",
+            filePath: testGitlabFile.filePath,
+            content: testGitlabFile.content,
+          },
+        ]
+      );
+    });
+
+    it("fails clearly when the default branch is missing and a new branch cannot be created", async () => {
+      vi.spyOn(gitlabRepoService, "getBranchCommitSha").mockRejectedValue(
+        new NotFoundError("Branch 'main'")
+      );
+      vi.spyOn(gitlabRepoService, "getRepositoryLink").mockResolvedValue({
+        id: 1,
+        projectId: testProjectId,
+        gitlabProjectId: 42,
+        repositoryName: "test/repo",
+        defaultBranch: "main",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      } as never);
+      await makeFileContentModified(testGitlabFileId);
+
+      const result = await exportToGitlab(
+        testProjectId,
+        testUserId,
+        "main",
+        "Missing default"
+      );
+
+      expect(result.status).toBe("FAILED");
+      expect(result.errorMessage).toBe(
+        "Export failed. The repository default branch was not found, so a new branch cannot be created."
+      );
     });
 
     it("should export empty-string files created locally", async () => {

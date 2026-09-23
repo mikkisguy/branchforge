@@ -18,6 +18,9 @@
  * Safety properties:
  * - Per-file preflight against the stored per-file remote content baseline
  *   (never the branch head SHA); an expected source that 404s is a conflict.
+ * - A target branch that does not exist yet is created from the repository
+ *   default branch. Preflight and generated-file actions read that default
+ *   branch, because the new branch does not exist until the commit.
  * - Before the remote call the attempt is durably marked on the pending
  *   rows; on an ambiguous response or retry, the remote source/destination
  *   paths and content are re-read, and the attempt is only treated as
@@ -58,6 +61,7 @@ import {
 import { batchCommitFiles } from "./gitlab-file.service.js";
 import {
   _listFilesWithAuth,
+  getBranchCommitSha,
   getFileContentWithMetadata,
   getRepositoryLink,
 } from "./gitlab-repository.service.js";
@@ -256,12 +260,19 @@ async function buildGeneratedActions(
   );
 }
 
+const MISSING_DEFAULT_BRANCH_MESSAGE =
+  "Export failed. The repository default branch was not found, so a new branch cannot be created.";
+
 function toUserFacingExportError(error: unknown): string {
   if (error instanceof RepositoryNotLinkedError) {
     return "Export failed. Link a GitLab repository in project settings, then try again.";
   }
 
-  if (error instanceof Error && error.message.startsWith("Conflict:")) {
+  if (
+    error instanceof Error &&
+    (error.message.startsWith("Conflict:") ||
+      error.message === MISSING_DEFAULT_BRANCH_MESSAGE)
+  ) {
     return error.message;
   }
 
@@ -558,6 +569,47 @@ async function advanceLabelBaselines(
   }
 }
 
+/**
+ * Branch whose file tree the export commit is applied to.
+ * An existing target is that branch. A missing target is created from the
+ * repository default branch, so preflight must read the default branch.
+ */
+async function resolveExportContentBranch(
+  projectId: string,
+  userId: string,
+  targetBranch: string
+): Promise<string> {
+  try {
+    await getBranchCommitSha(projectId, userId, targetBranch);
+    return targetBranch;
+  } catch (error) {
+    if (!(error instanceof NotFoundError)) {
+      throw error;
+    }
+  }
+
+  const repoLink = await getRepositoryLink(projectId);
+  if (!repoLink) {
+    throw new RepositoryNotLinkedError();
+  }
+
+  const baseBranch = repoLink.defaultBranch || "main";
+  if (baseBranch === targetBranch) {
+    throw new Error(MISSING_DEFAULT_BRANCH_MESSAGE);
+  }
+
+  try {
+    await getBranchCommitSha(projectId, userId, baseBranch);
+  } catch (error) {
+    if (error instanceof NotFoundError) {
+      throw new Error(MISSING_DEFAULT_BRANCH_MESSAGE);
+    }
+    throw error;
+  }
+
+  return baseBranch;
+}
+
 export async function exportToGitlab(
   projectId: string,
   userId: string,
@@ -708,6 +760,14 @@ export async function exportToGitlab(
       if (action) action.content = item.content;
     }
 
+    // A missing target is created from the default branch at commit time.
+    // Read that base so updates are not treated as 404 conflicts.
+    const contentBranch = await resolveExportContentBranch(
+      projectId,
+      userId,
+      targetBranch
+    );
+
     // Determine the directory prefix for generated files (e.g. "game/")
     const fileDirPrefix = computeCommonDirectoryPrefix(
       activeFiles.map((f) => f.filePath)
@@ -751,7 +811,7 @@ export async function exportToGitlab(
     const generatedActions = await buildGeneratedActions(
       projectId,
       userId,
-      targetBranch,
+      contentBranch,
       fileDirPrefix,
       {
         variables: projectVariables,
@@ -765,7 +825,7 @@ export async function exportToGitlab(
     if (allActions.length > 0) {
       // Preflight each affected source against the stored per-file remote
       // content baseline.
-      await preflightConflicts(projectId, userId, targetBranch, files, plan);
+      await preflightConflicts(projectId, userId, contentBranch, files, plan);
 
       // Durably mark the exact planned attempt BEFORE the remote call.
       const plannedIds = plan.operations.map((item) => item.op.id);

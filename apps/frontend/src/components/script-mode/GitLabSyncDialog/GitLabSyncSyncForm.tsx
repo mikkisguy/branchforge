@@ -7,6 +7,7 @@
 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import type { ConflictResolution } from "@/lib/api/gitlab";
 
 // ============================================================================
@@ -51,6 +52,10 @@ interface GitLabSyncSyncFormProps {
   onCommitMessageChange: (value: string) => void;
   onConflictResolutionChange: (value: ConflictResolution) => void;
   defaultBranch: string;
+  createNewBranch: boolean;
+  onCreateNewBranchChange: (value: boolean) => void;
+  branchNameError: string | null;
+  branchAlreadyExists: boolean;
 }
 
 // ============================================================================
@@ -69,7 +74,19 @@ export function GitLabSyncSyncForm({
   onCommitMessageChange,
   onConflictResolutionChange,
   defaultBranch,
+  createNewBranch,
+  onCreateNewBranchChange,
+  branchNameError,
+  branchAlreadyExists,
 }: GitLabSyncSyncFormProps) {
+  const branchHelp = branchHelpText({
+    operationType,
+    createNewBranch,
+    defaultBranch,
+    branchNameError,
+    branchAlreadyExists,
+  });
+
   return (
     <>
       {/* Branch Selection */}
@@ -78,16 +95,37 @@ export function GitLabSyncSyncForm({
         <Input
           id="sync-branch"
           type="text"
-          placeholder={defaultBranch}
+          placeholder={createNewBranch ? "feature/my-changes" : defaultBranch}
           value={branch}
           onChange={(e) => onBranchChange(e.target.value)}
           disabled={isProcessing}
           aria-required="true"
+          aria-invalid={branchNameError ? true : undefined}
+          aria-describedby="sync-branch-help"
         />
-        <p className="text-xs text-muted-foreground">
-          The GitLab branch to{" "}
-          {operationType === "export" ? "push to" : "pull from"}.
+        <p
+          id="sync-branch-help"
+          className={
+            branchNameError
+              ? "text-xs text-red-800 dark:text-red-200"
+              : "text-xs text-muted-foreground"
+          }
+        >
+          {branchHelp}
         </p>
+        {operationType === "export" && (
+          <div className="flex items-center justify-between gap-3 pt-1">
+            <Label htmlFor="create-new-branch" className="font-normal">
+              Create new branch
+            </Label>
+            <Switch
+              id="create-new-branch"
+              checked={createNewBranch}
+              onCheckedChange={onCreateNewBranchChange}
+              disabled={isProcessing}
+            />
+          </div>
+        )}
       </div>
 
       {/* Commit Message (export only) */}
@@ -155,4 +193,29 @@ export function GitLabSyncSyncForm({
       )}
     </>
   );
+}
+
+function branchHelpText({
+  operationType,
+  createNewBranch,
+  defaultBranch,
+  branchNameError,
+  branchAlreadyExists,
+}: {
+  operationType: "export" | "import";
+  createNewBranch: boolean;
+  defaultBranch: string;
+  branchNameError: string | null;
+  branchAlreadyExists: boolean;
+}): string {
+  if (operationType === "import" || !createNewBranch) {
+    return `The GitLab branch to ${
+      operationType === "export" ? "push to" : "pull from"
+    }.`;
+  }
+  if (branchNameError) return branchNameError;
+  if (branchAlreadyExists) {
+    return "This branch already exists. Export will update it.";
+  }
+  return `A new branch is created from ${defaultBranch} and your labels are committed onto it.`;
 }

@@ -335,6 +335,7 @@ describe("GitLabService (HTTP Operations)", () => {
 
       nock(testGitlabUrl)
         .get(`/api/v4/projects/${testGitlabProjectId}/repository/branches`)
+        .query({ per_page: "100", page: "1" })
         .matchHeader("private-token", testToken)
         .reply(200, mockBranches);
 
@@ -345,6 +346,56 @@ describe("GitLabService (HTTP Operations)", () => {
       );
 
       expect(result).toEqual(["main", "develop"]);
+    });
+
+    it("should follow GitLab branch list pagination", async () => {
+      mockLimit.mockResolvedValueOnce([
+        {
+          id: "repo-123",
+          projectId: testProjectId,
+          gitlabProjectId: testGitlabProjectId,
+          repositoryName: testRepositoryName,
+          gitlabUrl: testGitlabUrl,
+          defaultBranch: testBranch,
+          createdAt: new Date(),
+        },
+      ]);
+
+      mockLimit.mockResolvedValueOnce([
+        {
+          id: "integration-123",
+          userId: testUserId,
+          encryptedToken: "encrypted_token",
+          gitlabUrl: testGitlabUrl,
+          username: "testuser",
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      ]);
+
+      nock(testGitlabUrl)
+        .get(`/api/v4/projects/${testGitlabProjectId}/repository/branches`)
+        .query({ per_page: "100", page: "1" })
+        .matchHeader("private-token", testToken)
+        .reply(200, [{ name: "main", commit: { id: "abc123" } }], {
+          "x-total-pages": "2",
+        });
+
+      nock(testGitlabUrl)
+        .get(`/api/v4/projects/${testGitlabProjectId}/repository/branches`)
+        .query({ per_page: "100", page: "2" })
+        .matchHeader("private-token", testToken)
+        .reply(200, [{ name: "feature/late", commit: { id: "def456" } }], {
+          "x-total-pages": "2",
+        });
+
+      const result = await listBranches(
+        testProjectId,
+        testUserId,
+        testGitlabUrl
+      );
+
+      expect(result).toEqual(["main", "feature/late"]);
     });
 
     it("should throw when repository not linked", async () => {
