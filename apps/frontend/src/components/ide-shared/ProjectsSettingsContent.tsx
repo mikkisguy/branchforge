@@ -29,6 +29,36 @@ function isProjectOwner(project: Project): boolean {
   return project.visibility === "OWNER";
 }
 
+function ProjectTitle({ project }: { project: Project }) {
+  return (
+    <div className="min-w-0 flex-1">
+      <div className="flex items-start gap-1.5">
+        <p className="line-clamp-2 min-w-0 break-words font-medium text-base leading-snug">
+          {project.name}
+        </p>
+        {project.description ? (
+          <Tooltip
+            side="top"
+            content={project.description}
+            className="max-w-md"
+          >
+            <button
+              type="button"
+              className="inline-flex size-11 shrink-0 items-center justify-center rounded-sm text-muted-foreground/70 focus-ring md:size-6"
+              aria-label={`About ${project.name}`}
+            >
+              <Info className="size-3.5" aria-hidden="true" />
+            </button>
+          </Tooltip>
+        ) : null}
+      </div>
+      {project.description ? (
+        <span className="sr-only">{project.description}</span>
+      ) : null}
+    </div>
+  );
+}
+
 interface ProjectsSettingsContentProps {
   projects: Project[];
   onUpdateProject?: (
@@ -144,11 +174,12 @@ export function ProjectsSettingsContent({
           Get started by importing a project from GitLab or uploading a ZIP file
           containing your Ren'Py scripts.
         </p>
-        <div className="flex gap-3 flex-col items-center">
-          <div className="flex gap-3">
+        <div className="flex w-full flex-col items-center gap-3">
+          <div className="flex w-full max-w-md flex-col gap-3 min-[540px]:w-auto min-[540px]:max-w-none min-[540px]:flex-row">
             {onImportFromGitLab && (
               <Button
                 type="button"
+                className="w-full min-[540px]:w-auto"
                 onClick={onImportFromGitLab}
                 disabled={!hasIntegration || isLoadingIntegration}
               >
@@ -156,7 +187,12 @@ export function ProjectsSettingsContent({
               </Button>
             )}
             {onImportZip && (
-              <Button type="button" variant="outline" onClick={onImportZip}>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full min-[540px]:w-auto"
+                onClick={onImportZip}
+              >
                 <FileArchive className="size-4 mr-2" />
                 Import ZIP
               </Button>
@@ -223,53 +259,31 @@ export function ProjectsSettingsContent({
         </div>
       </div>
 
-      {/* Projects table */}
+      {/* Projects table. Below 540px the same rows stack as cards. */}
       <div className="overflow-hidden rounded-lg border border-border/60 bg-card">
-        <Table className="table-fixed">
-          <TableHeader>
+        <Table className="max-[539px]:block min-[540px]:table-fixed">
+          <TableHeader className="max-[539px]:hidden">
             <TableRow className="bg-muted/20 hover:bg-muted/20">
-              <TableHead className="h-11">Project</TableHead>
-              <TableHead className="h-11 w-[9rem] whitespace-nowrap">
+              <TableHead className="h-11 min-w-0">Project</TableHead>
+              <TableHead className="h-11 w-[8.5rem] whitespace-nowrap">
                 Updated
               </TableHead>
-              <TableHead className="h-11 w-[11rem] whitespace-nowrap text-right">
+              <TableHead className="h-11 w-[12.5rem] whitespace-nowrap text-right">
                 Actions
               </TableHead>
             </TableRow>
           </TableHeader>
-          <TableBody>
+          <TableBody className="max-[539px]:block">
             {projects.map((project) => (
               <TableRow
                 key={project.id}
-                className="align-top hover:bg-muted/35"
+                className="align-top hover:bg-muted/35 max-[539px]:block"
               >
-                <TableCell className="py-4">
-                  <div className="space-y-3">
-                    {project.description ? (
-                      <Tooltip
-                        side="top"
-                        content={project.description}
-                        className="max-w-md"
-                        triggerClassName="block w-full group cursor-help"
-                      >
-                        <div className="inline-flex items-center gap-1.5 flex-wrap">
-                          <span className="break-words font-medium text-base leading-snug">
-                            {project.name}
-                          </span>
-                          <Info
-                            className="size-3.5 text-muted-foreground/70 flex-shrink-0"
-                            aria-hidden="true"
-                          />
-                          <span className="sr-only">{project.description}</span>
-                        </div>
-                      </Tooltip>
-                    ) : (
-                      <span className="block w-full break-words font-medium text-base leading-snug">
-                        {project.name}
-                      </span>
-                    )}
+                <TableCell className="min-w-0 py-4 align-top max-[539px]:block max-[539px]:px-4 max-[539px]:pb-2 max-[539px]:pt-4">
+                  <div className="flex items-start justify-between gap-3 min-[540px]:flex-col">
+                    <ProjectTitle project={project} />
                     <Badge
-                      className="w-fit"
+                      className="w-fit shrink-0"
                       variant={
                         project.source === "GITLAB" ? "default" : "secondary"
                       }
@@ -278,55 +292,56 @@ export function ProjectsSettingsContent({
                     </Badge>
                   </div>
                 </TableCell>
-                <TableCell className="whitespace-nowrap py-4 text-sm text-muted-foreground">
+                <TableCell className="py-4 align-top text-sm text-muted-foreground max-[539px]:block max-[539px]:px-4 max-[539px]:py-0 min-[540px]:w-[8.5rem] min-[540px]:whitespace-nowrap">
+                  <span className="min-[540px]:sr-only">Updated</span>{" "}
                   {formatDate(project.updatedAt)}
                 </TableCell>
-                <TableCell className="w-36 py-4 text-right">
-                  <div className="flex justify-end gap-1">
+                <TableCell className="py-4 align-top max-[539px]:block max-[539px]:px-4 max-[539px]:pb-4 max-[539px]:pt-3 min-[540px]:w-[12.5rem] min-[540px]:whitespace-nowrap min-[540px]:text-right">
+                  <div className="flex flex-nowrap gap-1 min-[540px]:justify-end">
                     {onExportProject && (
                       <Button
                         type="button"
                         variant="ghost"
-                        size="sm"
+                        size="icon"
                         disabled={exportingProjectId === project.id}
                         onClick={() => handleExportClick(project)}
                         aria-label={`Export ${project.name}`}
                       >
-                        <Download className="size-4" />
+                        <Download />
                       </Button>
                     )}
                     {onViewExportHistory && (
                       <Button
                         type="button"
                         variant="ghost"
-                        size="sm"
+                        size="icon"
                         onClick={() => handleViewHistory(project)}
                         aria-label={`Export history for ${project.name}`}
                       >
-                        <History className="size-4" />
+                        <History />
                       </Button>
                     )}
                     {onUpdateProject && isProjectOwner(project) && (
                       <Button
                         type="button"
                         variant="ghost"
-                        size="sm"
+                        size="icon"
                         onClick={() => handleEditClick(project)}
                         aria-label={`Edit ${project.name}`}
                       >
-                        <Edit className="size-4" />
+                        <Edit />
                       </Button>
                     )}
                     {isProjectOwner(project) && onDeleteProject && (
                       <Button
                         type="button"
                         variant="ghost"
-                        size="sm"
+                        size="icon"
                         className="text-destructive hover:bg-destructive/10 hover:text-destructive"
                         onClick={() => handleDeleteClick(project)}
                         aria-label={`Delete ${project.name}`}
                       >
-                        <Trash2 className="size-4" />
+                        <Trash2 />
                       </Button>
                     )}
                   </div>
