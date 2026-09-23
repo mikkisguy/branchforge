@@ -83,7 +83,7 @@ function GitlabProjectLink({
       rel="noopener noreferrer"
       aria-label={`Open ${path} on GitLab`}
       className={cn(
-        "inline-flex min-w-0 max-w-full items-center gap-1 rounded-sm text-sm text-muted-foreground hover:text-foreground focus-ring",
+        "flex min-w-0 max-w-full items-center gap-1.5 rounded-sm text-sm text-muted-foreground hover:text-foreground focus-ring",
         className
       )}
     >
@@ -314,12 +314,20 @@ export function ProjectsSettingsContent({
                 className="align-top hover:bg-muted/35 max-[539px]:block"
               >
                 <TableCell className="min-w-0 py-4 align-top max-[539px]:block max-[539px]:px-4 max-[539px]:pb-2 max-[539px]:pt-4">
-                  <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-2 min-[540px]:grid-cols-[auto_minmax(0,1fr)]">
-                    <div className="col-start-1 row-start-1 min-w-0 min-[540px]:col-span-2">
+                  <div className="flex min-w-0 flex-col gap-3">
+                    <div className="flex items-start justify-between gap-3">
                       <ProjectTitle project={project} />
+                      <Badge
+                        className="w-fit shrink-0 min-[540px]:hidden"
+                        variant={
+                          project.source === "GITLAB" ? "default" : "secondary"
+                        }
+                      >
+                        {project.source === "GITLAB" ? "GitLab" : "ZIP"}
+                      </Badge>
                     </div>
                     <Badge
-                      className="col-start-2 row-start-1 w-fit shrink-0 min-[540px]:col-start-1 min-[540px]:row-start-2"
+                      className="hidden w-fit min-[540px]:inline-flex"
                       variant={
                         project.source === "GITLAB" ? "default" : "secondary"
                       }
@@ -329,7 +337,7 @@ export function ProjectsSettingsContent({
                     {project.gitlabWebUrl ? (
                       <GitlabProjectLink
                         url={project.gitlabWebUrl}
-                        className="col-span-2 row-start-2 min-[540px]:col-span-1 min-[540px]:col-start-2 min-[540px]:row-start-2"
+                        className="w-full"
                       />
                     ) : null}
                   </div>
