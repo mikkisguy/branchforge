@@ -3,4 +3,4 @@
 "@branchforge/frontend": patch
 ---
 
-Fixed GitLab export error with new files
+Fixed GitLab export error when pushing new files.

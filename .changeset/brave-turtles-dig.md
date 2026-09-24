@@ -4,4 +4,4 @@
 "@branchforge/shared": patch
 ---
 
-Added ability to create new GitLab branch when exporting
+Added the ability to create a new GitLab branch during export.
