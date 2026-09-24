@@ -3,6 +3,8 @@
  * apps/backend/src/lib/validation/gitlab.ts.
  */
 
+import { hasInvalidBranchComponent } from "@branchforge/shared";
+
 const GIT_BRANCH_NAME = /^[a-zA-Z0-9_/$.-]+$/;
 
 export function gitBranchNameError(name: string): string | null {
@@ -18,6 +20,9 @@ export function gitBranchNameError(name: string): string | null {
     name.includes("..")
   ) {
     return "Branch name cannot start with '-' or '/', end with '/', or contain '..'";
+  }
+  if (hasInvalidBranchComponent(name)) {
+    return "Branch name components cannot be empty, start with '.', end with '.', or end with '.lock'";
   }
   return null;
 }

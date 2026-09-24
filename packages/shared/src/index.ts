@@ -615,6 +615,8 @@ export const GitLabFileType = {
   SETTINGS: "SETTINGS",
 } as const;
 
+export { hasInvalidBranchComponent } from "./git-branch-name.js";
+
 /**
  * Source origin enumeration
  * Indicates where content originated from (GitLab repository or ZIP file)

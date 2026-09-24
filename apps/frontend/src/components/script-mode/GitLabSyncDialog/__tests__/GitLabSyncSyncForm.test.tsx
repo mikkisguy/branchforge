@@ -167,9 +167,19 @@ describe("branch names", () => {
   it("rejects empty names, path tricks, and characters GitLab does not allow", () => {
     expect(gitBranchNameError("")).toBe("Branch is required");
     expect(gitBranchNameError("feature/labels")).toBeNull();
+    expect(gitBranchNameError("release-1.2")).toBeNull();
     expect(gitBranchNameError("-hidden")).toMatch(/cannot start/);
     expect(gitBranchNameError("feature/")).toMatch(/cannot start/);
     expect(gitBranchNameError("feature/../main")).toMatch(/cannot start/);
+    expect(gitBranchNameError("feature//labels")).toMatch(/components cannot/);
+    expect(gitBranchNameError(".hidden")).toMatch(/components cannot/);
+    expect(gitBranchNameError("feature/.hidden")).toMatch(/components cannot/);
+    expect(gitBranchNameError("feature.")).toMatch(/components cannot/);
+    expect(gitBranchNameError("feature/labels.")).toMatch(/components cannot/);
+    expect(gitBranchNameError("feature.lock")).toMatch(/components cannot/);
+    expect(gitBranchNameError("feature/labels.lock")).toMatch(
+      /components cannot/
+    );
   });
 
   it("clears a prefilled default branch when creating a new one", () => {
