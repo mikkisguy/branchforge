@@ -4,6 +4,12 @@ All notable changes to BranchForge will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v1.0.0-beta.10 - 2026-09-24
+
+- Added the ability to create a new GitLab branch during export.
+- Fixed GitLab export error when pushing new files.
+- Polished project list in settings and added GitLab link.
+
 ## v1.0.0-beta.9 - 2026-09-21
 
 - Fixed bugs in daily word-goal settings
