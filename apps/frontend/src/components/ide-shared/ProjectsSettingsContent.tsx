@@ -1,4 +1,4 @@
-import { useReducer, useState } from "react";
+import { useReducer, useState, type ReactNode } from "react";
 import {
   FileArchive,
   Edit,
@@ -90,6 +90,182 @@ function GitlabProjectLink({
       <span className="truncate">{path}</span>
       <ExternalLink className="size-3.5 shrink-0" aria-hidden="true" />
     </a>
+  );
+}
+
+type ProjectImportLayout = "empty" | "toolbar";
+
+function gitlabImportDisabled(
+  hasIntegration: boolean,
+  isLoadingIntegration: boolean
+): boolean {
+  return !hasIntegration || isLoadingIntegration;
+}
+
+function needsGitLabSetupHint(
+  hasIntegration: boolean,
+  isLoadingIntegration: boolean,
+  onImportFromGitLab: (() => void) | undefined
+): boolean {
+  return (
+    !hasIntegration && !isLoadingIntegration && onImportFromGitLab !== undefined
+  );
+}
+
+function ProjectImportButton({
+  layout,
+  variant,
+  disabled,
+  onClick,
+  children,
+}: {
+  layout: ProjectImportLayout;
+  variant?: "outline";
+  disabled?: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  const isEmpty = layout === "empty";
+  return (
+    <Button
+      type="button"
+      size={isEmpty ? undefined : "sm"}
+      variant={variant}
+      className={isEmpty ? "w-full min-[540px]:w-auto" : undefined}
+      onClick={onClick}
+      disabled={disabled}
+    >
+      {children}
+    </Button>
+  );
+}
+
+function GitLabSetupHint({ layout }: { layout: ProjectImportLayout }) {
+  const isEmpty = layout === "empty";
+  return (
+    <div
+      className={
+        isEmpty
+          ? "flex items-start gap-2 max-w-md text-sm text-muted-foreground mt-2"
+          : "flex items-start gap-2 text-xs text-muted-foreground max-w-[300px]"
+      }
+    >
+      <Info
+        className={
+          isEmpty
+            ? "size-4 mt-0.5 flex-shrink-0"
+            : "size-3 mt-0.5 flex-shrink-0"
+        }
+      />
+      {isEmpty ? (
+        <p>
+          GitLab import requires{" "}
+          <span className="font-medium">GitLab integration</span> to be
+          configured first. Go to Settings → Integrations to set it up.
+        </p>
+      ) : (
+        <p>
+          Configure GitLab integration in{" "}
+          <span className="font-medium">Integrations</span> tab first
+        </p>
+      )}
+    </div>
+  );
+}
+
+function ProjectImportActions({
+  layout,
+  hasIntegration,
+  isLoadingIntegration,
+  onImportFromGitLab,
+  onImportZip,
+}: {
+  layout: ProjectImportLayout;
+  hasIntegration: boolean;
+  isLoadingIntegration: boolean;
+  onImportFromGitLab?: () => void;
+  onImportZip?: () => void;
+}) {
+  const gitlabDisabled = gitlabImportDisabled(
+    hasIntegration,
+    isLoadingIntegration
+  );
+  const showHint = needsGitLabSetupHint(
+    hasIntegration,
+    isLoadingIntegration,
+    onImportFromGitLab
+  );
+  const isEmpty = layout === "empty";
+
+  return (
+    <div
+      className={
+        isEmpty
+          ? "flex w-full flex-col items-center gap-3"
+          : "flex flex-col gap-2 sm:items-end"
+      }
+    >
+      <div
+        className={
+          isEmpty
+            ? "flex w-full max-w-md flex-col gap-3 min-[540px]:w-auto min-[540px]:max-w-none min-[540px]:flex-row"
+            : "flex flex-wrap gap-2 sm:justify-end"
+        }
+      >
+        {onImportFromGitLab ? (
+          <ProjectImportButton
+            layout={layout}
+            onClick={onImportFromGitLab}
+            disabled={gitlabDisabled}
+          >
+            Import from GitLab
+          </ProjectImportButton>
+        ) : null}
+        {onImportZip ? (
+          <ProjectImportButton
+            layout={layout}
+            variant="outline"
+            onClick={onImportZip}
+          >
+            <FileArchive className="size-4 mr-2" />
+            Import ZIP
+          </ProjectImportButton>
+        ) : null}
+      </div>
+      {showHint ? <GitLabSetupHint layout={layout} /> : null}
+    </div>
+  );
+}
+
+function EmptyProjectsState({
+  hasIntegration,
+  isLoadingIntegration,
+  onImportFromGitLab,
+  onImportZip,
+}: {
+  hasIntegration: boolean;
+  isLoadingIntegration: boolean;
+  onImportFromGitLab?: () => void;
+  onImportZip?: () => void;
+}) {
+  return (
+    <div className="flex flex-col items-center justify-center py-16 px-4">
+      <div className="size-16 rounded-full bg-muted flex items-center justify-center mb-4">
+        <FileArchive className="size-8 text-muted-foreground" />
+      </div>
+      <h3 className="text-lg font-medium mb-2">No projects yet</h3>
+      <p className="text-sm text-muted-foreground text-center max-w-md mb-6">
+        Get started by importing a project from GitLab or uploading a ZIP file
+        containing your Ren'Py scripts.
+      </p>
+      <ProjectImportActions
+        layout="empty"
+        hasIntegration={hasIntegration}
+        isLoadingIntegration={isLoadingIntegration}
+        onImportFromGitLab={onImportFromGitLab}
+        onImportZip={onImportZip}
+      />
+    </div>
   );
 }
 
@@ -199,51 +375,12 @@ export function ProjectsSettingsContent({
   // Empty state
   if (projects.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 px-4">
-        <div className="size-16 rounded-full bg-muted flex items-center justify-center mb-4">
-          <FileArchive className="size-8 text-muted-foreground" />
-        </div>
-        <h3 className="text-lg font-medium mb-2">No projects yet</h3>
-        <p className="text-sm text-muted-foreground text-center max-w-md mb-6">
-          Get started by importing a project from GitLab or uploading a ZIP file
-          containing your Ren'Py scripts.
-        </p>
-        <div className="flex w-full flex-col items-center gap-3">
-          <div className="flex w-full max-w-md flex-col gap-3 min-[540px]:w-auto min-[540px]:max-w-none min-[540px]:flex-row">
-            {onImportFromGitLab && (
-              <Button
-                type="button"
-                className="w-full min-[540px]:w-auto"
-                onClick={onImportFromGitLab}
-                disabled={!hasIntegration || isLoadingIntegration}
-              >
-                Import from GitLab
-              </Button>
-            )}
-            {onImportZip && (
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full min-[540px]:w-auto"
-                onClick={onImportZip}
-              >
-                <FileArchive className="size-4 mr-2" />
-                Import ZIP
-              </Button>
-            )}
-          </div>
-          {!hasIntegration && !isLoadingIntegration && onImportFromGitLab && (
-            <div className="flex items-start gap-2 max-w-md text-sm text-muted-foreground mt-2">
-              <Info className="size-4 mt-0.5 flex-shrink-0" />
-              <p>
-                GitLab import requires{" "}
-                <span className="font-medium">GitLab integration</span> to be
-                configured first. Go to Settings → Integrations to set it up.
-              </p>
-            </div>
-          )}
-        </div>
-      </div>
+      <EmptyProjectsState
+        hasIntegration={hasIntegration}
+        isLoadingIntegration={isLoadingIntegration}
+        onImportFromGitLab={onImportFromGitLab}
+        onImportZip={onImportZip}
+      />
     );
   }
 
@@ -257,40 +394,13 @@ export function ProjectsSettingsContent({
             Manage your visual novel projects
           </p>
         </div>
-        <div className="flex flex-col gap-2 sm:items-end">
-          <div className="flex flex-wrap gap-2 sm:justify-end">
-            {onImportFromGitLab && (
-              <Button
-                type="button"
-                size="sm"
-                onClick={onImportFromGitLab}
-                disabled={!hasIntegration || isLoadingIntegration}
-              >
-                Import from GitLab
-              </Button>
-            )}
-            {onImportZip && (
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={onImportZip}
-              >
-                <FileArchive className="size-4 mr-2" />
-                Import ZIP
-              </Button>
-            )}
-          </div>
-          {!hasIntegration && !isLoadingIntegration && onImportFromGitLab && (
-            <div className="flex items-start gap-2 text-xs text-muted-foreground max-w-[300px]">
-              <Info className="size-3 mt-0.5 flex-shrink-0" />
-              <p>
-                Configure GitLab integration in{" "}
-                <span className="font-medium">Integrations</span> tab first
-              </p>
-            </div>
-          )}
-        </div>
+        <ProjectImportActions
+          layout="toolbar"
+          hasIntegration={hasIntegration}
+          isLoadingIntegration={isLoadingIntegration}
+          onImportFromGitLab={onImportFromGitLab}
+          onImportZip={onImportZip}
+        />
       </div>
 
       {/* Projects table. Below 540px the same rows stack as cards. */}

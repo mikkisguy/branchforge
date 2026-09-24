@@ -4,6 +4,7 @@
  */
 
 import { hasInvalidBranchComponent } from "@branchforge/shared";
+import type { SyncOperationType } from "./GitLabSyncDialogReducer";
 
 const GIT_BRANCH_NAME = /^[a-zA-Z0-9_/$.-]+$/;
 
@@ -45,4 +46,37 @@ export function branchAfterCreateNewToggle(
     return userBranch;
   }
   return userBranch === "" ? null : userBranch;
+}
+
+/**
+ * Branch field shown in the sync dialog, including validation for a
+ * newly created export branch.
+ */
+export function resolveSyncBranchFields(input: {
+  operationType: SyncOperationType;
+  createNewBranch: boolean;
+  userBranch: string | null;
+  defaultBranch: string;
+  knownBranches: readonly string[] | undefined;
+}): {
+  branch: string;
+  branchNameError: string | null;
+  branchAlreadyExists: boolean;
+} {
+  const branch = input.userBranch ?? input.defaultBranch;
+  const trimmedBranch = branch.trim();
+  const creatingNewBranch =
+    input.operationType === "export" && input.createNewBranch;
+  const branchNameError =
+    creatingNewBranch && trimmedBranch.length > 0
+      ? gitBranchNameError(trimmedBranch)
+      : null;
+  return {
+    branch,
+    branchNameError,
+    branchAlreadyExists:
+      creatingNewBranch &&
+      branchNameError === null &&
+      (input.knownBranches ?? []).includes(trimmedBranch),
+  };
 }

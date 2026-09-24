@@ -32,7 +32,7 @@ import {
 } from "./GitLabSyncDialogReducer";
 import {
   branchAfterCreateNewToggle,
-  gitBranchNameError,
+  resolveSyncBranchFields,
 } from "./git-branch-name";
 
 // Types
@@ -62,18 +62,19 @@ export function GitLabSyncDialog({
   const { state, exportToGitlab, importFromGitlab, reset } = useGitLabSync();
   const { success, error } = useToast();
   const { invalidateLabels, labels, isLoadingLabels } = useLabels();
+  const exportDialogOpen = isExportDialogOpen(open, operationType);
   const pendingChanges = useGitLabPendingChanges(projectId, {
-    enabled: open && operationType === "export",
+    enabled: exportDialogOpen,
   });
   const branchesQuery = useQuery({
     queryKey: gitlabKeys.branches(projectId),
     queryFn: () => gitlabApi.getBranches(projectId),
-    enabled: open && operationType === "export",
+    enabled: exportDialogOpen,
   });
   const [discardConfirmationOpen, setDiscardConfirmationOpen] = useState(false);
 
   // Check if this is a first sync (no local labels)
-  const isFirstSync = !isLoadingLabels && labels.length === 0;
+  const isFirstSync = isFirstLabelSync(isLoadingLabels, labels.length);
 
   // Form state — derive branch from prop, track user overrides separately
   const [formState, dispatch] = useReducer(
@@ -81,18 +82,14 @@ export function GitLabSyncDialog({
     operationType,
     createInitialSyncFormState
   );
-  const branch = formState.userBranch ?? defaultBranch;
-  const trimmedBranch = branch.trim();
-  const creatingNewBranch =
-    operationType === "export" && formState.createNewBranch;
-  const branchNameError =
-    creatingNewBranch && trimmedBranch
-      ? gitBranchNameError(trimmedBranch)
-      : null;
-  const branchAlreadyExists =
-    creatingNewBranch &&
-    branchNameError === null &&
-    (branchesQuery.data ?? []).includes(trimmedBranch);
+  const { branch, branchNameError, branchAlreadyExists } =
+    resolveSyncBranchFields({
+      operationType,
+      createNewBranch: formState.createNewBranch,
+      userBranch: formState.userBranch,
+      defaultBranch,
+      knownBranches: branchesQuery.data,
+    });
 
   // Ref to track the timeout so we can clear it on unmount
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(
@@ -246,7 +243,8 @@ export function GitLabSyncDialog({
     [handleClose, onOpenChange, state.isProcessing]
   );
 
-  const SyncIcon = operationType === "export" ? Upload : Download;
+  const { label: dialogLabel, Icon: SyncIcon } =
+    syncOperationPresentation(operationType);
 
   // ============================================================================
   // Render
@@ -256,9 +254,7 @@ export function GitLabSyncDialog({
     <Dialog
       open={open}
       onOpenChange={handleDialogOpenChange}
-      aria-label={
-        operationType === "export" ? "Export to GitLab" : "Import from GitLab"
-      }
+      aria-label={dialogLabel}
     >
       <DialogContent className="max-w-md w-full p-0 gap-0">
         <GitLabSyncDialogHeader
@@ -402,6 +398,30 @@ export function GitLabSyncDialog({
       )}
     </Dialog>
   );
+}
+
+function isExportDialogOpen(
+  open: boolean,
+  operationType: SyncOperationType
+): boolean {
+  return open && operationType === "export";
+}
+
+function isFirstLabelSync(
+  isLoadingLabels: boolean,
+  labelCount: number
+): boolean {
+  return !isLoadingLabels && labelCount === 0;
+}
+
+function syncOperationPresentation(operationType: SyncOperationType): {
+  label: string;
+  Icon: typeof Upload;
+} {
+  if (operationType === "export") {
+    return { label: "Export to GitLab", Icon: Upload };
+  }
+  return { label: "Import from GitLab", Icon: Download };
 }
 
 function PendingFileChangesSection({
