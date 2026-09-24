@@ -18,6 +18,9 @@
  * Safety properties:
  * - Per-file preflight against the stored per-file remote content baseline
  *   (never the branch head SHA); an expected source that 404s is a conflict.
+ * - A target branch that does not exist yet is created from the repository
+ *   default branch. Preflight and generated-file actions read that default
+ *   branch, because the new branch does not exist until the commit.
  * - Before the remote call the attempt is durably marked on the pending
  *   rows; on an ambiguous response or retry, the remote source/destination
  *   paths and content are re-read, and the attempt is only treated as
@@ -58,6 +61,7 @@ import {
 import { batchCommitFiles } from "./gitlab-file.service.js";
 import {
   _listFilesWithAuth,
+  getBranchCommitSha,
   getFileContentWithMetadata,
   getRepositoryLink,
 } from "./gitlab-repository.service.js";
@@ -68,7 +72,10 @@ import { requireProjectOwnership } from "../authz.service.js";
 import { lockProject } from "../project-files-operations.service.js";
 import { localContentBaselineHash } from "../project-file-baseline.js";
 import { logWarn } from "../../lib/logger.js";
-import { NotFoundError } from "../../middleware/error-handler.middleware.js";
+import {
+  NotFoundError,
+  RepositoryNotLinkedError,
+} from "../../middleware/error-handler.middleware.js";
 import type { Transaction } from "../../db/types.js";
 
 type PendingOpRow = typeof projectFilePendingOperations.$inferSelect;
@@ -173,6 +180,103 @@ function buildPlannedActions(
   }
 
   return { actions, operations, contentUpdatedFiles };
+}
+
+interface GeneratedExportData {
+  variables: Array<{
+    key: string;
+    description: string | null;
+    category: string | null;
+  }>;
+  stats: Array<{
+    key: string;
+    name: string;
+    minValue: number;
+    maxValue: number;
+    description: string | null;
+  }>;
+  characters: Array<{
+    renpyTag: string;
+    name: string;
+    nameType: string;
+    color: string;
+    isNarrator: boolean;
+    displayName: string;
+  }>;
+}
+
+/**
+ * Generated files are not tracked in project_files, so GitLab needs an
+ * explicit create action on their first export and an update thereafter.
+ */
+async function buildGeneratedActions(
+  projectId: string,
+  userId: string,
+  branch: string,
+  fileDirPrefix: string,
+  generated: GeneratedExportData
+): Promise<PlannedAction[]> {
+  const candidates: Array<{ filePath: string; content: string }> = [];
+
+  if (generated.variables.length > 0) {
+    candidates.push({
+      filePath: `${fileDirPrefix}branchforge_variables.rpy`,
+      content: generateVariablesFile(generated.variables),
+    });
+  }
+  if (generated.stats.length > 0) {
+    candidates.push({
+      filePath: `${fileDirPrefix}branchforge_stats.rpy`,
+      content: generateStatsFile(generated.stats),
+    });
+  }
+  if (generated.characters.length > 0) {
+    candidates.push({
+      filePath: `${fileDirPrefix}branchforge_definitions.rpy`,
+      content: generateCharacterDefinitionsFile(
+        generated.characters.map((character) => ({
+          ...character,
+          nameType: normalizeCharacterNameType(character.nameType),
+        }))
+      ),
+    });
+  }
+
+  return Promise.all(
+    candidates.map(async ({ filePath, content }) => {
+      // A 404 (including for a new branch) is represented as content: null.
+      const remoteFile = await getFileContentWithMetadata(
+        projectId,
+        userId,
+        filePath,
+        branch
+      );
+      return {
+        action: remoteFile.content === null ? "create" : "update",
+        filePath,
+        content,
+      };
+    })
+  );
+}
+
+const MISSING_DEFAULT_BRANCH_MESSAGE =
+  "Export failed. The repository default branch was not found, so a new branch cannot be created.";
+
+function toUserFacingExportError(error: unknown): string {
+  if (error instanceof RepositoryNotLinkedError) {
+    return "Export failed. Link a GitLab repository in project settings, then try again.";
+  }
+
+  if (
+    error instanceof Error &&
+    (error.message.startsWith("Conflict:") ||
+      error.message === MISSING_DEFAULT_BRANCH_MESSAGE)
+  ) {
+    return error.message;
+  }
+
+  return "Export failed. Check your GitLab connection, branch name, and permissions, then try again.";
 }
 
 /**
@@ -465,6 +569,47 @@ async function advanceLabelBaselines(
   }
 }
 
+/**
+ * Branch whose file tree the export commit is applied to.
+ * An existing target is that branch. A missing target is created from the
+ * repository default branch, so preflight must read the default branch.
+ */
+async function resolveExportContentBranch(
+  projectId: string,
+  userId: string,
+  targetBranch: string
+): Promise<string> {
+  try {
+    await getBranchCommitSha(projectId, userId, targetBranch);
+    return targetBranch;
+  } catch (error) {
+    if (!(error instanceof NotFoundError)) {
+      throw error;
+    }
+  }
+
+  const repoLink = await getRepositoryLink(projectId);
+  if (!repoLink) {
+    throw new RepositoryNotLinkedError();
+  }
+
+  const baseBranch = repoLink.defaultBranch || "main";
+  if (baseBranch === targetBranch) {
+    throw new Error(MISSING_DEFAULT_BRANCH_MESSAGE);
+  }
+
+  try {
+    await getBranchCommitSha(projectId, userId, baseBranch);
+  } catch (error) {
+    if (error instanceof NotFoundError) {
+      throw new Error(MISSING_DEFAULT_BRANCH_MESSAGE, { cause: error });
+    }
+    throw error;
+  }
+
+  return baseBranch;
+}
+
 export async function exportToGitlab(
   projectId: string,
   userId: string,
@@ -615,13 +760,19 @@ export async function exportToGitlab(
       if (action) action.content = item.content;
     }
 
+    // A missing target is created from the default branch at commit time.
+    // Read that base so updates are not treated as 404 conflicts.
+    const contentBranch = await resolveExportContentBranch(
+      projectId,
+      userId,
+      targetBranch
+    );
+
     // Determine the directory prefix for generated files (e.g. "game/")
     const fileDirPrefix = computeCommonDirectoryPrefix(
       activeFiles.map((f) => f.filePath)
     );
 
-    // Generated files share the single atomic commit.
-    const generatedActions: PlannedAction[] = [];
     const [projectVariables, projectStats, projectCharacters] =
       await Promise.all([
         db
@@ -656,39 +807,25 @@ export async function exportToGitlab(
           .where(eq(characters.projectId, projectId)),
       ]);
 
-    if (projectVariables.length > 0) {
-      generatedActions.push({
-        action: "update",
-        filePath: `${fileDirPrefix}branchforge_variables.rpy`,
-        content: generateVariablesFile(projectVariables),
-      });
-    }
-    if (projectStats.length > 0) {
-      generatedActions.push({
-        action: "update",
-        filePath: `${fileDirPrefix}branchforge_stats.rpy`,
-        content: generateStatsFile(projectStats),
-      });
-    }
-    if (projectCharacters.length > 0) {
-      generatedActions.push({
-        action: "update",
-        filePath: `${fileDirPrefix}branchforge_definitions.rpy`,
-        content: generateCharacterDefinitionsFile(
-          projectCharacters.map((c) => ({
-            ...c,
-            nameType: normalizeCharacterNameType(c.nameType),
-          }))
-        ),
-      });
-    }
+    // Generated files share the single atomic commit.
+    const generatedActions = await buildGeneratedActions(
+      projectId,
+      userId,
+      contentBranch,
+      fileDirPrefix,
+      {
+        variables: projectVariables,
+        stats: projectStats,
+        characters: projectCharacters,
+      }
+    );
 
     const allActions = [...plan.actions, ...generatedActions];
 
     if (allActions.length > 0) {
       // Preflight each affected source against the stored per-file remote
       // content baseline.
-      await preflightConflicts(projectId, userId, targetBranch, files, plan);
+      await preflightConflicts(projectId, userId, contentBranch, files, plan);
 
       // Durably mark the exact planned attempt BEFORE the remote call.
       const plannedIds = plan.operations.map((item) => item.op.id);
@@ -762,8 +899,7 @@ export async function exportToGitlab(
       conflictCount: 0,
     };
   } catch (error) {
-    const errorMessage =
-      error instanceof Error ? error.message : "Unknown error";
+    const errorMessage = toUserFacingExportError(error);
     await updateSyncOperation(operation.id, {
       status: "FAILED",
       errorMessage,

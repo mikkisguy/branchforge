@@ -6,7 +6,7 @@
  */
 
 import { useReducer, useCallback, useRef, useEffect, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Download, FilePenLine, Upload } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
@@ -14,7 +14,9 @@ import { useGitLabSync } from "@/hooks/useGitLabSync";
 import { useToast } from "@/contexts/ToastContext";
 import { useLabels } from "@/hooks/useLabels";
 import { useGitLabPendingChanges } from "@/hooks/useGitLabPendingChanges";
-import { characterKeys, projectFilesKeys } from "@/lib/query-keys";
+import { gitlabApi } from "@/lib/api/gitlab";
+import { characterKeys, gitlabKeys, projectFilesKeys } from "@/lib/query-keys";
+import { formatGitLabSyncError } from "@/lib/format-gitlab-sync-error";
 import { CharacterImportWizard } from "@/components/CharacterImportWizard/CharacterImportWizard.lazy";
 import { charactersApi } from "@/lib/api/characters";
 import { Button } from "@/components/ui/button";
@@ -28,6 +30,10 @@ import {
   createInitialSyncFormState,
   type SyncOperationType,
 } from "./GitLabSyncDialogReducer";
+import {
+  branchAfterCreateNewToggle,
+  resolveSyncBranchFields,
+} from "./git-branch-name";
 
 // Types
 // ============================================================================
@@ -56,13 +62,19 @@ export function GitLabSyncDialog({
   const { state, exportToGitlab, importFromGitlab, reset } = useGitLabSync();
   const { success, error } = useToast();
   const { invalidateLabels, labels, isLoadingLabels } = useLabels();
+  const exportDialogOpen = isExportDialogOpen(open, operationType);
   const pendingChanges = useGitLabPendingChanges(projectId, {
-    enabled: open && operationType === "export",
+    enabled: exportDialogOpen,
+  });
+  const branchesQuery = useQuery({
+    queryKey: gitlabKeys.branches(projectId),
+    queryFn: () => gitlabApi.getBranches(projectId),
+    enabled: exportDialogOpen,
   });
   const [discardConfirmationOpen, setDiscardConfirmationOpen] = useState(false);
 
   // Check if this is a first sync (no local labels)
-  const isFirstSync = !isLoadingLabels && labels.length === 0;
+  const isFirstSync = isFirstLabelSync(isLoadingLabels, labels.length);
 
   // Form state — derive branch from prop, track user overrides separately
   const [formState, dispatch] = useReducer(
@@ -70,7 +82,14 @@ export function GitLabSyncDialog({
     operationType,
     createInitialSyncFormState
   );
-  const branch = formState.userBranch ?? defaultBranch;
+  const { branch, branchNameError, branchAlreadyExists } =
+    resolveSyncBranchFields({
+      operationType,
+      createNewBranch: formState.createNewBranch,
+      userBranch: formState.userBranch,
+      defaultBranch,
+      knownBranches: branchesQuery.data,
+    });
 
   // Ref to track the timeout so we can clear it on unmount
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(
@@ -161,7 +180,12 @@ export function GitLabSyncDialog({
         onOpenChange(false);
       }, 1000);
     } else if (result?.status === "FAILED") {
-      error(result.errorMessage || "Operation failed");
+      error(
+        formatGitLabSyncError(
+          result.errorMessage || "Operation failed",
+          operationType
+        )
+      );
     } else {
       console.warn("Unexpected sync result:", result);
       error("Failed to complete sync operation");
@@ -195,9 +219,13 @@ export function GitLabSyncDialog({
       show: false,
       characters: null,
     });
+    dispatch({ type: "SET_CREATE_NEW_BRANCH", value: false });
+    if (formState.userBranch === "") {
+      dispatch({ type: "SET_USER_BRANCH", value: null });
+    }
     reset();
     onOpenChange(false);
-  }, [clearAutoCloseTimeout, reset, onOpenChange]);
+  }, [clearAutoCloseTimeout, formState.userBranch, reset, onOpenChange]);
 
   const handleDialogOpenChange = useCallback(
     (nextOpen: boolean) => {
@@ -215,7 +243,8 @@ export function GitLabSyncDialog({
     [handleClose, onOpenChange, state.isProcessing]
   );
 
-  const SyncIcon = operationType === "export" ? Upload : Download;
+  const { label: dialogLabel, Icon: SyncIcon } =
+    syncOperationPresentation(operationType);
 
   // ============================================================================
   // Render
@@ -225,9 +254,7 @@ export function GitLabSyncDialog({
     <Dialog
       open={open}
       onOpenChange={handleDialogOpenChange}
-      aria-label={
-        operationType === "export" ? "Export to GitLab" : "Import from GitLab"
-      }
+      aria-label={dialogLabel}
     >
       <DialogContent className="max-w-md w-full p-0 gap-0">
         <GitLabSyncDialogHeader
@@ -294,6 +321,20 @@ export function GitLabSyncDialog({
                   dispatch({ type: "SET_CONFLICT_RESOLUTION", value })
                 }
                 defaultBranch={defaultBranch}
+                createNewBranch={formState.createNewBranch}
+                onCreateNewBranchChange={(value) => {
+                  dispatch({ type: "SET_CREATE_NEW_BRANCH", value });
+                  dispatch({
+                    type: "SET_USER_BRANCH",
+                    value: branchAfterCreateNewToggle(
+                      value,
+                      formState.userBranch,
+                      defaultBranch
+                    ),
+                  });
+                }}
+                branchNameError={branchNameError}
+                branchAlreadyExists={branchAlreadyExists}
               />
             </>
           )}
@@ -304,6 +345,7 @@ export function GitLabSyncDialog({
           hasOperation={!!state.operation}
           operationStatus={state.operation?.status}
           branch={branch}
+          branchInvalid={branchNameError !== null}
           operationType={operationType}
           onSync={handleSync}
           onClose={handleClose}
@@ -356,6 +398,30 @@ export function GitLabSyncDialog({
       )}
     </Dialog>
   );
+}
+
+function isExportDialogOpen(
+  open: boolean,
+  operationType: SyncOperationType
+): boolean {
+  return open && operationType === "export";
+}
+
+function isFirstLabelSync(
+  isLoadingLabels: boolean,
+  labelCount: number
+): boolean {
+  return !isLoadingLabels && labelCount === 0;
+}
+
+function syncOperationPresentation(operationType: SyncOperationType): {
+  label: string;
+  Icon: typeof Upload;
+} {
+  if (operationType === "export") {
+    return { label: "Export to GitLab", Icon: Upload };
+  }
+  return { label: "Import from GitLab", Icon: Download };
 }
 
 function PendingFileChangesSection({

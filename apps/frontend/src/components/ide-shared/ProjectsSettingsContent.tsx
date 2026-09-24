@@ -1,4 +1,4 @@
-import { useReducer, useState } from "react";
+import { useReducer, useState, type ReactNode } from "react";
 import {
   FileArchive,
   Edit,
@@ -6,10 +6,11 @@ import {
   Info,
   Download,
   History,
+  ExternalLink,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { formatDate } from "@/lib/utils";
+import { cn, formatDate } from "@/lib/utils";
 import {
   Table,
   TableBody,
@@ -27,6 +28,245 @@ import type { Project, UpdateProjectBody } from "@/lib/api/projects";
 
 function isProjectOwner(project: Project): boolean {
   return project.visibility === "OWNER";
+}
+
+function ProjectTitle({ project }: { project: Project }) {
+  return (
+    <div className="min-w-0 flex-1">
+      <div className="flex items-start gap-1.5">
+        <p className="line-clamp-2 min-w-0 break-words font-medium text-base leading-snug">
+          {project.name}
+        </p>
+        {project.description ? (
+          <Tooltip
+            side="top"
+            content={project.description}
+            className="max-w-md"
+          >
+            <button
+              type="button"
+              className="inline-flex size-11 shrink-0 items-center justify-center rounded-sm text-muted-foreground/70 focus-ring md:size-6"
+              aria-label={`About ${project.name}`}
+            >
+              <Info className="size-3.5" aria-hidden="true" />
+            </button>
+          </Tooltip>
+        ) : null}
+      </div>
+      {project.description ? (
+        <span className="sr-only">{project.description}</span>
+      ) : null}
+    </div>
+  );
+}
+
+function gitlabPathFromUrl(url: string): string {
+  try {
+    return decodeURIComponent(new URL(url).pathname.replace(/^\/+/, ""));
+  } catch {
+    return url;
+  }
+}
+
+function GitlabProjectLink({
+  url,
+  className,
+}: {
+  url: string;
+  className?: string;
+}) {
+  const path = gitlabPathFromUrl(url);
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label={`Open ${path} on GitLab`}
+      className={cn(
+        "flex min-w-0 max-w-full items-center gap-1.5 rounded-sm text-sm text-muted-foreground hover:text-foreground focus-ring",
+        className
+      )}
+    >
+      <span className="truncate">{path}</span>
+      <ExternalLink className="size-3.5 shrink-0" aria-hidden="true" />
+    </a>
+  );
+}
+
+type ProjectImportLayout = "empty" | "toolbar";
+
+function gitlabImportDisabled(
+  hasIntegration: boolean,
+  isLoadingIntegration: boolean
+): boolean {
+  return !hasIntegration || isLoadingIntegration;
+}
+
+function needsGitLabSetupHint(
+  hasIntegration: boolean,
+  isLoadingIntegration: boolean,
+  onImportFromGitLab: (() => void) | undefined
+): boolean {
+  return (
+    !hasIntegration && !isLoadingIntegration && onImportFromGitLab !== undefined
+  );
+}
+
+function ProjectImportButton({
+  layout,
+  variant,
+  disabled,
+  onClick,
+  children,
+}: {
+  layout: ProjectImportLayout;
+  variant?: "outline";
+  disabled?: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  const isEmpty = layout === "empty";
+  return (
+    <Button
+      type="button"
+      size={isEmpty ? undefined : "sm"}
+      variant={variant}
+      className={isEmpty ? "w-full min-[540px]:w-auto" : undefined}
+      onClick={onClick}
+      disabled={disabled}
+    >
+      {children}
+    </Button>
+  );
+}
+
+function GitLabSetupHint({ layout }: { layout: ProjectImportLayout }) {
+  const isEmpty = layout === "empty";
+  return (
+    <div
+      className={
+        isEmpty
+          ? "flex items-start gap-2 max-w-md text-sm text-muted-foreground mt-2"
+          : "flex items-start gap-2 text-xs text-muted-foreground max-w-[300px]"
+      }
+    >
+      <Info
+        className={
+          isEmpty
+            ? "size-4 mt-0.5 flex-shrink-0"
+            : "size-3 mt-0.5 flex-shrink-0"
+        }
+      />
+      {isEmpty ? (
+        <p>
+          GitLab import requires{" "}
+          <span className="font-medium">GitLab integration</span> to be
+          configured first. Go to Settings → Integrations to set it up.
+        </p>
+      ) : (
+        <p>
+          Configure GitLab integration in{" "}
+          <span className="font-medium">Integrations</span> tab first
+        </p>
+      )}
+    </div>
+  );
+}
+
+function ProjectImportActions({
+  layout,
+  hasIntegration,
+  isLoadingIntegration,
+  onImportFromGitLab,
+  onImportZip,
+}: {
+  layout: ProjectImportLayout;
+  hasIntegration: boolean;
+  isLoadingIntegration: boolean;
+  onImportFromGitLab?: () => void;
+  onImportZip?: () => void;
+}) {
+  const gitlabDisabled = gitlabImportDisabled(
+    hasIntegration,
+    isLoadingIntegration
+  );
+  const showHint = needsGitLabSetupHint(
+    hasIntegration,
+    isLoadingIntegration,
+    onImportFromGitLab
+  );
+  const isEmpty = layout === "empty";
+
+  return (
+    <div
+      className={
+        isEmpty
+          ? "flex w-full flex-col items-center gap-3"
+          : "flex flex-col gap-2 sm:items-end"
+      }
+    >
+      <div
+        className={
+          isEmpty
+            ? "flex w-full max-w-md flex-col gap-3 min-[540px]:w-auto min-[540px]:max-w-none min-[540px]:flex-row"
+            : "flex flex-wrap gap-2 sm:justify-end"
+        }
+      >
+        {onImportFromGitLab ? (
+          <ProjectImportButton
+            layout={layout}
+            onClick={onImportFromGitLab}
+            disabled={gitlabDisabled}
+          >
+            Import from GitLab
+          </ProjectImportButton>
+        ) : null}
+        {onImportZip ? (
+          <ProjectImportButton
+            layout={layout}
+            variant="outline"
+            onClick={onImportZip}
+          >
+            <FileArchive className="size-4 mr-2" />
+            Import ZIP
+          </ProjectImportButton>
+        ) : null}
+      </div>
+      {showHint ? <GitLabSetupHint layout={layout} /> : null}
+    </div>
+  );
+}
+
+function EmptyProjectsState({
+  hasIntegration,
+  isLoadingIntegration,
+  onImportFromGitLab,
+  onImportZip,
+}: {
+  hasIntegration: boolean;
+  isLoadingIntegration: boolean;
+  onImportFromGitLab?: () => void;
+  onImportZip?: () => void;
+}) {
+  return (
+    <div className="flex flex-col items-center justify-center py-16 px-4">
+      <div className="size-16 rounded-full bg-muted flex items-center justify-center mb-4">
+        <FileArchive className="size-8 text-muted-foreground" />
+      </div>
+      <h3 className="text-lg font-medium mb-2">No projects yet</h3>
+      <p className="text-sm text-muted-foreground text-center max-w-md mb-6">
+        Get started by importing a project from GitLab or uploading a ZIP file
+        containing your Ren'Py scripts.
+      </p>
+      <ProjectImportActions
+        layout="empty"
+        hasIntegration={hasIntegration}
+        isLoadingIntegration={isLoadingIntegration}
+        onImportFromGitLab={onImportFromGitLab}
+        onImportZip={onImportZip}
+      />
+    </div>
+  );
 }
 
 interface ProjectsSettingsContentProps {
@@ -135,45 +375,12 @@ export function ProjectsSettingsContent({
   // Empty state
   if (projects.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 px-4">
-        <div className="size-16 rounded-full bg-muted flex items-center justify-center mb-4">
-          <FileArchive className="size-8 text-muted-foreground" />
-        </div>
-        <h3 className="text-lg font-medium mb-2">No projects yet</h3>
-        <p className="text-sm text-muted-foreground text-center max-w-md mb-6">
-          Get started by importing a project from GitLab or uploading a ZIP file
-          containing your Ren'Py scripts.
-        </p>
-        <div className="flex gap-3 flex-col items-center">
-          <div className="flex gap-3">
-            {onImportFromGitLab && (
-              <Button
-                type="button"
-                onClick={onImportFromGitLab}
-                disabled={!hasIntegration || isLoadingIntegration}
-              >
-                Import from GitLab
-              </Button>
-            )}
-            {onImportZip && (
-              <Button type="button" variant="outline" onClick={onImportZip}>
-                <FileArchive className="size-4 mr-2" />
-                Import ZIP
-              </Button>
-            )}
-          </div>
-          {!hasIntegration && !isLoadingIntegration && onImportFromGitLab && (
-            <div className="flex items-start gap-2 max-w-md text-sm text-muted-foreground mt-2">
-              <Info className="size-4 mt-0.5 flex-shrink-0" />
-              <p>
-                GitLab import requires{" "}
-                <span className="font-medium">GitLab integration</span> to be
-                configured first. Go to Settings → Integrations to set it up.
-              </p>
-            </div>
-          )}
-        </div>
-      </div>
+      <EmptyProjectsState
+        hasIntegration={hasIntegration}
+        isLoadingIntegration={isLoadingIntegration}
+        onImportFromGitLab={onImportFromGitLab}
+        onImportZip={onImportZip}
+      />
     );
   }
 
@@ -187,146 +394,114 @@ export function ProjectsSettingsContent({
             Manage your visual novel projects
           </p>
         </div>
-        <div className="flex flex-col gap-2 sm:items-end">
-          <div className="flex flex-wrap gap-2 sm:justify-end">
-            {onImportFromGitLab && (
-              <Button
-                type="button"
-                size="sm"
-                onClick={onImportFromGitLab}
-                disabled={!hasIntegration || isLoadingIntegration}
-              >
-                Import from GitLab
-              </Button>
-            )}
-            {onImportZip && (
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={onImportZip}
-              >
-                <FileArchive className="size-4 mr-2" />
-                Import ZIP
-              </Button>
-            )}
-          </div>
-          {!hasIntegration && !isLoadingIntegration && onImportFromGitLab && (
-            <div className="flex items-start gap-2 text-xs text-muted-foreground max-w-[300px]">
-              <Info className="size-3 mt-0.5 flex-shrink-0" />
-              <p>
-                Configure GitLab integration in{" "}
-                <span className="font-medium">Integrations</span> tab first
-              </p>
-            </div>
-          )}
-        </div>
+        <ProjectImportActions
+          layout="toolbar"
+          hasIntegration={hasIntegration}
+          isLoadingIntegration={isLoadingIntegration}
+          onImportFromGitLab={onImportFromGitLab}
+          onImportZip={onImportZip}
+        />
       </div>
 
-      {/* Projects table */}
+      {/* Projects table. Below 540px the same rows stack as cards. */}
       <div className="overflow-hidden rounded-lg border border-border/60 bg-card">
-        <Table className="table-fixed">
-          <TableHeader>
+        <Table className="max-[539px]:block min-[540px]:table-fixed">
+          <TableHeader className="max-[539px]:hidden">
             <TableRow className="bg-muted/20 hover:bg-muted/20">
-              <TableHead className="h-11">Project</TableHead>
-              <TableHead className="h-11 w-[9rem] whitespace-nowrap">
+              <TableHead className="h-11 min-w-0">Project</TableHead>
+              <TableHead className="h-11 w-[8.5rem] whitespace-nowrap">
                 Updated
               </TableHead>
-              <TableHead className="h-11 w-[11rem] whitespace-nowrap text-right">
+              <TableHead className="h-11 w-[12.5rem] whitespace-nowrap text-right">
                 Actions
               </TableHead>
             </TableRow>
           </TableHeader>
-          <TableBody>
+          <TableBody className="max-[539px]:block">
             {projects.map((project) => (
               <TableRow
                 key={project.id}
-                className="align-top hover:bg-muted/35"
+                className="align-top hover:bg-muted/35 max-[539px]:block"
               >
-                <TableCell className="py-4">
-                  <div className="space-y-3">
-                    {project.description ? (
-                      <Tooltip
-                        side="top"
-                        content={project.description}
-                        className="max-w-md"
-                        triggerClassName="block w-full group cursor-help"
+                <TableCell className="min-w-0 py-4 align-top max-[539px]:block max-[539px]:px-4 max-[539px]:pb-2 max-[539px]:pt-4">
+                  <div className="flex min-w-0 flex-col gap-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <ProjectTitle project={project} />
+                      <Badge
+                        className="w-fit shrink-0 min-[540px]:hidden"
+                        variant={
+                          project.source === "GITLAB" ? "default" : "secondary"
+                        }
                       >
-                        <div className="inline-flex items-center gap-1.5 flex-wrap">
-                          <span className="break-words font-medium text-base leading-snug">
-                            {project.name}
-                          </span>
-                          <Info
-                            className="size-3.5 text-muted-foreground/70 flex-shrink-0"
-                            aria-hidden="true"
-                          />
-                          <span className="sr-only">{project.description}</span>
-                        </div>
-                      </Tooltip>
-                    ) : (
-                      <span className="block w-full break-words font-medium text-base leading-snug">
-                        {project.name}
-                      </span>
-                    )}
+                        {project.source === "GITLAB" ? "GitLab" : "ZIP"}
+                      </Badge>
+                    </div>
                     <Badge
-                      className="w-fit"
+                      className="hidden w-fit min-[540px]:inline-flex"
                       variant={
                         project.source === "GITLAB" ? "default" : "secondary"
                       }
                     >
                       {project.source === "GITLAB" ? "GitLab" : "ZIP"}
                     </Badge>
+                    {project.gitlabWebUrl ? (
+                      <GitlabProjectLink
+                        url={project.gitlabWebUrl}
+                        className="w-full"
+                      />
+                    ) : null}
                   </div>
                 </TableCell>
-                <TableCell className="whitespace-nowrap py-4 text-sm text-muted-foreground">
+                <TableCell className="py-4 align-top text-sm text-muted-foreground max-[539px]:block max-[539px]:px-4 max-[539px]:py-0 min-[540px]:w-[8.5rem] min-[540px]:whitespace-nowrap">
+                  <span className="min-[540px]:sr-only">Updated</span>{" "}
                   {formatDate(project.updatedAt)}
                 </TableCell>
-                <TableCell className="w-36 py-4 text-right">
-                  <div className="flex justify-end gap-1">
+                <TableCell className="py-4 align-top max-[539px]:block max-[539px]:px-4 max-[539px]:pb-4 max-[539px]:pt-3 min-[540px]:w-[12.5rem] min-[540px]:whitespace-nowrap min-[540px]:text-right">
+                  <div className="flex flex-nowrap gap-1 min-[540px]:justify-end">
                     {onExportProject && (
                       <Button
                         type="button"
                         variant="ghost"
-                        size="sm"
+                        size="icon"
                         disabled={exportingProjectId === project.id}
                         onClick={() => handleExportClick(project)}
                         aria-label={`Export ${project.name}`}
                       >
-                        <Download className="size-4" />
+                        <Download />
                       </Button>
                     )}
                     {onViewExportHistory && (
                       <Button
                         type="button"
                         variant="ghost"
-                        size="sm"
+                        size="icon"
                         onClick={() => handleViewHistory(project)}
                         aria-label={`Export history for ${project.name}`}
                       >
-                        <History className="size-4" />
+                        <History />
                       </Button>
                     )}
                     {onUpdateProject && isProjectOwner(project) && (
                       <Button
                         type="button"
                         variant="ghost"
-                        size="sm"
+                        size="icon"
                         onClick={() => handleEditClick(project)}
                         aria-label={`Edit ${project.name}`}
                       >
-                        <Edit className="size-4" />
+                        <Edit />
                       </Button>
                     )}
                     {isProjectOwner(project) && onDeleteProject && (
                       <Button
                         type="button"
                         variant="ghost"
-                        size="sm"
+                        size="icon"
                         className="text-destructive hover:bg-destructive/10 hover:text-destructive"
                         onClick={() => handleDeleteClick(project)}
                         aria-label={`Delete ${project.name}`}
                       >
-                        <Trash2 className="size-4" />
+                        <Trash2 />
                       </Button>
                     )}
                   </div>

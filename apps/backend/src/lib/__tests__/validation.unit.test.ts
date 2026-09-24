@@ -27,6 +27,7 @@ import {
   renpyTagSchema,
   colorHexSchema,
   gitlabUrlSchema,
+  gitLabFileListQuerySchema,
   validateData,
   safeValidateData,
   sessionDataSchema,
@@ -497,6 +498,35 @@ describe("GitLab URL Schema (SSRF Protection)", () => {
       const result = gitlabUrlSchema.safeParse("https://0.0.0.0");
       expect(result.success).toBe(false);
     });
+  });
+});
+
+describe("GitLab branch name validation", () => {
+  it("accepts hierarchical names and dotted version segments", () => {
+    for (const branch of ["main", "feature/labels", "release-1.2"]) {
+      const result = gitLabFileListQuerySchema.safeParse({ branch });
+      expect(result.success).toBe(true);
+    }
+  });
+
+  it("rejects empty path components and . / .lock segments", () => {
+    const invalidBranches = [
+      "feature//labels",
+      ".hidden",
+      "feature/.hidden",
+      "feature.",
+      "feature/labels.",
+      "feature.lock",
+      "feature/labels.lock",
+    ];
+
+    for (const branch of invalidBranches) {
+      const result = gitLabFileListQuerySchema.safeParse({ branch });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues[0]?.message).toMatch(/components cannot/);
+      }
+    }
   });
 });
 

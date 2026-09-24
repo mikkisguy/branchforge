@@ -28,6 +28,7 @@ export interface Project {
   visibility?: UserRole;
   source: SourceOrigin;
   duoEndingEnabled: boolean;
+  gitlabWebUrl?: string;
   createdAt: string;
   updatedAt: string;
 }

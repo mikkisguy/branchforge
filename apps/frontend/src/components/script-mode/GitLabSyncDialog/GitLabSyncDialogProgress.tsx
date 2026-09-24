@@ -6,6 +6,7 @@
  */
 
 import { CheckCircle2, AlertCircle } from "lucide-react";
+import { formatGitLabSyncError } from "@/lib/format-gitlab-sync-error";
 // ============================================================================
 // Types
 // ============================================================================
@@ -34,6 +35,8 @@ export function GitLabSyncDialogProgress({
   error: syncError,
   operationType,
 }: GitLabSyncDialogProgressProps) {
+  const failureMessage = formatGitLabSyncError(syncError, operationType);
+
   return (
     <div className="space-y-3">
       {/* Status Message */}
@@ -56,16 +59,19 @@ export function GitLabSyncDialogProgress({
             </div>
           )}
           {operation.status === "FAILED" && (
-            <div className="flex items-center gap-2 text-sm">
-              <AlertCircle className="size-4" />
-              <span>{syncError || "Operation failed"}</span>
+            <div role="alert" className="flex items-start gap-2 text-sm">
+              <AlertCircle
+                className="size-4 shrink-0 mt-0.5"
+                aria-hidden="true"
+              />
+              <span>{failureMessage}</span>
             </div>
           )}
         </div>
       )}
 
       {/* Conflict Warning */}
-      {operation?.conflictCount && operation.conflictCount > 0 && (
+      {operation !== null && (operation.conflictCount ?? 0) > 0 && (
         <div className="p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200 rounded-md text-sm">
           {operation.conflictCount} conflict(s) detected. Manual review may be
           required.

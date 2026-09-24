@@ -6,6 +6,7 @@
  */
 
 import { z } from "zod";
+import { hasInvalidBranchComponent } from "@branchforge/shared";
 import {
   uuidSchema,
   nonEmptyStringSchema,
@@ -66,7 +67,9 @@ const gitlabTokenSchema = nonEmptyStringSchema
 
 /**
  * Shared branch-name validation
- * Only allows /^[a-zA-Z0-9_/$.-]+$/, no leading `-` or `/`, no trailing `/`, no `..`.
+ * Only allows /^[a-zA-Z0-9_/$.-]+$/, no leading `-` or `/`, no trailing `/`,
+ * no `..`, and no `/` component that is empty, starts/ends with `.`, or
+ * ends with `.lock`.
  */
 const gitBranchNameSchema = z
   .string()
@@ -80,6 +83,10 @@ const gitBranchNameSchema = z
       !name.endsWith("/") &&
       !name.includes(".."),
     "Branch name cannot start with '-' or '/', end with '/', or contain '..'"
+  )
+  .refine(
+    (name) => !hasInvalidBranchComponent(name),
+    "Branch name components cannot be empty, start with '.', end with '.', or end with '.lock'"
   );
 
 /**

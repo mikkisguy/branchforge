@@ -16,6 +16,7 @@ interface GitLabSyncDialogFooterProps {
   hasOperation: boolean;
   operationStatus: string | undefined;
   branch: string;
+  branchInvalid?: boolean;
   operationType: "export" | "import";
   onSync: () => void;
   onClose: () => void;
@@ -30,6 +31,7 @@ export function GitLabSyncDialogFooter({
   hasOperation,
   operationStatus,
   branch,
+  branchInvalid = false,
   operationType,
   onSync,
   onClose,
@@ -41,7 +43,11 @@ export function GitLabSyncDialogFooter({
           <Button type="button" variant="outline" onClick={onClose}>
             Cancel
           </Button>
-          <Button type="button" onClick={onSync} disabled={!branch.trim()}>
+          <Button
+            type="button"
+            onClick={onSync}
+            disabled={!branch.trim() || branchInvalid}
+          >
             {operationType === "export" ? "Export" : "Import"}
           </Button>
         </>

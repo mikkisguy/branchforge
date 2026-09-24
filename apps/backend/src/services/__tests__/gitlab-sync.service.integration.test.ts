@@ -31,11 +31,13 @@ import {
   labels as labelsTable,
   labelLines,
   characters,
+  variables,
   projectFiles,
   projectFilePendingOperations,
   gitlabSyncOperations,
 } from "../../db/schema/index.js";
 import { eq } from "drizzle-orm";
+import { NotFoundError } from "../../middleware/error-handler.middleware.js";
 import {
   detectConflicts,
   exportToGitlab,
@@ -170,6 +172,9 @@ describe("GitLabSyncService (Integration)", () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
+    vi.spyOn(gitlabRepoService, "getBranchCommitSha").mockResolvedValue(
+      "existing-sha"
+    );
     nock.cleanAll();
     nock.disableNetConnect();
     projectFileFixtureCounter = 2; // Reset counter (1 is used by testGitlabFile)
@@ -800,6 +805,98 @@ describe("GitLabSyncService (Integration)", () => {
       expect(file?.remoteFilePath).toBe("game/script.rpy");
     });
 
+    it("preflights a missing branch against the default branch and commits to the new name", async () => {
+      vi.spyOn(gitlabRepoService, "getBranchCommitSha").mockImplementation(
+        async (_projectId, _userId, branch) => {
+          if (branch === "feature/labels") {
+            throw new NotFoundError("Branch 'feature/labels'");
+          }
+          return "base-sha";
+        }
+      );
+      vi.spyOn(gitlabRepoService, "getRepositoryLink").mockResolvedValue({
+        id: 1,
+        projectId: testProjectId,
+        gitlabProjectId: 42,
+        repositoryName: "test/repo",
+        defaultBranch: "main",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      } as never);
+      vi.spyOn(gitlabFileService, "batchCommitFiles").mockResolvedValue(
+        "commit-new-branch"
+      );
+      await makeFileContentModified(testGitlabFileId);
+      const contentSpy = vi
+        .spyOn(gitlabRepoService, "getFileContentWithMetadata")
+        .mockResolvedValue({
+          content: testGitlabFile.content,
+          lastCommitId: "remote-rev-1",
+          contentSha256: null,
+          blobId: null,
+        });
+
+      const result = await exportToGitlab(
+        testProjectId,
+        testUserId,
+        "feature/labels",
+        "Create branch"
+      );
+
+      expect(result).toMatchObject({
+        status: "COMPLETED",
+        branch: "feature/labels",
+        commitId: "commit-new-branch",
+      });
+      expect(contentSpy).toHaveBeenCalledWith(
+        testProjectId,
+        testUserId,
+        testGitlabFile.filePath,
+        "main"
+      );
+      expect(gitlabFileService.batchCommitFiles).toHaveBeenCalledWith(
+        testProjectId,
+        testUserId,
+        "feature/labels",
+        "Create branch",
+        [
+          {
+            action: "update",
+            filePath: testGitlabFile.filePath,
+            content: testGitlabFile.content,
+          },
+        ]
+      );
+    });
+
+    it("fails clearly when the default branch is missing and a new branch cannot be created", async () => {
+      vi.spyOn(gitlabRepoService, "getBranchCommitSha").mockRejectedValue(
+        new NotFoundError("Branch 'main'")
+      );
+      vi.spyOn(gitlabRepoService, "getRepositoryLink").mockResolvedValue({
+        id: 1,
+        projectId: testProjectId,
+        gitlabProjectId: 42,
+        repositoryName: "test/repo",
+        defaultBranch: "main",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      } as never);
+      await makeFileContentModified(testGitlabFileId);
+
+      const result = await exportToGitlab(
+        testProjectId,
+        testUserId,
+        "main",
+        "Missing default"
+      );
+
+      expect(result.status).toBe("FAILED");
+      expect(result.errorMessage).toBe(
+        "Export failed. The repository default branch was not found, so a new branch cannot be created."
+      );
+    });
+
     it("should export empty-string files created locally", async () => {
       const emptyFile = createProjectFileFixture({
         filePath: "game/new_chapter.rpy",
@@ -894,7 +991,8 @@ describe("GitLabSyncService (Integration)", () => {
         projectId: testProjectId,
         operation: "EXPORT",
         status: "FAILED",
-        errorMessage: "GitLab API Error",
+        errorMessage:
+          "Export failed. Check your GitLab connection, branch name, and permissions, then try again.",
       });
 
       // Failure preserves pending baselines untouched
@@ -903,6 +1001,66 @@ describe("GitLabSyncService (Integration)", () => {
         .from(projectFiles)
         .where(eq(projectFiles.id, testGitlabFileId));
       expect(file?.lastPushedContentHash).toBe("stale-pushed-baseline");
+    });
+
+    it("creates generated files when absent and updates them after export", async () => {
+      await db.insert(variables).values({
+        id: testUuid("76000000", 1),
+        projectId: testProjectId,
+        key: "met_sylvie",
+        description: "Met Sylvie",
+        category: "story",
+      });
+      await makeFileContentModified(testGitlabFileId);
+
+      let generatedFileExists = false;
+      vi.spyOn(
+        gitlabRepoService,
+        "getFileContentWithMetadata"
+      ).mockImplementation(async (_projectId, _userId, filePath) => ({
+        content:
+          filePath === "game/branchforge_variables.rpy" && !generatedFileExists
+            ? null
+            : testGitlabFile.content,
+        lastCommitId: "remote-rev-1",
+        contentSha256: null,
+        blobId: null,
+      }));
+      const batchCommitFilesSpy = vi
+        .spyOn(gitlabFileService, "batchCommitFiles")
+        .mockResolvedValue("commit-generated");
+
+      await exportToGitlab(
+        testProjectId,
+        testUserId,
+        testBranch,
+        "First generated export"
+      );
+      expect(batchCommitFilesSpy.mock.calls[0]?.[4]).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            action: "create",
+            filePath: "game/branchforge_variables.rpy",
+          }),
+        ])
+      );
+
+      generatedFileExists = true;
+      await makeFileContentModified(testGitlabFileId);
+      await exportToGitlab(
+        testProjectId,
+        testUserId,
+        testBranch,
+        "Repeat generated export"
+      );
+      expect(batchCommitFilesSpy.mock.calls[1]?.[4]).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            action: "update",
+            filePath: "game/branchforge_variables.rpy",
+          }),
+        ])
+      );
     });
 
     it("should generate default commit message when not provided", async () => {

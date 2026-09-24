@@ -163,6 +163,9 @@ export async function linkRepository(
 
   await requireProjectOwnership(projectId, userId);
 
+  const integration = await getGitlabIntegration(userId);
+  const gitlabUrl = validateGitLabUrl(integration?.gitlabUrl || undefined);
+
   try {
     await db.transaction(async (tx) => {
       // Check if this GitLab repository is already linked to a different project
@@ -197,6 +200,7 @@ export async function linkRepository(
           gitlabProjectId,
           repositoryName,
           defaultBranch,
+          gitlabUrl,
         })
         .onConflictDoUpdate({
           target: gitlabRepositories.projectId,
@@ -204,6 +208,7 @@ export async function linkRepository(
             gitlabProjectId,
             repositoryName,
             defaultBranch,
+            gitlabUrl,
           },
         });
     });
@@ -303,23 +308,40 @@ export async function listBranches(
   const token = await getDecryptedToken(userId);
   const url = validateGitLabUrl(gitlabUrl || repoLink.gitlabUrl || undefined);
 
-  const apiUrl = new URL(
-    `/api/v4/projects/${repoLink.gitlabProjectId}/repository/branches`,
-    url
-  );
+  const branches: string[] = [];
+  let page = 1;
+  const perPage = 100;
 
-  const response = await fetchWithTimeout(apiUrl.toString(), {
-    headers: {
-      "PRIVATE-TOKEN": token,
-    },
-  });
+  do {
+    const apiUrl = new URL(
+      `/api/v4/projects/${repoLink.gitlabProjectId}/repository/branches`,
+      url
+    );
+    apiUrl.searchParams.set("per_page", perPage.toString());
+    apiUrl.searchParams.set("page", page.toString());
 
-  if (!response.ok) {
-    throw new Error(`GitLab API error: ${response.status}`);
-  }
+    const response = await fetchWithTimeout(apiUrl.toString(), {
+      headers: {
+        "PRIVATE-TOKEN": token,
+      },
+    });
 
-  const branches = (await response.json()) as GitlabBranch[];
-  return branches.map((b) => b.name);
+    if (!response.ok) {
+      throw new Error(`GitLab API error: ${response.status}`);
+    }
+
+    const pageBranches = (await response.json()) as GitlabBranch[];
+    branches.push(...pageBranches.map((branch) => branch.name));
+
+    const totalPages = response.headers.get("x-total-pages");
+    if (totalPages && parseInt(totalPages) > page) {
+      page++;
+    } else {
+      break;
+    }
+  } while (true); // eslint-disable-line no-constant-condition -- Valid pagination pattern with break condition inside loop
+
+  return branches;
 }
 
 /**
