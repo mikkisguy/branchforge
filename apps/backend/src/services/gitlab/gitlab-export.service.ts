@@ -602,7 +602,7 @@ async function resolveExportContentBranch(
     await getBranchCommitSha(projectId, userId, baseBranch);
   } catch (error) {
     if (error instanceof NotFoundError) {
-      throw new Error(MISSING_DEFAULT_BRANCH_MESSAGE);
+      throw new Error(MISSING_DEFAULT_BRANCH_MESSAGE, { cause: error });
     }
     throw error;
   }
