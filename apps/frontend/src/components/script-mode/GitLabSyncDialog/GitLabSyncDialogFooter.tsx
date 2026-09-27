@@ -17,6 +17,7 @@ interface GitLabSyncDialogFooterProps {
   operationStatus: string | undefined;
   branch: string;
   branchInvalid?: boolean;
+  createNewBranch: boolean;
   operationType: "export" | "import";
   onSync: () => void;
   onClose: () => void;
@@ -32,6 +33,7 @@ export function GitLabSyncDialogFooter({
   operationStatus,
   branch,
   branchInvalid = false,
+  createNewBranch,
   operationType,
   onSync,
   onClose,
@@ -48,7 +50,7 @@ export function GitLabSyncDialogFooter({
             onClick={onSync}
             disabled={!branch.trim() || branchInvalid}
           >
-            {operationType === "export" ? "Export" : "Import"}
+            {submitLabel({ operationType, createNewBranch, branch })}
           </Button>
         </>
       )}
@@ -69,4 +71,22 @@ export function GitLabSyncDialogFooter({
       )}
     </div>
   );
+}
+
+function submitLabel({
+  operationType,
+  createNewBranch,
+  branch,
+}: {
+  operationType: "export" | "import";
+  createNewBranch: boolean;
+  branch: string;
+}): string {
+  if (operationType === "import") {
+    return "Import";
+  }
+  if (createNewBranch) {
+    return "Create branch and export";
+  }
+  return `Export to ${branch || "branch"}`;
 }

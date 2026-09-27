@@ -30,10 +30,7 @@ import {
   createInitialSyncFormState,
   type SyncOperationType,
 } from "./GitLabSyncDialogReducer";
-import {
-  branchAfterCreateNewToggle,
-  resolveSyncBranchFields,
-} from "./git-branch-name";
+import { canExportToBranch, resolveSyncBranchFields } from "./git-branch-name";
 
 // Types
 // ============================================================================
@@ -70,6 +67,8 @@ export function GitLabSyncDialog({
     queryKey: gitlabKeys.branches(projectId),
     queryFn: () => gitlabApi.getBranches(projectId),
     enabled: exportDialogOpen,
+    staleTime: 0,
+    refetchOnMount: "always",
   });
   const [discardConfirmationOpen, setDiscardConfirmationOpen] = useState(false);
 
@@ -82,14 +81,52 @@ export function GitLabSyncDialog({
     operationType,
     createInitialSyncFormState
   );
+  const branchesReady =
+    branchesQuery.isSuccess &&
+    !branchesQuery.isFetching &&
+    branchesQuery.data.length > 0;
   const { branch, branchNameError, branchAlreadyExists } =
     resolveSyncBranchFields({
       operationType,
       createNewBranch: formState.createNewBranch,
       userBranch: formState.userBranch,
       defaultBranch,
-      knownBranches: branchesQuery.data,
+      knownBranches: branchesReady ? branchesQuery.data : undefined,
     });
+  const exportBranchInvalid = !canExportToBranch({
+    branch,
+    createNewBranch: formState.createNewBranch,
+    branchNameError,
+    branchAlreadyExists,
+    knownBranches: branchesReady ? branchesQuery.data : undefined,
+  });
+
+  // Preselect the linked default branch in export existing-branch mode when
+  // it is present in the freshly fetched list and the user has not made a
+  // selection yet.
+  useEffect(() => {
+    if (
+      operationType !== "export" ||
+      !exportDialogOpen ||
+      !branchesReady ||
+      formState.createNewBranch ||
+      formState.userBranch !== null
+    ) {
+      return;
+    }
+    const list = branchesQuery.data;
+    if (list && list.includes(defaultBranch)) {
+      dispatch({ type: "SET_USER_BRANCH", value: defaultBranch });
+    }
+  }, [
+    operationType,
+    exportDialogOpen,
+    branchesReady,
+    formState.createNewBranch,
+    formState.userBranch,
+    branchesQuery.data,
+    defaultBranch,
+  ]);
 
   // Ref to track the timeout so we can clear it on unmount
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(
@@ -112,6 +149,7 @@ export function GitLabSyncDialog({
 
   /** Handle sync operation */
   const handleSync = useCallback(async () => {
+    if (operationType === "export" && exportBranchInvalid) return;
     if (!branch.trim()) {
       error("Branch name is required");
       return;
@@ -145,6 +183,14 @@ export function GitLabSyncDialog({
       await invalidateLabels();
       pendingChanges.refetch();
 
+      // Export may have created a new branch; invalidate the cached list so
+      // the next dialog open reflects the new branch.
+      if (operationType === "export") {
+        void queryClient.invalidateQueries({
+          queryKey: gitlabKeys.branches(projectId),
+        });
+      }
+
       // For import operations, also refresh project files list
       // to ensure Script Mode shows imported files immediately
       if (operationType === "import") {
@@ -176,6 +222,7 @@ export function GitLabSyncDialog({
       // Close dialog after successful sync (if not showing character wizard)
       clearAutoCloseTimeout();
       timeoutRef.current = setTimeout(() => {
+        dispatch({ type: "RESET_BRANCH_MODE" });
         reset();
         onOpenChange(false);
       }, 1000);
@@ -192,6 +239,7 @@ export function GitLabSyncDialog({
     }
   }, [
     branch,
+    exportBranchInvalid,
     formState.commitMessage,
     formState.conflictResolution,
     operationType,
@@ -219,13 +267,10 @@ export function GitLabSyncDialog({
       show: false,
       characters: null,
     });
-    dispatch({ type: "SET_CREATE_NEW_BRANCH", value: false });
-    if (formState.userBranch === "") {
-      dispatch({ type: "SET_USER_BRANCH", value: null });
-    }
+    dispatch({ type: "RESET_BRANCH_MODE" });
     reset();
     onOpenChange(false);
-  }, [clearAutoCloseTimeout, formState.userBranch, reset, onOpenChange]);
+  }, [clearAutoCloseTimeout, reset, onOpenChange]);
 
   const handleDialogOpenChange = useCallback(
     (nextOpen: boolean) => {
@@ -324,17 +369,17 @@ export function GitLabSyncDialog({
                 createNewBranch={formState.createNewBranch}
                 onCreateNewBranchChange={(value) => {
                   dispatch({ type: "SET_CREATE_NEW_BRANCH", value });
-                  dispatch({
-                    type: "SET_USER_BRANCH",
-                    value: branchAfterCreateNewToggle(
-                      value,
-                      formState.userBranch,
-                      defaultBranch
-                    ),
-                  });
                 }}
                 branchNameError={branchNameError}
                 branchAlreadyExists={branchAlreadyExists}
+                branches={branchesQuery.data}
+                branchesLoading={
+                  branchesQuery.isPending || branchesQuery.isFetching
+                }
+                branchesError={
+                  branchesQuery.isError ? branchesQuery.error : null
+                }
+                onBranchesRetry={() => void branchesQuery.refetch()}
               />
             </>
           )}
@@ -345,7 +390,8 @@ export function GitLabSyncDialog({
           hasOperation={!!state.operation}
           operationStatus={state.operation?.status}
           branch={branch}
-          branchInvalid={branchNameError !== null}
+          branchInvalid={operationType === "export" && exportBranchInvalid}
+          createNewBranch={formState.createNewBranch}
           operationType={operationType}
           onSync={handleSync}
           onClose={handleClose}
