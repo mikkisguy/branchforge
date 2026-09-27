@@ -825,7 +825,13 @@ describe("GitLabSyncService (Integration)", () => {
       expect(source.remoteContentHash).toBe(calculateContentHash(cleaned));
 
       remoteSource = cleaned;
-      await exportToGitlab(testProjectId, testUserId, testBranch);
+      const second = await exportToGitlab(
+        testProjectId,
+        testUserId,
+        testBranch
+      );
+      expect(second.status).toBe("COMPLETED");
+      expect(commitSpy).toHaveBeenCalledTimes(2);
       expect(commitSpy.mock.calls[1]?.[4]).not.toEqual(
         expect.arrayContaining([
           expect.objectContaining({ filePath: sourcePath }),

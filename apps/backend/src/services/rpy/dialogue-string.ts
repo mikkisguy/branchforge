@@ -8,7 +8,7 @@ export function escapeRenpyDialogueText(value: string): string {
 
   for (let i = 0; i < value.length; i++) {
     const char = value[i];
-    if (char === "\\" && i + 1 < value.length) {
+    if (char === "\\" && i + 1 < value.length && value[i + 1] !== "\n") {
       result += char + value[++i];
     } else if (char === "\\") {
       result += "\\\\";
