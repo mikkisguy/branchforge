@@ -4,6 +4,11 @@ All notable changes to BranchForge will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v1.0.0-beta.11 - 2026-09-27
+
+- Fixed the GitLab export bug where cleaned Ren'Py files were not uploaded.
+- Fixed the extra escaping when edited Ren’Py dialogue is saved or exported.
+
 ## v1.0.0-beta.10 - 2026-09-24
 
 - Added the ability to create a new GitLab branch during export.
