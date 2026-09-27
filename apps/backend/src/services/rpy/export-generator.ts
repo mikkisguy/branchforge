@@ -1,4 +1,4 @@
-import { escapeRenpyString } from "../rpy-generator.service.js";
+import { escapeRenpyDialogueText } from "./dialogue-string.js";
 import type { BranchForgeScene, ParsedRPYFileWithLabels } from "./types.js";
 import { extractTechnicalConstructsFromLines } from "./technical-constructs.js";
 
@@ -205,13 +205,15 @@ export function generateRpyFile(scene: BranchForgeScene): string {
       if (inMenu) {
         inMenu = false;
       }
-      lines.push(`    ${entry.speaker} "${escapeRenpyString(entry.text)}"`);
+      lines.push(
+        `    ${entry.speaker} "${escapeRenpyDialogueText(entry.text)}"`
+      );
     } else if (entry.type === "NARRATION" && entry.text) {
       // Close any open menu before narration
       if (inMenu) {
         inMenu = false;
       }
-      lines.push(`    "${escapeRenpyString(entry.text)}"`);
+      lines.push(`    "${escapeRenpyDialogueText(entry.text)}"`);
     } else if (
       entry.type === "MENU" &&
       entry.menuOptions &&
@@ -226,7 +228,7 @@ export function generateRpyFile(scene: BranchForgeScene): string {
       for (const opt of entry.menuOptions) {
         const conditionSuffix = opt.condition ? ` ${opt.condition}` : "";
         lines.push(
-          `${choiceIndent}"${escapeRenpyString(opt.label)}"${conditionSuffix}:`
+          `${choiceIndent}"${escapeRenpyDialogueText(opt.label)}"${conditionSuffix}:`
         );
         if (opt.effects?.stats) {
           for (const [stat, value] of Object.entries(opt.effects.stats)) {
@@ -245,7 +247,7 @@ export function generateRpyFile(scene: BranchForgeScene): string {
         lines.push(`    menu:`);
         inMenu = true;
       }
-      lines.push(`        "${escapeRenpyString(entry.text)}":`);
+      lines.push(`        "${escapeRenpyDialogueText(entry.text)}":`);
       lines.push(`            jump ${entry.target}`);
     } else if (entry.type === "JUMP" && entry.target) {
       if (inMenu) {

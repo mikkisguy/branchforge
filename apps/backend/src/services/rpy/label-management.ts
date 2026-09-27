@@ -1,7 +1,7 @@
 import { NotFoundError } from "../../middleware/error-handler.middleware.js";
 import { RENPY_LABEL_REGEX, sanitizeLabelName } from "@branchforge/shared";
 import type { LabelBlock } from "./types.js";
-import { escapeRenpyString } from "../rpy-generator.service.js";
+import { escapeRenpyDialogueText } from "./dialogue-string.js";
 
 /**
  * Remove a label from RPY file content
@@ -341,10 +341,10 @@ export function replaceLabelDialogue(
           for (const entry of newDialogue) {
             if (entry.speaker) {
               result.push(
-                `${indent}${entry.speaker} "${escapeRenpyString(entry.text)}"`
+                `${indent}${entry.speaker} "${escapeRenpyDialogueText(entry.text)}"`
               );
             } else {
-              result.push(`${indent}"${escapeRenpyString(entry.text)}"`);
+              result.push(`${indent}"${escapeRenpyDialogueText(entry.text)}"`);
             }
           }
           newDialogueInserted = true;
@@ -371,10 +371,10 @@ export function replaceLabelDialogue(
           for (const entry of newDialogue) {
             if (entry.speaker) {
               result.push(
-                `${indent}${entry.speaker} "${escapeRenpyString(entry.text)}"`
+                `${indent}${entry.speaker} "${escapeRenpyDialogueText(entry.text)}"`
               );
             } else {
-              result.push(`${indent}"${escapeRenpyString(entry.text)}"`);
+              result.push(`${indent}"${escapeRenpyDialogueText(entry.text)}"`);
             }
           }
           newDialogueInserted = true;
@@ -404,10 +404,10 @@ export function replaceLabelDialogue(
     for (const entry of newDialogue) {
       if (entry.speaker) {
         result.push(
-          `${indent}${entry.speaker} "${escapeRenpyString(entry.text)}"`
+          `${indent}${entry.speaker} "${escapeRenpyDialogueText(entry.text)}"`
         );
       } else {
-        result.push(`${indent}"${escapeRenpyString(entry.text)}"`);
+        result.push(`${indent}"${escapeRenpyDialogueText(entry.text)}"`);
       }
     }
   }
