@@ -760,6 +760,24 @@ export async function exportToGitlab(
       if (action) action.content = item.content;
     }
 
+    // Import strips managed statements from the stored source file and sets
+    // the local baseline to that cleaned content. The local hash is therefore
+    // unchanged even though GitLab still has the original statements. Include
+    // any source whose desired export content differs from its remote baseline.
+    const plannedFileIds = new Set([
+      ...plan.operations.map((item) => item.op.projectFileId),
+      ...plan.contentUpdatedFiles.map((item) => item.file.id),
+    ]);
+    for (const file of activeFiles) {
+      if (plannedFileIds.has(file.id) || file.remoteContentHash === null) {
+        continue;
+      }
+      const content = buildPushedContent(file, labelsByFile.get(file.id) ?? []);
+      if (calculateContentHash(content) === file.remoteContentHash) continue;
+      plan.actions.push({ action: "update", filePath: file.filePath, content });
+      plan.contentUpdatedFiles.push({ file, content });
+    }
+
     // A missing target is created from the default branch at commit time.
     // Read that base so updates are not treated as 404 conflicts.
     const contentBranch = await resolveExportContentBranch(
