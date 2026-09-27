@@ -1045,6 +1045,23 @@ label chapter1:
     "Chapter content"
 `;
 
+    it("preserves a Ren'Py newline escape when dialogue is edited", () => {
+      const originalText = String.raw`{b}Text meaning:{/b} Character speaking - (Character thinking) - {i}Narration{/i}\n{b}Check your settings!{/b} Game uses sound effects and transitions.`;
+      const updatedText = originalText.replace(
+        "Character speaking",
+        "A character speaking"
+      );
+      const result = reconstructRPYFile({
+        originalContent: `label start:\n    "${originalText}"\n`,
+        updatedDialogue: new Map([
+          ["start", [{ speaker: null, text: updatedText }]],
+        ]),
+      });
+
+      expect(result).toContain(`    "${updatedText}"`);
+      expect(result).not.toContain(String.raw`\\n{b}Check your settings!`);
+    });
+
     it("should replace dialogue with updated content", () => {
       const updatedDialogue = new Map([
         [

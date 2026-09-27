@@ -1,6 +1,6 @@
 import { RENPY_LABEL_REGEX } from "@branchforge/shared";
 import type { ReconstructedFileOptions } from "./types.js";
-import { escapeRenpyString } from "../rpy-generator.service.js";
+import { escapeRenpyDialogueText } from "./dialogue-string.js";
 import {
   alignDialogue,
   type DialogueAlignEntry,
@@ -17,12 +17,11 @@ interface LabelAlignState {
 }
 
 /**
- * Always emit double-quoted Ren'Py strings. escapeRenpyString only escapes
- * double quotes / backslashes / newlines — single-quoted output would be
- * invalid when the text contains apostrophes.
+ * Always emit double-quoted Ren'Py strings so apostrophes remain valid.
+ * Existing source escapes are retained while unescaped quotes are encoded.
  */
 function formatDialogueLine(entry: DialogueAlignEntry, indent: string): string {
-  const text = escapeRenpyString(entry.text);
+  const text = escapeRenpyDialogueText(entry.text);
   if (entry.speaker) {
     return `${indent}${entry.speaker} "${text}"`;
   }
@@ -307,13 +306,15 @@ export function reconstructRPYFile(options: ReconstructedFileOptions): string {
 
           const indent = line.match(/^(\s*)/)?.[1] || "";
           const conditionPart = choiceMatch[4];
-          // Always double-quote — escapeRenpyString handles " safely
+          // Always double-quote and preserve source escapes.
           if (conditionPart) {
             result.push(
-              `${indent}"${escapeRenpyString(newChoiceText)}" ${conditionPart}:`
+              `${indent}"${escapeRenpyDialogueText(newChoiceText)}" ${conditionPart}:`
             );
           } else {
-            result.push(`${indent}"${escapeRenpyString(newChoiceText)}":`);
+            result.push(
+              `${indent}"${escapeRenpyDialogueText(newChoiceText)}":`
+            );
           }
           continue;
         }

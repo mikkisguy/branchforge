@@ -47,6 +47,7 @@ import type { ConflictResolution } from "../gitlab.types.js";
 import { testEmail, testUuid } from "../../utils/test-ids.js";
 import { calculateContentHash } from "../../lib/hash.js";
 import * as labelsService from "../labels.service.js";
+import { extractAndStripRpySymbols } from "../rpy-statements.service.js";
 
 describe("GitLabSyncService (Integration)", () => {
   let db: ReturnType<typeof getDb>;
@@ -759,6 +760,84 @@ describe("GitLabSyncService (Integration)", () => {
         blobId: null,
       });
     }
+
+    it("exports stripped source files alongside generated managed definitions", async () => {
+      const sourcePath = "game/variables.rpy";
+      const original =
+        'default met_sylvie = False\ndefine s = Character("Sylvie")\nlabel start:\n    return';
+      const cleaned = extractAndStripRpySymbols(original).cleanedContent;
+      const sourceId = testUuid("56000000", 90);
+      await db.insert(projectFiles).values({
+        id: sourceId,
+        projectId: testProjectId,
+        source: "GITLAB",
+        filePath: sourcePath,
+        fileType: "STORY",
+        content: cleaned,
+        originalContent: original,
+        contentHash: calculateContentHash(cleaned),
+        lastPushedContentHash: calculateContentHash(cleaned),
+        remoteFilePath: sourcePath,
+        remoteContent: original,
+        remoteContentHash: calculateContentHash(original),
+      });
+      await db.insert(variables).values({
+        id: testUuid("76000000", 90),
+        projectId: testProjectId,
+        key: "met_sylvie",
+      });
+      await db.insert(characters).values(testCharacter);
+
+      let remoteSource = original;
+      vi.spyOn(
+        gitlabRepoService,
+        "getFileContentWithMetadata"
+      ).mockImplementation(async (_projectId, _userId, filePath) => ({
+        content: filePath === sourcePath ? remoteSource : null,
+        lastCommitId: "remote-rev-1",
+        contentSha256: null,
+        blobId: null,
+      }));
+      const commitSpy = vi
+        .spyOn(gitlabFileService, "batchCommitFiles")
+        .mockResolvedValue("commit-managed");
+
+      const first = await exportToGitlab(testProjectId, testUserId, testBranch);
+      expect(first.status).toBe("COMPLETED");
+      expect(commitSpy.mock.calls[0]?.[4]).toEqual(
+        expect.arrayContaining([
+          { action: "update", filePath: sourcePath, content: cleaned },
+          expect.objectContaining({
+            action: "create",
+            filePath: "game/branchforge_variables.rpy",
+          }),
+          expect.objectContaining({
+            action: "create",
+            filePath: "game/branchforge_definitions.rpy",
+          }),
+        ])
+      );
+
+      const [source] = await db
+        .select()
+        .from(projectFiles)
+        .where(eq(projectFiles.id, sourceId));
+      expect(source.remoteContentHash).toBe(calculateContentHash(cleaned));
+
+      remoteSource = cleaned;
+      const second = await exportToGitlab(
+        testProjectId,
+        testUserId,
+        testBranch
+      );
+      expect(second.status).toBe("COMPLETED");
+      expect(commitSpy).toHaveBeenCalledTimes(2);
+      expect(commitSpy.mock.calls[1]?.[4]).not.toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ filePath: sourcePath }),
+        ])
+      );
+    });
 
     it("should export files to GitLab when files exist", async () => {
       vi.spyOn(gitlabFileService, "batchCommitFiles").mockResolvedValue(
