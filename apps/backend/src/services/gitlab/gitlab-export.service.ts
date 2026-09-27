@@ -82,6 +82,12 @@ type PendingOpRow = typeof projectFilePendingOperations.$inferSelect;
 type ProjectFileRow = typeof projectFiles.$inferSelect;
 type ExportTx = Transaction;
 
+function remoteContentBaselineHash(file: ProjectFileRow): string | null {
+  if (file.remoteContentHash) return file.remoteContentHash;
+  const content = file.remoteContent ?? file.originalContent;
+  return content === null ? null : calculateContentHash(content);
+}
+
 /** Deterministic temp path for casing-only two-step moves. */
 function casingMoveTempPath(finalPath: string): string {
   return `${finalPath}.branchforge-casing-move-tmp`;
@@ -429,9 +435,12 @@ async function preflightConflicts(
       );
     }
     const storedFile = filesByRemoteBasePath.get(remotePath);
-    if (storedFile?.remoteContentHash) {
+    const expectedHash = storedFile
+      ? remoteContentBaselineHash(storedFile)
+      : null;
+    if (expectedHash) {
       const remoteHash = calculateContentHash(meta.content);
-      if (remoteHash !== storedFile.remoteContentHash) {
+      if (remoteHash !== expectedHash) {
         throw new Error(
           `Conflict: remote file changed since the last sync: ${remotePath}`
         );
@@ -769,11 +778,14 @@ export async function exportToGitlab(
       ...plan.contentUpdatedFiles.map((item) => item.file.id),
     ]);
     for (const file of activeFiles) {
-      if (plannedFileIds.has(file.id) || file.remoteContentHash === null) {
+      if (plannedFileIds.has(file.id)) {
         continue;
       }
       const content = buildPushedContent(file, labelsByFile.get(file.id) ?? []);
-      if (calculateContentHash(content) === file.remoteContentHash) continue;
+      const remoteHash = remoteContentBaselineHash(file);
+      if (remoteHash === null || calculateContentHash(content) === remoteHash) {
+        continue;
+      }
       plan.actions.push({ action: "update", filePath: file.filePath, content });
       plan.contentUpdatedFiles.push({ file, content });
     }
