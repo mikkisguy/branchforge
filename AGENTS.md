@@ -172,6 +172,10 @@ The script prints these instructions automatically if the CLI is absent.
 
 All types shared between frontend and backend MUST be defined in `packages/shared/src/index.ts`. After changes, rebuild: `pnpm --filter @branchforge/shared build`.
 
+### Line notes in RPY
+
+Script-backed line notes use consecutive comments immediately above a dialogue or narration line: `# BFNOTE[id=<uuid>] <text>`. Each line of a multiline note repeats the same UUID tag. Preserve ordinary Ren'Py comments separately; only tagged comments belong to BranchForge line notes. BranchForge-only notes live in the database and must not change RPY content.
+
 ### Database Migrations (CRITICAL)
 
 NEVER create hand-written migration files. The only correct workflow:

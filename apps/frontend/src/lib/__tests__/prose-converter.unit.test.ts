@@ -20,8 +20,8 @@ describe("dialogueToPayload", () => {
     const result = dialogueToPayload(entries);
 
     expect(result).toEqual([
-      { speakerId: "uuid-123", text: "Hello world" },
-      { speakerId: null, text: "Narration text" },
+      { clientId: "1", speakerId: "uuid-123", text: "Hello world" },
+      { clientId: "2", speakerId: null, text: "Narration text" },
     ]);
   });
 
@@ -35,8 +35,8 @@ describe("dialogueToPayload", () => {
     const result = dialogueToPayload(entries);
 
     expect(result).toEqual([
-      { speakerId: "uuid-123", text: "Hello world" },
-      { speakerId: null, text: "Narration" },
+      { clientId: "1", speakerId: "uuid-123", text: "Hello world" },
+      { clientId: "3", speakerId: null, text: "Narration" },
     ]);
     expect(result).toHaveLength(2);
   });
@@ -51,8 +51,8 @@ describe("dialogueToPayload", () => {
     const result = dialogueToPayload(entries);
 
     expect(result).toEqual([
-      { speakerId: "uuid-123", text: "Hello world" },
-      { speakerId: null, text: "Narration" },
+      { clientId: "1", speakerId: "uuid-123", text: "Hello world" },
+      { clientId: "3", speakerId: null, text: "Narration" },
     ]);
     expect(result).toHaveLength(2);
   });
@@ -65,7 +65,29 @@ describe("dialogueToPayload", () => {
     const result = dialogueToPayload(entries);
 
     expect(result).toEqual([
-      { speakerId: "uuid-123", text: "  Hello world  " },
+      { clientId: "1", speakerId: "uuid-123", text: "  Hello world  " },
+    ]);
+  });
+
+  it("includes line identity and note choice in the save payload", () => {
+    expect(
+      dialogueToPayload([
+        {
+          id: "draft-1",
+          labelLineId: "saved-1",
+          speakerId: null,
+          text: "Hello",
+          note: { text: "Check", storage: "SCRIPT" },
+        },
+      ])
+    ).toEqual([
+      {
+        clientId: "draft-1",
+        lineId: "saved-1",
+        speakerId: null,
+        text: "Hello",
+        note: { text: "Check", storage: "SCRIPT" },
+      },
     ]);
   });
 

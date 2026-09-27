@@ -46,6 +46,15 @@ import {
 import { updateIncomingJumpsForLabels } from "./incoming-jumps.js";
 import type { SyncLabelsResult, SyncLabelsOptions } from "./types.js";
 import { UUID_REGEX } from "./types.js";
+import {
+  extractTaggedNoteLine,
+  parseTaggedNoteBlocks,
+} from "../rpy/tagged-notes.js";
+import {
+  captureNoteSyncSnapshot,
+  reconcileNotesAfterSync,
+  type NoteSyncSnapshot,
+} from "./notes-sync.js";
 
 // ============================================================================
 // Helper Functions
@@ -391,6 +400,23 @@ async function syncLabelsInTransaction(
   affectedLabelIds: string[];
   dbLabelCount: number;
 }> {
+  const noteBlocksByLabel = new Map<
+    string,
+    ReturnType<typeof parseTaggedNoteBlocks>
+  >();
+  for (const block of parseTaggedNoteBlocks(rpyContent)) {
+    const blocks = noteBlocksByLabel.get(block.label) ?? [];
+    blocks.push(block);
+    noteBlocksByLabel.set(block.label, blocks);
+  }
+  const presentTagIds = new Set(
+    rpyContent
+      .split("\n")
+      .map((line) => extractTaggedNoteLine(line)?.noteId)
+      .filter((id): id is string => id !== undefined)
+  );
+  const emptyNotes: NoteSyncSnapshot = { prose: [], notes: [] };
+
   // Fetch existing labels and project characters in parallel
   const [existingLabels, projectCharacters] = await Promise.all([
     tx.select().from(labels).where(eq(labels.projectFileId, sourceId)),
@@ -516,6 +542,7 @@ async function syncLabelsInTransaction(
             .returning();
 
           // Insert lines in batch
+          let insertedLines: Array<typeof labelLines.$inferSelect> = [];
           if (labelData.entries.length > 0) {
             const lineValues = buildLineValues(
               newScene.id,
@@ -524,9 +551,20 @@ async function syncLabelsInTransaction(
               lookupMaps
             );
 
-            await tx.insert(labelLines).values(lineValues);
+            insertedLines = await tx
+              .insert(labelLines)
+              .values(lineValues)
+              .returning();
             iterLinesProcessed += lineValues.length;
           }
+          await reconcileNotesAfterSync(
+            tx,
+            newScene.id,
+            emptyNotes,
+            insertedLines,
+            noteBlocksByLabel.get(label.label) ?? [],
+            presentTagIds
+          );
 
           // JS state mutations after all DB operations (avoids savepoint drift)
           affectedLabelIds.push(newScene.id);
@@ -538,6 +576,10 @@ async function syncLabelsInTransaction(
         }
 
         // Update existing active label - Delete old lines
+        const noteSnapshot = await captureNoteSyncSnapshot(
+          tx,
+          existingLabel.id
+        );
         await tx
           .delete(labelLines)
           .where(eq(labelLines.labelId, existingLabel.id));
@@ -546,6 +588,7 @@ async function syncLabelsInTransaction(
         const labelLinesHash = calculateLinesHash(labelData.entries);
 
         // Insert new lines in batch
+        let insertedLines: Array<typeof labelLines.$inferSelect> = [];
         if (labelData.entries.length > 0) {
           const lineValues = buildLineValues(
             existingLabel.id,
@@ -554,9 +597,20 @@ async function syncLabelsInTransaction(
             lookupMaps
           );
 
-          await tx.insert(labelLines).values(lineValues);
+          insertedLines = await tx
+            .insert(labelLines)
+            .values(lineValues)
+            .returning();
           iterLinesProcessed += lineValues.length;
         }
+        await reconcileNotesAfterSync(
+          tx,
+          existingLabel.id,
+          noteSnapshot,
+          insertedLines,
+          noteBlocksByLabel.get(label.label) ?? [],
+          presentTagIds
+        );
 
         // Update label sync metadata (clear deletedAt to revive if soft-deleted)
         await tx
@@ -704,6 +758,10 @@ async function syncLabelsInTransaction(
 
         if (renameCandidate) {
           // Delete old lines
+          const noteSnapshot = await captureNoteSyncSnapshot(
+            tx,
+            renameCandidate.id
+          );
           await tx
             .delete(labelLines)
             .where(eq(labelLines.labelId, renameCandidate.id));
@@ -711,6 +769,7 @@ async function syncLabelsInTransaction(
           const labelLinesHash = calculateLinesHash(labelData.entries);
 
           // Insert new lines
+          let insertedLines: Array<typeof labelLines.$inferSelect> = [];
           if (labelData.entries.length > 0) {
             const lineValues = buildLineValues(
               renameCandidate.id,
@@ -718,9 +777,20 @@ async function syncLabelsInTransaction(
               sourceId,
               lookupMaps
             );
-            await tx.insert(labelLines).values(lineValues);
+            insertedLines = await tx
+              .insert(labelLines)
+              .values(lineValues)
+              .returning();
             iterLinesProcessed += lineValues.length;
           }
+          await reconcileNotesAfterSync(
+            tx,
+            renameCandidate.id,
+            noteSnapshot,
+            insertedLines,
+            noteBlocksByLabel.get(label.label) ?? [],
+            presentTagIds
+          );
 
           // Rename existing label: update labelName, preserve custom title
           // if the user has given it a different display name than the original
@@ -776,6 +846,7 @@ async function syncLabelsInTransaction(
             .returning();
 
           // Insert lines in batch
+          let insertedLines: Array<typeof labelLines.$inferSelect> = [];
           if (labelData.entries.length > 0) {
             const lineValues = buildLineValues(
               newScene.id,
@@ -784,9 +855,20 @@ async function syncLabelsInTransaction(
               lookupMaps
             );
 
-            await tx.insert(labelLines).values(lineValues);
+            insertedLines = await tx
+              .insert(labelLines)
+              .values(lineValues)
+              .returning();
             iterLinesProcessed += lineValues.length;
           }
+          await reconcileNotesAfterSync(
+            tx,
+            newScene.id,
+            emptyNotes,
+            insertedLines,
+            noteBlocksByLabel.get(label.label) ?? [],
+            presentTagIds
+          );
 
           // JS state mutations after all DB operations (avoids savepoint drift)
           affectedLabelIds.push(newScene.id);

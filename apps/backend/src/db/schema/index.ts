@@ -48,6 +48,7 @@ export * from "./tables/variables.js";
 // Content tables
 export * from "./tables/labels.js";
 export * from "./tables/label-lines.js";
+export * from "./tables/label-line-notes.js";
 
 // World building
 export * from "./tables/world-elements.js";

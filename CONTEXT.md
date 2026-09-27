@@ -57,6 +57,8 @@ Individual line of content within a label. Content types:
 
 Distraction-free prose editor for writing dialogue and narration. Technical badges (conditions, stats, variables, visual statements) are **display-only** here — they reflect the RPY source but cannot be edited from this mode.
 
+Each nonempty dialogue or narration line can have one editable line note. The note is stored either only in BranchForge or as tagged Ren'Py comments immediately above its line. Choosing "Add to script" takes effect on the next normal Write Mode save. If a script edit makes a private note's line ambiguous, the note stays in the label's unattached notes list for manual reassignment.
+
 ### Script Mode
 
 Raw RPY source editor (CodeMirror 6 with custom Ren'Py syntax highlighting). This is where all technical content is authored: conditions, variables, stats, scene/show/hide commands, menu choices, labels, and jumps. Changes here are re-parsed and badges update in Write Mode automatically.

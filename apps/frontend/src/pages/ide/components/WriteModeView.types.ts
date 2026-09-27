@@ -77,6 +77,7 @@ export interface WriteModeViewProps {
   activeLabel: LabelDetail | undefined;
   characters: Character[];
   onChange: (entries: DialogueEntry[]) => void;
+  canEditNotes?: boolean;
   editorSaveState: EditorSaveState;
   onReloadScene: () => void;
   onDiscardDraft: () => void;

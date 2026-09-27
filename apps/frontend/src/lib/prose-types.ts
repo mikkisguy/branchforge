@@ -4,7 +4,11 @@
  * Types for the WriteMode prose editor interface.
  */
 
-import type { StatCondition, VariableCondition } from "@branchforge/shared";
+import type {
+  StatCondition,
+  VariableCondition,
+  UpdateLabelDialogueNoteInput,
+} from "@branchforge/shared";
 
 // ============================================================================
 // Types
@@ -18,9 +22,12 @@ export interface DialogueEntry {
   id: string; // UUID for the entry
   speakerId: string | null; // Character UUID (null = narration)
   text: string; // Content text
+  /** Persisted line ID; absent until a newly added line is saved. */
+  labelLineId?: string;
+  /** Undefined keeps the saved note, null deletes it. */
+  note?: UpdateLabelDialogueNoteInput | null;
 
   // Additional fields for backend integration
-  labelLineId?: string;
   sequence?: number;
   speakerName?: string | null;
   contentType?: string;

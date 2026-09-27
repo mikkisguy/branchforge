@@ -73,3 +73,11 @@ export { updateIncomingJumpsForLabels } from "./incoming-jumps.js";
 
 // Jump Targets
 export { resolveJumpTargets } from "./jump-targets.js";
+
+// Notes
+export {
+  getNotesForLabel,
+  getNotesByLineIds,
+  applyNoteChanges,
+} from "./notes.js";
+export type { NoteInput, LineNoteChange } from "./notes.js";

@@ -14,7 +14,6 @@ interface TechnicalBadgeRowProps {
   showBadges?: boolean;
   technicalInfo?: DialogueEntry["technicalInfo"];
   isHovered: boolean;
-  isStacked: boolean;
   popoverType: PopoverType;
   setPopoverType: React.Dispatch<React.SetStateAction<PopoverType>>;
 }
@@ -23,7 +22,6 @@ export function TechnicalBadgeRow({
   showBadges,
   technicalInfo,
   isHovered,
-  isStacked,
   popoverType,
   setPopoverType,
 }: TechnicalBadgeRowProps) {
@@ -62,7 +60,7 @@ export function TechnicalBadgeRow({
   return (
     <>
       {showBadgeUi && technicalInfo ? (
-        <div className={`mt-1 mb-3 relative ${isStacked ? "" : "ml-[172px]"}`}>
+        <div className="relative">
           <div className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded border-b border-border/40 bg-muted/15">
             {/* Menu choices badge (first per spec stacking order) */}
             {technicalInfo.choices && technicalInfo.choices.length > 0 && (

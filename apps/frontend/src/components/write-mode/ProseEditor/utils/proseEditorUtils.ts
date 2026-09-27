@@ -127,8 +127,18 @@ export function convertLabelLinesToEntries(
     if (line.contentType === "DIALOGUE" || line.contentType === "NARRATION") {
       result.push({
         id: line.id,
+        labelLineId: line.id,
         speakerId: line.speakerId,
         text: line.content,
+        ...(activeLabel.lineNotes?.[line.id]
+          ? {
+              note: {
+                id: activeLabel.lineNotes[line.id].id,
+                text: activeLabel.lineNotes[line.id].body,
+                storage: activeLabel.lineNotes[line.id].storage,
+              },
+            }
+          : {}),
       });
     } else if (
       line.contentType === "MENU" &&

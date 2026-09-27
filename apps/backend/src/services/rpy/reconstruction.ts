@@ -9,6 +9,13 @@ import {
 import { parseLabelBoundaries } from "./label-management.js";
 import type { LabelBlock } from "./types.js";
 import { trackBlocks } from "./helpers.js";
+import {
+  formatTaggedNote,
+  extractTaggedNoteLine,
+  isTaggedNoteLine,
+  parseTaggedNoteBlocks,
+  type TaggedNoteBlock,
+} from "./tagged-notes.js";
 
 interface LabelAlignState {
   ops: DialogueAlignOp[];
@@ -101,31 +108,6 @@ function extractOriginalDialogueByLabel(
   return byLabel;
 }
 
-function flushInserts(
-  state: LabelAlignState,
-  result: string[],
-  indent: string
-): void {
-  while (state.opIdx < state.ops.length) {
-    const op = state.ops[state.opIdx];
-    if (op.type !== "insert") {
-      break;
-    }
-    result.push(formatDialogueLine(state.updated[op.updatedIndex], indent));
-    state.opIdx++;
-  }
-}
-
-function flushRemainingInserts(
-  state: LabelAlignState,
-  result: string[],
-  indent: string
-): boolean {
-  const before = state.opIdx;
-  flushInserts(state, result, indent);
-  return state.opIdx > before;
-}
-
 /**
  * Reconstruct RPY file content with updated dialogue while preserving keywords.
  * Used when Write Mode saves dialogue changes - the original keywords (show, scene, play, etc.)
@@ -141,7 +123,8 @@ function flushRemainingInserts(
  * @returns Reconstructed RPY file content
  */
 export function reconstructRPYFile(options: ReconstructedFileOptions): string {
-  const { originalContent, updatedDialogue, updatedMenuChoices } = options;
+  const { originalContent, updatedDialogue, updatedMenuChoices, lineNotes } =
+    options;
   const lines = originalContent.split("\n");
   const result: string[] = [];
 
@@ -173,6 +156,28 @@ export function reconstructRPYFile(options: ReconstructedFileOptions): string {
     });
   }
 
+  // Map original tagged note blocks to their owning dialogue slot and to each
+  // source line so we can preserve, remove, or replace them during reconstruction.
+  const taggedBlocks = parseTaggedNoteBlocks(originalContent);
+  const currentNoteIds = new Set(
+    [...(lineNotes?.values() ?? [])].map((note) => note.id)
+  );
+  const dialogueNoteByKey = new Map<string, TaggedNoteBlock>();
+  const taggedNoteLineOwners = new Map<
+    number,
+    { label: string; dialogueIndex: number }
+  >();
+  for (const block of taggedBlocks) {
+    const key = `${block.label}:${block.dialogueIndex}`;
+    dialogueNoteByKey.set(key, block);
+    for (let i = block.noteStartLine; i <= block.noteEndLine; i++) {
+      taggedNoteLineOwners.set(i, {
+        label: block.label,
+        dialogueIndex: block.dialogueIndex,
+      });
+    }
+  }
+
   let currentLabel: string | null = null;
   const labelIndentation = new Map<string, string>();
   let lastDialogueIndent = "    ";
@@ -189,12 +194,70 @@ export function reconstructRPYFile(options: ReconstructedFileOptions): string {
     return labelEndKeywords.has(normalized);
   };
 
+  function emitNoteAndDialogue(
+    label: string,
+    op: DialogueAlignOp,
+    entry: DialogueAlignEntry,
+    indent: string
+  ): void {
+    // New note from the caller takes precedence; otherwise preserve an old
+    // note only when the original dialogue slot is unchanged.
+    if (entry.lineId && lineNotes?.has(entry.lineId)) {
+      const note = lineNotes.get(entry.lineId)!;
+      for (const noteLine of formatTaggedNote(note.id, note.body, indent)) {
+        result.push(noteLine);
+      }
+    } else if (!lineNotes && op.type === "equal") {
+      const oldBlock = dialogueNoteByKey.get(`${label}:${op.origIndex}`);
+      if (oldBlock) {
+        for (const noteLine of formatTaggedNote(
+          oldBlock.noteId,
+          oldBlock.body,
+          indent
+        )) {
+          result.push(noteLine);
+        }
+      }
+    }
+    result.push(formatDialogueLine(entry, indent));
+  }
+
+  function flushInserts(
+    state: LabelAlignState,
+    result: string[],
+    indent: string,
+    label: string
+  ): void {
+    while (state.opIdx < state.ops.length) {
+      const op = state.ops[state.opIdx];
+      if (op.type !== "insert") {
+        break;
+      }
+      const newDialogue = state.updated[op.updatedIndex];
+      // Insert op has no original slot, so only a new note from the caller can
+      // be emitted. emitNoteAndDialogue treats op.type === "insert" as no old note.
+      emitNoteAndDialogue(label, op, newDialogue, indent);
+      state.opIdx++;
+    }
+  }
+
+  function flushRemainingInserts(
+    state: LabelAlignState,
+    result: string[],
+    indent: string,
+    label: string
+  ): boolean {
+    const before = state.opIdx;
+    flushInserts(state, result, indent, label);
+    return state.opIdx > before;
+  }
+
   const flushLabelTrailing = (label: string | null): boolean => {
     if (!label) return false;
     const state = alignStates.get(label);
     if (!state) return false;
     const indent = labelIndentation.get(label) || lastDialogueIndent;
-    return flushRemainingInserts(state, result, indent);
+    return flushRemainingInserts(state, result, indent, label);
   };
 
   for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
@@ -247,6 +310,28 @@ export function reconstructRPYFile(options: ReconstructedFileOptions): string {
       continue;
     }
 
+    // Tagged note lines that belong to a dialogue slot in an updated label are
+    // skipped here and re-emitted (or not) above the owning dialogue line. All
+    // other tagged notes (dangling, in unupdated labels, etc.) are preserved.
+    if (isTaggedNoteLine(line)) {
+      const sourceNoteId = extractTaggedNoteLine(line)?.noteId;
+      if (sourceNoteId && currentNoteIds.has(sourceNoteId)) {
+        continue;
+      }
+      const owner = taggedNoteLineOwners.get(lineIndex);
+      if (!owner) {
+        result.push(line);
+        continue;
+      }
+      const ownerState = alignStates.get(owner.label);
+      if (!ownerState) {
+        result.push(line);
+        continue;
+      }
+      // Skip: the note will be re-emitted above the dialogue line when needed.
+      continue;
+    }
+
     // Track menu block nesting: push on menu:, pop on dedent.
     // Inserts that follow a menu title in the flat dialogue list must not be
     // emitted inside the menu — flush them when the menu block ends.
@@ -280,7 +365,7 @@ export function reconstructRPYFile(options: ReconstructedFileOptions): string {
         openMenuKeywordIndent.delete(currentLabel);
         const state = alignStates.get(currentLabel)!;
         const indent = " ".repeat(poppedMenuIndent);
-        flushInserts(state, result, indent);
+        flushInserts(state, result, indent, currentLabel);
       }
     }
 
@@ -335,7 +420,7 @@ export function reconstructRPYFile(options: ReconstructedFileOptions): string {
       // Do not flush inserts inside a menu — the menu title is a dialogue
       // slot, but Write Mode inserts after it belong after the whole block.
       if (menuStack.length === 0) {
-        flushInserts(state, result, indent);
+        flushInserts(state, result, indent, currentLabel);
       }
 
       if (state.opIdx >= state.ops.length) {
@@ -348,7 +433,7 @@ export function reconstructRPYFile(options: ReconstructedFileOptions): string {
       if (op.type === "delete") {
         state.opIdx++;
         if (menuStack.length === 0) {
-          flushInserts(state, result, indent);
+          flushInserts(state, result, indent, currentLabel);
         }
         continue;
       }
@@ -356,9 +441,9 @@ export function reconstructRPYFile(options: ReconstructedFileOptions): string {
       if (op.type === "equal" || op.type === "replace") {
         const newDialogue = state.updated[op.updatedIndex];
         state.opIdx++;
-        result.push(formatDialogueLine(newDialogue, indent));
+        emitNoteAndDialogue(currentLabel, op, newDialogue, indent);
         if (menuStack.length === 0) {
-          flushInserts(state, result, indent);
+          flushInserts(state, result, indent, currentLabel);
         }
         continue;
       }
@@ -395,7 +480,7 @@ export function reconstructRPYFile(options: ReconstructedFileOptions): string {
         menuIndent !== undefined
           ? " ".repeat(menuIndent)
           : labelIndentation.get(label) || lastDialogueIndent;
-      flushRemainingInserts(state, result, indent);
+      flushRemainingInserts(state, result, indent, label);
     }
   }
 

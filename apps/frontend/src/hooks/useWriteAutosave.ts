@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useReducer, useRef } from "react";
 import type { RefObject } from "react";
-import type { PublicLabel, LabelDetail } from "@branchforge/shared";
+import type {
+  PublicLabel,
+  LabelDetail,
+  UpdateLabelDialogueEntry,
+} from "@branchforge/shared";
 import { useAutosave, type SaveStatus } from "@/hooks/useAutosave";
 import { registerModeFlushHandler } from "@/lib/editor-sync-coordinator";
 import {
@@ -28,7 +32,7 @@ interface UpdateDialogueOptions {
 
 type UpdateDialogue = (
   labelId: string,
-  dialogue: Array<{ speakerId: string | null; text: string }>,
+  dialogue: UpdateLabelDialogueEntry[],
   options?: UpdateDialogueOptions & {
     menuBlocks?: Array<{
       lineId: string;
@@ -245,8 +249,18 @@ export function getPersistedDialogueFromLabel(
     ) {
       result.push({
         id: line.id,
+        labelLineId: line.id,
         speakerId: line.speakerId,
         text: line.content,
+        ...(activeLabel.lineNotes?.[line.id]
+          ? {
+              note: {
+                id: activeLabel.lineNotes[line.id].id,
+                text: activeLabel.lineNotes[line.id].body,
+                storage: activeLabel.lineNotes[line.id].storage,
+              },
+            }
+          : {}),
       });
     } else if (
       line.contentType === "MENU" &&

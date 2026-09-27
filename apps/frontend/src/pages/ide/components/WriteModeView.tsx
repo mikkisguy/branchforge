@@ -46,6 +46,7 @@ export function WriteModeView({
   activeLabel,
   characters,
   onChange,
+  canEditNotes,
   editorSaveState,
   onReloadScene,
   onDiscardDraft,
@@ -189,6 +190,7 @@ export function WriteModeView({
                 activeLabel={activeLabel}
                 characters={characters}
                 onChange={onChange}
+                canEditNotes={canEditNotes}
                 isFocusMode={isFocusMode}
                 hideChrome
                 isSaving={editorSaveState.isSaving}

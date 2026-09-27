@@ -162,22 +162,12 @@ export function useDialogueLineSpeaker(
   const handleSpeakerSelect = useCallback(
     (speakerId: string | null) => {
       onChange({
-        id: entry.id,
+        ...entry,
         speakerId,
-        text: entry.text,
-        contentType: entry.contentType,
-        choiceData: entry.choiceData,
       });
       closeDropdown();
     },
-    [
-      onChange,
-      entry.id,
-      entry.text,
-      entry.contentType,
-      entry.choiceData,
-      closeDropdown,
-    ]
+    [onChange, entry, closeDropdown]
   );
 
   const handleDropdownKeyDown = useCallback(

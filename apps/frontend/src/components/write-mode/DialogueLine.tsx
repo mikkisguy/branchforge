@@ -15,6 +15,7 @@ import { areDialogueLinePropsEqual } from "./DialogueLine.types";
 import { matchesShortcut } from "@/lib/keyboard-shortcuts";
 import { useDialogueLineSpeaker } from "./useDialogueLineSpeaker";
 import { DialogueLineActions } from "./DialogueLineActions";
+import { LineNoteControl } from "./LineNoteControl";
 
 export const DialogueLine = memo(function DialogueLine({
   entry,
@@ -30,6 +31,7 @@ export const DialogueLine = memo(function DialogueLine({
   textareaRef,
   technicalInfo,
   showBadges,
+  canEditNotes = false,
 }: DialogueLineProps) {
   const [isHovered, setIsHovered] = useState(false);
   const [popoverType, setPopoverType] = useState<
@@ -113,21 +115,12 @@ export const DialogueLine = memo(function DialogueLine({
       }
       previousTextRef.current = e.target.value;
       textOnChangeRef.current({
-        id: entry.id,
-        speakerId: entry.speakerId,
+        ...entry,
         text: e.target.value,
-        contentType: entry.contentType,
-        choiceData: entry.choiceData,
       });
       resizeTextarea();
     },
-    [
-      entry.id,
-      entry.speakerId,
-      entry.contentType,
-      entry.choiceData,
-      resizeTextarea,
-    ]
+    [entry, resizeTextarea]
   );
 
   const handleKeyDown = useCallback(
@@ -247,14 +240,24 @@ export const DialogueLine = memo(function DialogueLine({
         choiceTargetName={choiceTargetName}
       />
 
-      <TechnicalBadgeRow
-        showBadges={showBadges}
-        technicalInfo={technicalInfo}
-        isHovered={isHovered}
-        isStacked={isStacked}
-        popoverType={popoverType}
-        setPopoverType={setPopoverType}
-      />
+      {(showBadges || (!isChoice && (canEditNotes || entry.note))) && (
+        <div
+          className={`relative mt-1 mb-2 flex flex-wrap items-start gap-2 ${isStacked ? "" : "ml-[172px]"}`}
+        >
+          <TechnicalBadgeRow
+            showBadges={showBadges}
+            technicalInfo={technicalInfo}
+            isHovered={isHovered}
+            popoverType={popoverType}
+            setPopoverType={setPopoverType}
+          />
+          <LineNoteControl
+            entry={entry}
+            canEdit={canEditNotes}
+            onChange={onChange}
+          />
+        </div>
+      )}
 
       <span
         ref={measureRef}

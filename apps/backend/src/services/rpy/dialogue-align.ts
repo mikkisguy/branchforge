@@ -10,6 +10,7 @@
 export interface DialogueAlignEntry {
   speaker: string | null;
   text: string;
+  lineId?: string;
 }
 
 export type DialogueAlignOp =

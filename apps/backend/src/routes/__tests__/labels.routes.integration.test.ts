@@ -18,6 +18,7 @@ import {
   projectFiles,
   labels,
   labelLines,
+  labelLineNotes,
   userSessions,
   characters,
   type NewUser,
@@ -25,6 +26,7 @@ import {
 } from "../../db/schema/index.js";
 import { eq, inArray, asc } from "drizzle-orm";
 import { calculateContentHash } from "../../lib/hash.js";
+import { syncLabelsFromFile } from "../../services/labels/sync.js";
 
 describe("LabelsRoutes (Integration)", () => {
   let db: ReturnType<typeof getDb>;
@@ -447,5 +449,195 @@ describe("LabelsRoutes (Integration)", () => {
 
     expect(lines[4].contentType).toBe("JUMP");
     expect(lines[4].content).toBe("jump ending");
+  });
+
+  it("saves a BranchForge-only note without changing the script", async () => {
+    const auth = await createAuthenticatedRequest(testUserId);
+    const [line] = await db
+      .select()
+      .from(labelLines)
+      .where(eq(labelLines.labelId, introLabelId));
+
+    const response = await fastify.inject({
+      method: "PUT",
+      url: `/labels/${introLabelId}/dialogue`,
+      payload: {
+        dialogue: [
+          {
+            lineId: line.id,
+            speakerId: null,
+            text: "Intro old",
+            note: { text: "Keep this quiet", storage: "BRANCHFORGE_ONLY" },
+          },
+        ],
+      },
+      cookies: { [SESSION_COOKIE_NAME]: auth.sessionId },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const [file] = await db
+      .select()
+      .from(projectFiles)
+      .where(eq(projectFiles.id, testFileId));
+    expect(file.content).toBe(currentFileContent);
+    const [note] = await db
+      .select()
+      .from(labelLineNotes)
+      .where(eq(labelLineNotes.labelId, introLabelId));
+    expect(note).toMatchObject({
+      labelLineId: line.id,
+      body: "Keep this quiet",
+      storage: "BRANCHFORGE_ONLY",
+    });
+  });
+
+  it("writes script notes above the line on save and removes them on deletion", async () => {
+    const auth = await createAuthenticatedRequest(testUserId);
+    const [line] = await db
+      .select()
+      .from(labelLines)
+      .where(eq(labelLines.labelId, introLabelId));
+    const request = (note: { text: string; storage: "SCRIPT" } | null) =>
+      fastify.inject({
+        method: "PUT",
+        url: `/labels/${introLabelId}/dialogue`,
+        payload: {
+          dialogue: [
+            { lineId: line.id, speakerId: null, text: "Intro old", note },
+          ],
+        },
+        cookies: { [SESSION_COOKIE_NAME]: auth.sessionId },
+      });
+
+    expect(
+      (await request({ text: "Check pacing", storage: "SCRIPT" })).statusCode
+    ).toBe(200);
+    const [note] = await db
+      .select()
+      .from(labelLineNotes)
+      .where(eq(labelLineNotes.labelId, introLabelId));
+    const [written] = await db
+      .select()
+      .from(projectFiles)
+      .where(eq(projectFiles.id, testFileId));
+    expect(written.content).toContain(
+      `    # BFNOTE[id=${note.id}] Check pacing\n    "Intro old"`
+    );
+
+    expect((await request(null)).statusCode).toBe(200);
+    const [removed] = await db
+      .select()
+      .from(projectFiles)
+      .where(eq(projectFiles.id, testFileId));
+    expect(removed.content).not.toContain("BFNOTE");
+  });
+
+  it("keeps an ambiguous private note unattached during script sync", async () => {
+    const [line] = await db
+      .select()
+      .from(labelLines)
+      .where(eq(labelLines.labelId, introLabelId));
+    await db.insert(labelLineNotes).values({
+      labelId: introLabelId,
+      labelLineId: line.id,
+      body: "Original line note",
+      storage: "BRANCHFORGE_ONLY",
+      anchorContent: line.content,
+      anchorSequence: line.sequence,
+    });
+    const changedContent = [
+      "label intro:",
+      '    "Different"',
+      "",
+      "label side_scene:",
+      '    "Side old"',
+    ].join("\n");
+    const result = await syncLabelsFromFile(
+      testProjectId,
+      { filePath: "story/scene.rpy", fileType: "STORY" },
+      changedContent,
+      testFileId
+    );
+    expect(result.success).toBe(true);
+    const [note] = await db
+      .select()
+      .from(labelLineNotes)
+      .where(eq(labelLineNotes.labelId, introLabelId));
+    expect(note.labelLineId).toBeNull();
+    expect(note.deletedAt).toBeNull();
+  });
+
+  it("imports a tagged script note and keeps its ID through a second sync", async () => {
+    const noteId = testUuid("23000005", 1);
+    const content = [
+      "label intro:",
+      `    # BFNOTE[id=${noteId}] Check timing`,
+      '    "Intro old"',
+      "",
+      "label side_scene:",
+      '    "Side old"',
+    ].join("\n");
+    const runSync = () =>
+      syncLabelsFromFile(
+        testProjectId,
+        { filePath: "story/scene.rpy", fileType: "STORY" },
+        content,
+        testFileId
+      );
+    expect((await runSync()).success).toBe(true);
+    expect((await runSync()).success).toBe(true);
+    const [note] = await db
+      .select()
+      .from(labelLineNotes)
+      .where(eq(labelLineNotes.id, noteId));
+    const [line] = await db
+      .select()
+      .from(labelLines)
+      .where(eq(labelLines.labelId, introLabelId));
+    expect(note).toMatchObject({
+      id: noteId,
+      labelLineId: line.id,
+      body: "Check timing",
+      storage: "SCRIPT",
+    });
+  });
+
+  it("keeps a note on its line when inserting prose before it", async () => {
+    const auth = await createAuthenticatedRequest(testUserId);
+    const [line] = await db
+      .select()
+      .from(labelLines)
+      .where(eq(labelLines.labelId, introLabelId));
+    const response = await fastify.inject({
+      method: "PUT",
+      url: `/labels/${introLabelId}/dialogue`,
+      payload: {
+        dialogue: [
+          { clientId: "new-line", speakerId: null, text: "Before" },
+          {
+            clientId: "old-line",
+            lineId: line.id,
+            speakerId: null,
+            text: "Intro old",
+            note: { text: "Attached to old", storage: "BRANCHFORGE_ONLY" },
+          },
+        ],
+      },
+      cookies: { [SESSION_COOKIE_NAME]: auth.sessionId },
+    });
+    expect(response.statusCode).toBe(200);
+    const mapping = response.json().lineIdMapping as Record<string, string>;
+    expect(mapping["new-line"]).toBeDefined();
+    expect(mapping["old-line"]).toBeDefined();
+    const [note] = await db
+      .select()
+      .from(labelLineNotes)
+      .where(eq(labelLineNotes.labelId, introLabelId));
+    const [attachedLine] = await db
+      .select()
+      .from(labelLines)
+      .where(eq(labelLines.id, note.labelLineId!));
+    expect(attachedLine.content).toBe("Intro old");
+    expect(note.labelLineId).toBe(mapping["old-line"]);
   });
 });

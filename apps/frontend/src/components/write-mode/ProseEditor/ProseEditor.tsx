@@ -30,6 +30,7 @@ interface ProseEditorProps {
   activeLabel: LabelDetail | undefined;
   characters: Character[];
   onChange: (entries: DialogueEntry[]) => void;
+  canEditNotes?: boolean;
   isFocusMode?: boolean;
   isSaving?: boolean;
   lastSaved?: Date | null;
@@ -85,6 +86,7 @@ export const ProseEditor = function ProseEditor({
   activeLabel,
   characters,
   onChange,
+  canEditNotes = false,
   isFocusMode = false,
   isSaving = false,
   lastSaved = null,
@@ -166,6 +168,8 @@ export const ProseEditor = function ProseEditor({
         characters={state.characters}
         layoutMode={state.layoutMode}
         showBadges={state.showBadges}
+        canEditNotes={canEditNotes}
+        unattachedNotes={activeLabel?.unattachedNotes ?? []}
         isFocusMode={isFocusMode}
         textareaRefs={state.textareaRefs}
         getTechnicalInfoForLine={state.getTechnicalInfoForLine}

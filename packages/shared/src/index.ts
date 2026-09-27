@@ -480,6 +480,50 @@ export interface IncomingJump {
 export type LabelVisualType = "GENERATED" | "BLACK" | "CUSTOM";
 
 /**
+ * Note storage mode enumeration
+ */
+export type NoteStorage = "BRANCHFORGE_ONLY" | "SCRIPT";
+export const NoteStorage = {
+  BRANCHFORGE_ONLY: "BRANCHFORGE_ONLY" as const,
+  SCRIPT: "SCRIPT" as const,
+} as const;
+
+/**
+ * A note attached to a single DIALOGUE or NARRATION line.
+ */
+export interface LabelLineNote {
+  id: string;
+  labelId: string;
+  labelLineId: string | null;
+  body: string;
+  storage: NoteStorage;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Note payload for a dialogue entry in PUT /labels/:labelId/dialogue.
+ * Omitting the field preserves the existing note.
+ * Passing null deletes the existing note.
+ */
+export interface UpdateLabelDialogueNoteInput {
+  id?: string;
+  text: string;
+  storage: NoteStorage;
+}
+
+/**
+ * Dialogue entry for PUT /labels/:labelId/dialogue.
+ */
+export interface UpdateLabelDialogueEntry {
+  clientId?: string;
+  lineId?: string;
+  speakerId: string | null;
+  text: string;
+  note?: UpdateLabelDialogueNoteInput | null;
+}
+
+/**
  * Label line with speaker information
  */
 export interface LabelLine {
@@ -510,6 +554,8 @@ export interface LabelLine {
       stats?: Record<string, number>;
     };
   }> | null;
+  // Optional note attached to this line
+  note?: LabelLineNote | null;
 }
 
 // ============================================================================
@@ -867,7 +913,24 @@ export interface LabelCharacter {
  */
 export interface LabelDetail extends PublicLabel {
   lines: LabelLine[];
+  /** Notes attached to lines, keyed by line ID */
+  lineNotes: Record<string, LabelLineNote>;
+  /** Notes whose line association is currently unresolved */
+  unattachedNotes: LabelLineNote[];
   characters: LabelCharacter[];
+}
+
+/**
+ * Response from PUT /labels/:labelId/dialogue.
+ */
+export interface UpdateLabelDialogueResponse {
+  success: boolean;
+  version: number;
+  contentHash: string;
+  fileContentHash: string;
+  fileUpdatedAt: string;
+  /** Mapping from client-provided clientId to persisted line ID for new entries */
+  lineIdMapping?: Record<string, string>;
 }
 
 /**

@@ -26,7 +26,11 @@ import {
   removeLocalStorageItem,
   writeLocalStorageItem,
 } from "@/hooks/useLocalStorage";
-import type { PublicLabel, LabelDetail } from "@branchforge/shared";
+import type {
+  PublicLabel,
+  LabelDetail,
+  UpdateLabelDialogueEntry,
+} from "@branchforge/shared";
 
 function clearHistoryCursor(labelId: string): void {
   removeLocalStorageItem(
@@ -64,7 +68,7 @@ export interface UseLabelsReturn {
   invalidateLabels: () => Promise<void>;
   updateDialogue: (
     labelId: string,
-    dialogue: Array<{ speakerId: string | null; text: string }>,
+    dialogue: UpdateLabelDialogueEntry[],
     options?: {
       expectedVersion?: number;
       expectedContentHash?: string;
@@ -172,7 +176,7 @@ export function useLabels(): UseLabelsReturn {
       menuBlocks,
     }: {
       labelId: string;
-      dialogue: Array<{ speakerId: string | null; text: string }>;
+      dialogue: UpdateLabelDialogueEntry[];
       expectedVersion?: number;
       expectedContentHash?: string;
       menuBlocks?: Array<{

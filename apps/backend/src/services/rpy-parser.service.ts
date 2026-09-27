@@ -15,6 +15,7 @@ export type {
   ParsedRPYFileWithLabels,
   MenuOptionForReconstruction,
   ReconstructedFileOptions,
+  LineNoteInfo,
   TechnicalConstructs,
   LabelBlock,
 } from "./rpy/types.js";
@@ -31,6 +32,19 @@ export {
   extractTechnicalConstructsFromLines,
   extractTechnicalConstructs,
 } from "./rpy/technical-constructs.js";
+
+export {
+  generateNoteId,
+  formatTaggedNote,
+  formatTaggedNoteLine,
+  parseTaggedNotes,
+  parseTaggedNoteBlocks,
+  isTaggedNoteLine,
+  stripTaggedNotes,
+  extractTaggedNoteLine,
+  type TaggedNote,
+  type TaggedNoteBlock,
+} from "./rpy/tagged-notes.js";
 
 export {
   extractLabels,

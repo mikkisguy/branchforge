@@ -159,10 +159,21 @@ export interface MenuOptionForReconstruction {
   effects?: { stats?: Record<string, number> };
 }
 
+/** A SCRIPT note attached to a dialogue line, keyed by persisted line ID. */
+export interface LineNoteInfo {
+  id: string;
+  body: string;
+}
+
 export interface ReconstructedFileOptions {
   originalContent: string;
-  updatedDialogue: Map<string, Array<{ speaker: string | null; text: string }>>; // label -> dialogue
+  updatedDialogue: Map<
+    string,
+    Array<{ speaker: string | null; text: string; lineId?: string }>
+  >; // label -> dialogue
   updatedMenuChoices?: Map<string, MenuOptionForReconstruction[][]>; // label -> [menuBlock1, menuBlock2, ...]
+  /** Optional per-line SCRIPT notes, keyed by persisted line ID. */
+  lineNotes?: Map<string, LineNoteInfo>;
 }
 
 /**

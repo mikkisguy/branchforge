@@ -5,6 +5,7 @@
  */
 
 import type { DialogueEntry } from "./prose-types";
+import type { UpdateLabelDialogueEntry } from "@branchforge/shared";
 
 // ============================================================================
 // Hash Functions (for O(1) equality comparison)
@@ -16,7 +17,22 @@ import type { DialogueEntry } from "./prose-types";
  * even if speakerId or text contain delimiter characters
  */
 function hashDialogueEntry(entry: DialogueEntry): string {
-  return JSON.stringify([entry.speakerId, entry.text, entry.contentType]);
+  return JSON.stringify([
+    entry.speakerId,
+    entry.text,
+    entry.contentType,
+    entry.note
+      ? [entry.note.id ?? null, entry.note.text, entry.note.storage]
+      : null,
+  ]);
+}
+
+function notesEqual(
+  a: DialogueEntry["note"],
+  b: DialogueEntry["note"]
+): boolean {
+  if (!a || !b) return !a && !b;
+  return a.id === b.id && a.text === b.text && a.storage === b.storage;
 }
 
 /**
@@ -42,7 +58,8 @@ export function areDialogueEntriesEqual(
     if (
       left[i].speakerId !== right[i].speakerId ||
       left[i].text !== right[i].text ||
-      left[i].contentType !== right[i].contentType
+      left[i].contentType !== right[i].contentType ||
+      !notesEqual(left[i].note, right[i].note)
     ) {
       return false;
     }
@@ -80,7 +97,8 @@ export function restoreEmptyProseEntries(
       !serverEntry ||
       localEntry.speakerId !== serverEntry.speakerId ||
       localEntry.text !== serverEntry.text ||
-      localEntry.contentType !== serverEntry.contentType
+      localEntry.contentType !== serverEntry.contentType ||
+      !notesEqual(localEntry.note, serverEntry.note)
     ) {
       return serverEntries;
     }
@@ -105,14 +123,10 @@ export function restoreEmptyProseEntries(
  * @param entries - Dialogue entries from the prose editor
  * @returns Backend dialogue payload
  */
-export function dialogueToPayload(entries: DialogueEntry[]): Array<{
-  speakerId: string | null;
-  text: string;
-}> {
-  const result: Array<{
-    speakerId: string | null;
-    text: string;
-  }> = [];
+export function dialogueToPayload(
+  entries: DialogueEntry[]
+): UpdateLabelDialogueEntry[] {
+  const result: UpdateLabelDialogueEntry[] = [];
   for (const entry of entries) {
     // Skip structural entries (MENU, JUMP, CHOICE) - they are handled via menuBlocks
     if (
@@ -124,8 +138,11 @@ export function dialogueToPayload(entries: DialogueEntry[]): Array<{
     }
     if (entry.text.trim().length > 0) {
       result.push({
+        clientId: entry.id,
+        ...(entry.labelLineId ? { lineId: entry.labelLineId } : {}),
         speakerId: entry.speakerId,
         text: entry.text,
+        ...(entry.note !== undefined ? { note: entry.note } : {}),
       });
     }
   }
