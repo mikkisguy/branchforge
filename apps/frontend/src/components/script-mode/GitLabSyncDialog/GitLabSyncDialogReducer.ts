@@ -29,6 +29,7 @@ export type SyncFormAction =
   | { type: "SET_USER_BRANCH"; value: string | null }
   | { type: "SET_CREATE_NEW_BRANCH"; value: boolean }
   | { type: "RESET_BRANCH_MODE" }
+  | { type: "RESET_BRANCH_SELECTION" }
   | { type: "SET_COMMIT_MESSAGE"; value: string }
   | { type: "SET_CONFLICT_RESOLUTION"; value: ConflictResolution }
   | {
@@ -81,6 +82,14 @@ export function syncFormReducer(
         ...state,
         createNewBranch: false,
         userBranch: state.lastExistingBranch,
+        lastNewBranchName: "",
+      };
+    case "RESET_BRANCH_SELECTION":
+      return {
+        ...state,
+        userBranch: null,
+        createNewBranch: false,
+        lastExistingBranch: null,
         lastNewBranchName: "",
       };
     case "SET_COMMIT_MESSAGE":

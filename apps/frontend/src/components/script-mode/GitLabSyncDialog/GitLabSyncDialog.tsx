@@ -81,6 +81,17 @@ export function GitLabSyncDialog({
     operationType,
     createInitialSyncFormState
   );
+  const linkedTargetRef = useRef({ projectId, defaultBranch });
+  useEffect(() => {
+    const previousTarget = linkedTargetRef.current;
+    if (
+      previousTarget.projectId !== projectId ||
+      previousTarget.defaultBranch !== defaultBranch
+    ) {
+      linkedTargetRef.current = { projectId, defaultBranch };
+      dispatch({ type: "RESET_BRANCH_SELECTION" });
+    }
+  }, [projectId, defaultBranch]);
   const branchesReady =
     branchesQuery.isSuccess &&
     !branchesQuery.isFetching &&

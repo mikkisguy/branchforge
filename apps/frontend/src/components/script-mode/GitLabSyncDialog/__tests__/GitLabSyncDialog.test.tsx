@@ -1,5 +1,5 @@
 import { QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { gitlabApi } from "@/lib/api/gitlab";
 import { createTestQueryClient } from "@/test/query-client";
@@ -78,6 +78,65 @@ describe("GitLabSyncDialog", () => {
         ).toBeEnabled();
       });
       expect(getBranches).toHaveBeenCalledWith("project-1");
+    } finally {
+      getBranches.mockRestore();
+      queryClient.clear();
+    }
+  });
+
+  it("selects the new default when the linked target changes", async () => {
+    const getBranches = vi
+      .spyOn(gitlabApi, "getBranches")
+      .mockImplementation(async (projectId) =>
+        projectId === "project-1"
+          ? ["main", "develop", "release"]
+          : ["release", "feature"]
+      );
+    const queryClient = createTestQueryClient();
+    const onOpenChange = vi.fn();
+    const renderDialog = (projectId: string, defaultBranch: string) => (
+      <QueryClientProvider client={queryClient}>
+        <GitLabSyncDialog
+          open
+          onOpenChange={onOpenChange}
+          operationType="export"
+          projectId={projectId}
+          defaultBranch={defaultBranch}
+        />
+      </QueryClientProvider>
+    );
+
+    try {
+      const { rerender } = render(renderDialog("project-1", "main"));
+      await waitFor(() =>
+        expect(
+          screen.getByRole("combobox", { name: "Branch" })
+        ).toHaveTextContent("main")
+      );
+
+      fireEvent.click(screen.getByRole("combobox", { name: "Branch" }));
+      fireEvent.click(screen.getByRole("option", { name: "develop" }));
+      expect(
+        screen.getByRole("combobox", { name: "Branch" })
+      ).toHaveTextContent("develop");
+
+      rerender(renderDialog("project-1", "release"));
+      await waitFor(() =>
+        expect(
+          screen.getByRole("combobox", { name: "Branch" })
+        ).toHaveTextContent("release")
+      );
+
+      rerender(renderDialog("project-2", "feature"));
+      await waitFor(() => {
+        expect(
+          screen.getByRole("combobox", { name: "Branch" })
+        ).toHaveTextContent("feature");
+        expect(
+          screen.getByRole("button", { name: "Export to feature" })
+        ).toBeEnabled();
+      });
+      expect(getBranches).toHaveBeenCalledWith("project-2");
     } finally {
       getBranches.mockRestore();
       queryClient.clear();

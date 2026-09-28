@@ -437,6 +437,31 @@ describe("export branch state", () => {
     expect(state.userBranch).toBe("");
   });
 
+  it("clears branch overrides when the linked target changes", () => {
+    let state = createInitialSyncFormState("export");
+    state = syncFormReducer(state, {
+      type: "SET_USER_BRANCH",
+      value: "develop",
+    });
+    state = syncFormReducer(state, {
+      type: "SET_CREATE_NEW_BRANCH",
+      value: true,
+    });
+    state = syncFormReducer(state, {
+      type: "SET_USER_BRANCH",
+      value: "feature/story",
+    });
+
+    state = syncFormReducer(state, { type: "RESET_BRANCH_SELECTION" });
+
+    expect(state).toMatchObject({
+      userBranch: null,
+      createNewBranch: false,
+      lastExistingBranch: null,
+      lastNewBranchName: "",
+    });
+  });
+
   it("requires a loaded list and a valid target in either path", () => {
     const existing = resolveSyncBranchFields({
       operationType: "export",
