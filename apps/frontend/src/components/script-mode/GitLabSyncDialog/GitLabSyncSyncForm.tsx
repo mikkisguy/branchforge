@@ -5,6 +5,7 @@
  * branch input, commit message, conflict resolution options.
  */
 
+import { ArrowLeft, Plus } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -105,13 +106,48 @@ export function GitLabSyncSyncForm({
     <>
       {/* Branch Selection */}
       <div className="space-y-2">
-        {hasBranchControl ? (
-          <Label htmlFor="sync-branch">
-            {isExport && createNewBranch ? "New branch name" : "Branch"}
-          </Label>
-        ) : (
-          <span className="text-sm font-medium leading-none">Branch</span>
-        )}
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          {hasBranchControl ? (
+            <Label htmlFor="sync-branch" className="shrink-0">
+              {isExport && createNewBranch ? "New branch name" : "Branch"}
+            </Label>
+          ) : (
+            <span className="text-sm font-medium leading-none shrink-0">
+              Branch
+            </span>
+          )}
+          {isExport &&
+            (createNewBranch ? (
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                className="shrink-0"
+                onClick={() => onCreateNewBranchChange(false)}
+                disabled={isProcessing}
+              >
+                <ArrowLeft aria-hidden="true" />
+                Use existing branch
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                className="shrink-0"
+                onClick={() => onCreateNewBranchChange(true)}
+                disabled={
+                  isProcessing ||
+                  branchesLoading ||
+                  !!branchesError ||
+                  !branches?.length
+                }
+              >
+                <Plus aria-hidden="true" />
+                Create a new branch
+              </Button>
+            ))}
+        </div>
         {isExport ? (
           createNewBranch ? (
             <Input
@@ -150,47 +186,17 @@ export function GitLabSyncSyncForm({
             aria-describedby="sync-branch-help"
           />
         )}
-        <p
-          id="sync-branch-help"
-          className={
-            branchNameError || branchAlreadyExists
-              ? "text-xs text-red-800 dark:text-red-200"
-              : "text-xs text-muted-foreground"
-          }
-        >
-          {branchHelp}
-        </p>
-        {isExport && (
-          <div className="flex items-center gap-2 pt-1">
-            {createNewBranch ? (
-              <Button
-                type="button"
-                variant="link"
-                size="sm"
-                className="h-auto p-0"
-                onClick={() => onCreateNewBranchChange(false)}
-                disabled={isProcessing}
-              >
-                Choose an existing branch
-              </Button>
-            ) : (
-              <Button
-                type="button"
-                variant="link"
-                size="sm"
-                className="h-auto p-0"
-                onClick={() => onCreateNewBranchChange(true)}
-                disabled={
-                  isProcessing ||
-                  branchesLoading ||
-                  !!branchesError ||
-                  !branches?.length
-                }
-              >
-                Create a new branch
-              </Button>
-            )}
-          </div>
+        {branchHelp && (
+          <p
+            id="sync-branch-help"
+            className={
+              branchNameError || branchAlreadyExists
+                ? "text-xs text-red-800 dark:text-red-200"
+                : "text-xs text-muted-foreground"
+            }
+          >
+            {branchHelp}
+          </p>
         )}
       </div>
 
@@ -334,7 +340,6 @@ function BranchSelect({
       disabled={isProcessing}
       aria-required="true"
       aria-label="Branch"
-      aria-describedby="sync-branch-help"
     />
   );
 }
@@ -351,7 +356,7 @@ function branchHelpText({
   defaultBranch: string;
   branchNameError: string | null;
   branchAlreadyExists: boolean;
-}): string {
+}): string | null {
   if (operationType === "import") {
     return "The GitLab branch to pull from.";
   }
@@ -360,7 +365,7 @@ function branchHelpText({
     if (branchAlreadyExists) {
       return "A branch with this name already exists. Choose an existing branch to export to it.";
     }
-    return `A new branch is created from ${defaultBranch} and your labels are committed onto it.`;
+    return `Creates a branch from ${defaultBranch} and commits your changes to it.`;
   }
-  return "The GitLab branch to push to.";
+  return null;
 }

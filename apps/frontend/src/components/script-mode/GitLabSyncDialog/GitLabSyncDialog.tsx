@@ -7,7 +7,7 @@
 
 import { useReducer, useCallback, useRef, useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Download, FilePenLine, Upload } from "lucide-react";
+import { Download, FilePenLine, RotateCcw, Trash2, Upload } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { useGitLabSync } from "@/hooks/useGitLabSync";
@@ -301,7 +301,7 @@ export function GitLabSyncDialog({
       onOpenChange={handleDialogOpenChange}
       aria-label={dialogLabel}
     >
-      <DialogContent className="max-w-md w-full p-0 gap-0">
+      <DialogContent className="max-w-md w-full p-0 max-sm:p-0 gap-0 flex flex-col max-h-[85vh] overflow-hidden">
         <GitLabSyncDialogHeader
           operationType={operationType}
           isProcessing={state.isProcessing}
@@ -310,7 +310,7 @@ export function GitLabSyncDialog({
         />
 
         {/* Content */}
-        <div className="p-6 max-sm:p-4 space-y-4">
+        <div className="p-6 max-sm:p-4 space-y-4 flex-1 min-h-0 overflow-y-auto">
           {state.isProcessing || state.operation ? (
             <GitLabSyncDialogProgress
               operation={state.operation}
@@ -510,18 +510,20 @@ function PendingFileChangesSection({
 
   return (
     <section
-      className="space-y-2 rounded-md border border-border/60 p-3"
+      className="space-y-2.5 rounded-md border border-border/30 p-3"
       aria-label="Pending file changes"
     >
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex items-center justify-between gap-3 border-b border-border/40 pb-2.5">
         <h3 className="text-sm font-medium">Pending file changes</h3>
         {changes.length > 0 && (
           <Button
             type="button"
-            variant="ghost"
+            variant="outline"
             size="sm"
+            className="border-destructive-muted/50 bg-destructive/10 text-destructive-muted hover:bg-destructive/20 hover:text-destructive-muted"
             onClick={onDiscardAll}
           >
+            <Trash2 aria-hidden="true" />
             Discard all
           </Button>
         )}
@@ -531,7 +533,7 @@ function PendingFileChangesSection({
           <p className="text-xs font-medium text-muted-foreground">
             File structure
           </p>
-          <ul className="space-y-1.5 text-sm">
+          <ul className="divide-y divide-border/30 text-sm">
             {changes.map((change) => {
               const actionLabel =
                 change.kind === "CREATED"
@@ -548,18 +550,20 @@ function PendingFileChangesSection({
               return (
                 <li
                   key={change.fileId}
-                  className="flex items-start justify-between gap-3 rounded-md bg-muted/40 px-2.5 py-2"
+                  className="flex items-start justify-between gap-3 py-2"
                 >
-                  <span className="min-w-0 flex-1 break-all leading-5">
+                  <span className="min-w-0 flex-1 break-words leading-5">
                     {description}
                   </span>
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
+                    className="shrink-0 border-border/70 bg-muted/50 hover:bg-muted"
                     disabled={isReversing}
                     onClick={() => onReverse(change)}
                   >
+                    <RotateCcw aria-hidden="true" />
                     {actionLabel}
                   </Button>
                 </li>
@@ -569,13 +573,7 @@ function PendingFileChangesSection({
         </div>
       )}
       {contentChangedCount > 0 && (
-        <div
-          className={
-            changes.length > 0
-              ? "space-y-1.5 border-t border-border/60 pt-2.5"
-              : "space-y-1.5"
-          }
-        >
+        <div className="space-y-1.5">
           <div className="flex items-center justify-between gap-3">
             <p className="text-xs font-medium text-muted-foreground">
               Content updates
@@ -591,10 +589,10 @@ function PendingFileChangesSection({
             {contentChanges.map((change) => (
               <li
                 key={change.fileId}
-                className="flex items-center gap-2 rounded-md bg-muted/40 px-2.5 py-2 text-muted-foreground"
+                className="flex items-center gap-2 text-muted-foreground"
               >
                 <FilePenLine className="size-3.5 shrink-0" aria-hidden="true" />
-                <span className="min-w-0 break-all leading-5">
+                <span className="min-w-0 break-words leading-5">
                   {change.filePath}
                 </span>
               </li>

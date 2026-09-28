@@ -39,16 +39,22 @@ export function GitLabSyncDialogFooter({
   onClose,
 }: GitLabSyncDialogFooterProps) {
   return (
-    <div className="p-6 max-sm:p-4 border-t border-border/30 flex justify-end gap-2">
+    <div className="p-6 max-sm:p-4 border-t border-border/30 flex justify-end gap-2 shrink-0 max-[380px]:flex-col">
       {!isProcessing && !hasOperation && (
         <>
-          <Button type="button" variant="outline" onClick={onClose}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onClose}
+            className="max-[380px]:w-full"
+          >
             Cancel
           </Button>
           <Button
             type="button"
             onClick={onSync}
             disabled={!branch.trim() || branchInvalid}
+            className="max-[380px]:w-full"
           >
             {submitLabel({ operationType, createNewBranch, branch })}
           </Button>
@@ -60,12 +66,13 @@ export function GitLabSyncDialogFooter({
           onClick={onClose}
           variant="outline"
           disabled={isProcessing}
+          className="max-[380px]:w-full"
         >
           Close
         </Button>
       )}
       {operationStatus === "COMPLETED" && (
-        <Button type="button" onClick={onClose}>
+        <Button type="button" onClick={onClose} className="max-[380px]:w-full">
           Close
         </Button>
       )}

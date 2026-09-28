@@ -85,11 +85,9 @@ describe("GitLabSyncSyncForm", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("preselects the default branch when it is in the fetched list", () => {
-    const onBranchChange = vi.fn();
+  it("renders an existing branch selection", () => {
     renderExportForm({
       branch: "main",
-      onBranchChange,
       branches: defaultBranches,
     });
 
@@ -130,11 +128,19 @@ describe("GitLabSyncSyncForm", () => {
     });
 
     expect(screen.getByPlaceholderText("feature/my-changes")).toHaveValue("");
+    expect(screen.getByText("New branch name")).toBeInTheDocument();
 
     await user.click(
-      screen.getByRole("button", { name: "Choose an existing branch" })
+      screen.getByRole("button", { name: "Use existing branch" })
     );
     expect(onCreateNewBranchChange).toHaveBeenCalledWith(false);
+  });
+
+  it("keeps the create-new-branch action disabled until branches load", () => {
+    renderExportForm({ branches: undefined, branchesLoading: true });
+    expect(
+      screen.getByRole("button", { name: "Create a new branch" })
+    ).toBeDisabled();
   });
 
   it("preserves the existing selection and new name independently when switching modes", () => {
@@ -299,7 +305,7 @@ describe("GitLabSyncSyncForm", () => {
     });
     expect(
       screen.getByText(
-        "A new branch is created from main and your labels are committed onto it."
+        "Creates a branch from main and commits your changes to it."
       )
     ).toBeInTheDocument();
     expect(
