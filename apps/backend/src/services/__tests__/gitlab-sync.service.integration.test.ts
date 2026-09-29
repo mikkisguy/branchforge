@@ -761,7 +761,7 @@ describe("GitLabSyncService (Integration)", () => {
       });
     }
 
-    it("exports stripped source files alongside generated managed definitions", async () => {
+    it("exports cleaned legacy source files and later Script Mode edits", async () => {
       const sourcePath = "game/variables.rpy";
       const original =
         'default met_sylvie = False\ndefine s = Character("Sylvie")\nlabel start:\n    return';
@@ -776,10 +776,10 @@ describe("GitLabSyncService (Integration)", () => {
         content: cleaned,
         originalContent: original,
         contentHash: calculateContentHash(cleaned),
-        lastPushedContentHash: calculateContentHash(cleaned),
+        lastPushedContentHash: null,
         remoteFilePath: sourcePath,
-        remoteContent: original,
-        remoteContentHash: calculateContentHash(original),
+        remoteContent: null,
+        remoteContentHash: null,
       });
       await db.insert(variables).values({
         id: testUuid("76000000", 90),
@@ -837,6 +837,87 @@ describe("GitLabSyncService (Integration)", () => {
           expect.objectContaining({ filePath: sourcePath }),
         ])
       );
+
+      const edited = `${cleaned}\n# local edit`;
+      await db
+        .update(projectFiles)
+        .set({ content: edited, contentHash: calculateContentHash(edited) })
+        .where(eq(projectFiles.id, sourceId));
+      const third = await exportToGitlab(testProjectId, testUserId, testBranch);
+      expect(third.status).toBe("COMPLETED");
+      expect(commitSpy.mock.calls[2]?.[4]).toEqual(
+        expect.arrayContaining([
+          { action: "update", filePath: sourcePath, content: edited },
+        ])
+      );
+    });
+
+    it("exports a Script Mode edit when a legacy file has no sync hashes", async () => {
+      const original = "default has_key = False\nlabel start:\n    return";
+      const cleaned = extractAndStripRpySymbols(original).cleanedContent;
+      const edited = `${cleaned}\n# Script Mode edit`;
+      await db
+        .update(projectFiles)
+        .set({
+          filePath: "variables.rpy",
+          content: edited,
+          contentHash: calculateContentHash(edited),
+          originalContent: original,
+          lastPushedContentHash: null,
+          remoteContent: null,
+          remoteContentHash: null,
+        })
+        .where(eq(projectFiles.id, testGitlabFileId));
+      mockRemoteContent(original);
+      const commitSpy = vi
+        .spyOn(gitlabFileService, "batchCommitFiles")
+        .mockResolvedValue("commit-legacy-edit");
+
+      const result = await exportToGitlab(
+        testProjectId,
+        testUserId,
+        testBranch
+      );
+      expect(result.status).toBe("COMPLETED");
+      expect(commitSpy.mock.calls[0]?.[4]).toEqual(
+        expect.arrayContaining([
+          {
+            action: "update",
+            filePath: "variables.rpy",
+            content: edited,
+          },
+        ])
+      );
+    });
+
+    it("rejects remote drift against a legacy file's original content", async () => {
+      const original = "default has_key = False\nlabel start:\n    return";
+      const cleaned = extractAndStripRpySymbols(original).cleanedContent;
+      await db
+        .update(projectFiles)
+        .set({
+          filePath: "variables.rpy",
+          content: cleaned,
+          contentHash: calculateContentHash(cleaned),
+          originalContent: original,
+          lastPushedContentHash: null,
+          remoteContent: null,
+          remoteContentHash: null,
+        })
+        .where(eq(projectFiles.id, testGitlabFileId));
+      mockRemoteContent(
+        'default has_key = False\nlabel start:\n    "Changed remotely"\n    return'
+      );
+      const commitSpy = vi.spyOn(gitlabFileService, "batchCommitFiles");
+
+      const result = await exportToGitlab(
+        testProjectId,
+        testUserId,
+        testBranch
+      );
+      expect(result.status).toBe("FAILED");
+      expect(result.errorMessage).toContain("remote file changed");
+      expect(commitSpy).not.toHaveBeenCalled();
     });
 
     it("should export files to GitLab when files exist", async () => {

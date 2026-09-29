@@ -5,6 +5,7 @@
  */
 
 import { X } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import type { SyncOperationType } from "./GitLabSyncDialogReducer";
 
 // ============================================================================
@@ -29,7 +30,7 @@ export function GitLabSyncDialogHeader({
   onClose,
 }: GitLabSyncDialogHeaderProps) {
   return (
-    <div className="p-6 max-sm:p-4 border-b border-border/30 flex items-start justify-between">
+    <div className="p-6 max-sm:p-4 border-b border-border/30 flex items-start justify-between gap-3 shrink-0">
       <div className="flex items-center gap-3">
         <div className="p-2 bg-muted rounded-md">
           <SyncIcon className="size-5" />
@@ -42,20 +43,22 @@ export function GitLabSyncDialogHeader({
           </h2>
           <p className="text-sm text-muted-foreground mt-0.5">
             {operationType === "export"
-              ? "Push your BranchForge labels to GitLab"
+              ? "Review changes and choose a destination branch"
               : "Pull changes from GitLab to BranchForge"}
           </p>
         </div>
       </div>
-      <button
-        onClick={onClose}
-        className="text-muted-foreground hover:text-foreground transition-colors"
-        disabled={isProcessing}
+      <Button
         type="button"
+        variant="ghost"
+        size="icon"
+        onClick={onClose}
+        className="text-muted-foreground hover:text-foreground transition-colors shrink-0"
+        disabled={isProcessing}
         aria-label="Close sync dialog"
       >
         <X className="size-5" />
-      </button>
+      </Button>
     </div>
   );
 }

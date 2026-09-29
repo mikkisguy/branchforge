@@ -7,7 +7,7 @@
 
 import { useReducer, useCallback, useRef, useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Download, FilePenLine, Upload } from "lucide-react";
+import { Download, FilePenLine, RotateCcw, Trash2, Upload } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { useGitLabSync } from "@/hooks/useGitLabSync";
@@ -30,10 +30,7 @@ import {
   createInitialSyncFormState,
   type SyncOperationType,
 } from "./GitLabSyncDialogReducer";
-import {
-  branchAfterCreateNewToggle,
-  resolveSyncBranchFields,
-} from "./git-branch-name";
+import { canExportToBranch, resolveSyncBranchFields } from "./git-branch-name";
 
 // Types
 // ============================================================================
@@ -70,6 +67,8 @@ export function GitLabSyncDialog({
     queryKey: gitlabKeys.branches(projectId),
     queryFn: () => gitlabApi.getBranches(projectId),
     enabled: exportDialogOpen,
+    staleTime: 0,
+    refetchOnMount: "always",
   });
   const [discardConfirmationOpen, setDiscardConfirmationOpen] = useState(false);
 
@@ -82,14 +81,63 @@ export function GitLabSyncDialog({
     operationType,
     createInitialSyncFormState
   );
+  const linkedTargetRef = useRef({ projectId, defaultBranch });
+  useEffect(() => {
+    const previousTarget = linkedTargetRef.current;
+    if (
+      previousTarget.projectId !== projectId ||
+      previousTarget.defaultBranch !== defaultBranch
+    ) {
+      linkedTargetRef.current = { projectId, defaultBranch };
+      dispatch({ type: "RESET_BRANCH_SELECTION" });
+    }
+  }, [projectId, defaultBranch]);
+  const branchesReady =
+    branchesQuery.isSuccess &&
+    !branchesQuery.isFetching &&
+    branchesQuery.data.length > 0;
   const { branch, branchNameError, branchAlreadyExists } =
     resolveSyncBranchFields({
       operationType,
       createNewBranch: formState.createNewBranch,
       userBranch: formState.userBranch,
       defaultBranch,
-      knownBranches: branchesQuery.data,
+      knownBranches: branchesReady ? branchesQuery.data : undefined,
     });
+  const exportBranchInvalid = !canExportToBranch({
+    branch,
+    createNewBranch: formState.createNewBranch,
+    branchNameError,
+    branchAlreadyExists,
+    knownBranches: branchesReady ? branchesQuery.data : undefined,
+  });
+
+  // Preselect the linked default branch in export existing-branch mode when
+  // it is present in the freshly fetched list and the user has not made a
+  // selection yet.
+  useEffect(() => {
+    if (
+      operationType !== "export" ||
+      !exportDialogOpen ||
+      !branchesReady ||
+      formState.createNewBranch ||
+      formState.userBranch !== null
+    ) {
+      return;
+    }
+    const list = branchesQuery.data;
+    if (list && list.includes(defaultBranch)) {
+      dispatch({ type: "SET_USER_BRANCH", value: defaultBranch });
+    }
+  }, [
+    operationType,
+    exportDialogOpen,
+    branchesReady,
+    formState.createNewBranch,
+    formState.userBranch,
+    branchesQuery.data,
+    defaultBranch,
+  ]);
 
   // Ref to track the timeout so we can clear it on unmount
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(
@@ -112,6 +160,7 @@ export function GitLabSyncDialog({
 
   /** Handle sync operation */
   const handleSync = useCallback(async () => {
+    if (operationType === "export" && exportBranchInvalid) return;
     if (!branch.trim()) {
       error("Branch name is required");
       return;
@@ -145,6 +194,14 @@ export function GitLabSyncDialog({
       await invalidateLabels();
       pendingChanges.refetch();
 
+      // Export may have created a new branch; invalidate the cached list so
+      // the next dialog open reflects the new branch.
+      if (operationType === "export") {
+        void queryClient.invalidateQueries({
+          queryKey: gitlabKeys.branches(projectId),
+        });
+      }
+
       // For import operations, also refresh project files list
       // to ensure Script Mode shows imported files immediately
       if (operationType === "import") {
@@ -176,6 +233,7 @@ export function GitLabSyncDialog({
       // Close dialog after successful sync (if not showing character wizard)
       clearAutoCloseTimeout();
       timeoutRef.current = setTimeout(() => {
+        dispatch({ type: "RESET_BRANCH_MODE" });
         reset();
         onOpenChange(false);
       }, 1000);
@@ -192,6 +250,7 @@ export function GitLabSyncDialog({
     }
   }, [
     branch,
+    exportBranchInvalid,
     formState.commitMessage,
     formState.conflictResolution,
     operationType,
@@ -219,13 +278,10 @@ export function GitLabSyncDialog({
       show: false,
       characters: null,
     });
-    dispatch({ type: "SET_CREATE_NEW_BRANCH", value: false });
-    if (formState.userBranch === "") {
-      dispatch({ type: "SET_USER_BRANCH", value: null });
-    }
+    dispatch({ type: "RESET_BRANCH_MODE" });
     reset();
     onOpenChange(false);
-  }, [clearAutoCloseTimeout, formState.userBranch, reset, onOpenChange]);
+  }, [clearAutoCloseTimeout, reset, onOpenChange]);
 
   const handleDialogOpenChange = useCallback(
     (nextOpen: boolean) => {
@@ -256,7 +312,7 @@ export function GitLabSyncDialog({
       onOpenChange={handleDialogOpenChange}
       aria-label={dialogLabel}
     >
-      <DialogContent className="max-w-md w-full p-0 gap-0">
+      <DialogContent className="max-w-md w-full p-0 max-sm:p-0 gap-0 flex flex-col max-h-[85vh] overflow-hidden">
         <GitLabSyncDialogHeader
           operationType={operationType}
           isProcessing={state.isProcessing}
@@ -265,7 +321,7 @@ export function GitLabSyncDialog({
         />
 
         {/* Content */}
-        <div className="p-6 max-sm:p-4 space-y-4">
+        <div className="p-6 max-sm:p-4 space-y-4 flex-1 min-h-0 overflow-y-auto">
           {state.isProcessing || state.operation ? (
             <GitLabSyncDialogProgress
               operation={state.operation}
@@ -324,17 +380,17 @@ export function GitLabSyncDialog({
                 createNewBranch={formState.createNewBranch}
                 onCreateNewBranchChange={(value) => {
                   dispatch({ type: "SET_CREATE_NEW_BRANCH", value });
-                  dispatch({
-                    type: "SET_USER_BRANCH",
-                    value: branchAfterCreateNewToggle(
-                      value,
-                      formState.userBranch,
-                      defaultBranch
-                    ),
-                  });
                 }}
                 branchNameError={branchNameError}
                 branchAlreadyExists={branchAlreadyExists}
+                branches={branchesQuery.data}
+                branchesLoading={
+                  branchesQuery.isPending || branchesQuery.isFetching
+                }
+                branchesError={
+                  branchesQuery.isError ? branchesQuery.error : null
+                }
+                onBranchesRetry={() => void branchesQuery.refetch()}
               />
             </>
           )}
@@ -345,7 +401,8 @@ export function GitLabSyncDialog({
           hasOperation={!!state.operation}
           operationStatus={state.operation?.status}
           branch={branch}
-          branchInvalid={branchNameError !== null}
+          branchInvalid={operationType === "export" && exportBranchInvalid}
+          createNewBranch={formState.createNewBranch}
           operationType={operationType}
           onSync={handleSync}
           onClose={handleClose}
@@ -464,18 +521,20 @@ function PendingFileChangesSection({
 
   return (
     <section
-      className="space-y-2 rounded-md border border-border/60 p-3"
+      className="space-y-2.5 rounded-md border border-border/30 p-3"
       aria-label="Pending file changes"
     >
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex items-center justify-between gap-3 border-b border-border/40 pb-2.5">
         <h3 className="text-sm font-medium">Pending file changes</h3>
         {changes.length > 0 && (
           <Button
             type="button"
-            variant="ghost"
+            variant="outline"
             size="sm"
+            className="border-destructive-muted/50 bg-destructive/10 text-destructive-muted hover:bg-destructive/20 hover:text-destructive-muted"
             onClick={onDiscardAll}
           >
+            <Trash2 aria-hidden="true" />
             Discard all
           </Button>
         )}
@@ -485,7 +544,7 @@ function PendingFileChangesSection({
           <p className="text-xs font-medium text-muted-foreground">
             File structure
           </p>
-          <ul className="space-y-1.5 text-sm">
+          <ul className="divide-y divide-border/30 text-sm">
             {changes.map((change) => {
               const actionLabel =
                 change.kind === "CREATED"
@@ -502,18 +561,20 @@ function PendingFileChangesSection({
               return (
                 <li
                   key={change.fileId}
-                  className="flex items-start justify-between gap-3 rounded-md bg-muted/40 px-2.5 py-2"
+                  className="flex items-start justify-between gap-3 py-2"
                 >
-                  <span className="min-w-0 flex-1 break-all leading-5">
+                  <span className="min-w-0 flex-1 break-words leading-5">
                     {description}
                   </span>
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
+                    className="shrink-0 border-border/70 bg-muted/50 hover:bg-muted"
                     disabled={isReversing}
                     onClick={() => onReverse(change)}
                   >
+                    <RotateCcw aria-hidden="true" />
                     {actionLabel}
                   </Button>
                 </li>
@@ -523,13 +584,7 @@ function PendingFileChangesSection({
         </div>
       )}
       {contentChangedCount > 0 && (
-        <div
-          className={
-            changes.length > 0
-              ? "space-y-1.5 border-t border-border/60 pt-2.5"
-              : "space-y-1.5"
-          }
-        >
+        <div className="space-y-1.5">
           <div className="flex items-center justify-between gap-3">
             <p className="text-xs font-medium text-muted-foreground">
               Content updates
@@ -545,10 +600,10 @@ function PendingFileChangesSection({
             {contentChanges.map((change) => (
               <li
                 key={change.fileId}
-                className="flex items-center gap-2 rounded-md bg-muted/40 px-2.5 py-2 text-muted-foreground"
+                className="flex items-center gap-2 text-muted-foreground"
               >
                 <FilePenLine className="size-3.5 shrink-0" aria-hidden="true" />
-                <span className="min-w-0 break-all leading-5">
+                <span className="min-w-0 break-words leading-5">
                   {change.filePath}
                 </span>
               </li>

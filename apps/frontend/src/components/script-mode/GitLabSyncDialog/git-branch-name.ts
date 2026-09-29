@@ -29,28 +29,15 @@ export function gitBranchNameError(name: string): string | null {
 }
 
 /**
- * Branch field value after toggling "Create new branch".
- * Turning it on clears a prefilled default name so export does not
- * target that branch by accident. Turning it off restores the default
- * when the field was cleared.
- */
-export function branchAfterCreateNewToggle(
-  createNewBranch: boolean,
-  userBranch: string | null,
-  defaultBranch: string
-): string | null {
-  if (createNewBranch) {
-    if (userBranch === null || userBranch === defaultBranch) {
-      return "";
-    }
-    return userBranch;
-  }
-  return userBranch === "" ? null : userBranch;
-}
-
-/**
- * Branch field shown in the sync dialog, including validation for a
- * newly created export branch.
+ * Resolves the branch value, validation state, and duplicate status for the
+ * sync dialog.
+ *
+ * - Import always falls back to the linked default branch when the user has
+ *   not entered a branch.
+ * - Export existing-branch mode has no fallback; the user must select a
+ *   branch from the fetched list.
+ * - Export new-branch mode validates the entered name and flags names that
+ *   already exist in the fetched list.
  */
 export function resolveSyncBranchFields(input: {
   operationType: SyncOperationType;
@@ -63,10 +50,14 @@ export function resolveSyncBranchFields(input: {
   branchNameError: string | null;
   branchAlreadyExists: boolean;
 } {
-  const branch = input.userBranch ?? input.defaultBranch;
-  const trimmedBranch = branch.trim();
   const creatingNewBranch =
     input.operationType === "export" && input.createNewBranch;
+  const branch = creatingNewBranch
+    ? (input.userBranch ?? "")
+    : input.operationType === "import"
+      ? (input.userBranch ?? input.defaultBranch)
+      : (input.userBranch ?? "");
+  const trimmedBranch = branch.trim();
   const branchNameError =
     creatingNewBranch && trimmedBranch.length > 0
       ? gitBranchNameError(trimmedBranch)
@@ -79,4 +70,19 @@ export function resolveSyncBranchFields(input: {
       branchNameError === null &&
       (input.knownBranches ?? []).includes(trimmedBranch),
   };
+}
+
+/** A loaded branch list is required before either export path can submit. */
+export function canExportToBranch(input: {
+  branch: string;
+  createNewBranch: boolean;
+  branchNameError: string | null;
+  branchAlreadyExists: boolean;
+  knownBranches: readonly string[] | undefined;
+}): boolean {
+  if (!input.knownBranches?.length || !input.branch.trim()) return false;
+  if (input.createNewBranch) {
+    return input.branchNameError === null && !input.branchAlreadyExists;
+  }
+  return input.knownBranches.includes(input.branch);
 }

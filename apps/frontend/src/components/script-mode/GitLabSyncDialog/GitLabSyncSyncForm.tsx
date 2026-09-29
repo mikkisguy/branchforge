@@ -5,9 +5,11 @@
  * branch input, commit message, conflict resolution options.
  */
 
+import { ArrowLeft, Plus } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
+import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/select";
 import type { ConflictResolution } from "@/lib/api/gitlab";
 
 // ============================================================================
@@ -56,6 +58,10 @@ interface GitLabSyncSyncFormProps {
   onCreateNewBranchChange: (value: boolean) => void;
   branchNameError: string | null;
   branchAlreadyExists: boolean;
+  branches: readonly string[] | undefined;
+  branchesLoading: boolean;
+  branchesError: Error | null;
+  onBranchesRetry: () => void;
 }
 
 // ============================================================================
@@ -78,7 +84,16 @@ export function GitLabSyncSyncForm({
   onCreateNewBranchChange,
   branchNameError,
   branchAlreadyExists,
+  branches,
+  branchesLoading,
+  branchesError,
+  onBranchesRetry,
 }: GitLabSyncSyncFormProps) {
+  const isExport = operationType === "export";
+  const hasBranchControl =
+    !isExport ||
+    createNewBranch ||
+    (!branchesLoading && !branchesError && !!branches?.length);
   const branchHelp = branchHelpText({
     operationType,
     createNewBranch,
@@ -91,40 +106,97 @@ export function GitLabSyncSyncForm({
     <>
       {/* Branch Selection */}
       <div className="space-y-2">
-        <Label htmlFor="sync-branch">Branch</Label>
-        <Input
-          id="sync-branch"
-          type="text"
-          placeholder={createNewBranch ? "feature/my-changes" : defaultBranch}
-          value={branch}
-          onChange={(e) => onBranchChange(e.target.value)}
-          disabled={isProcessing}
-          aria-required="true"
-          aria-invalid={branchNameError ? true : undefined}
-          aria-describedby="sync-branch-help"
-        />
-        <p
-          id="sync-branch-help"
-          className={
-            branchNameError
-              ? "text-xs text-red-800 dark:text-red-200"
-              : "text-xs text-muted-foreground"
-          }
-        >
-          {branchHelp}
-        </p>
-        {operationType === "export" && (
-          <div className="flex items-center justify-between gap-3 pt-1">
-            <Label htmlFor="create-new-branch" className="font-normal">
-              Create new branch
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          {hasBranchControl ? (
+            <Label htmlFor="sync-branch" className="shrink-0">
+              {isExport && createNewBranch ? "New branch name" : "Branch"}
             </Label>
-            <Switch
-              id="create-new-branch"
-              checked={createNewBranch}
-              onCheckedChange={onCreateNewBranchChange}
+          ) : (
+            <span className="text-sm font-medium leading-none shrink-0">
+              Branch
+            </span>
+          )}
+          {isExport &&
+            (createNewBranch ? (
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                className="shrink-0"
+                onClick={() => onCreateNewBranchChange(false)}
+                disabled={isProcessing}
+              >
+                <ArrowLeft aria-hidden="true" />
+                Use existing branch
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                className="shrink-0"
+                onClick={() => onCreateNewBranchChange(true)}
+                disabled={
+                  isProcessing ||
+                  branchesLoading ||
+                  !!branchesError ||
+                  !branches?.length
+                }
+              >
+                <Plus aria-hidden="true" />
+                Create a new branch
+              </Button>
+            ))}
+        </div>
+        {isExport ? (
+          createNewBranch ? (
+            <Input
+              id="sync-branch"
+              type="text"
+              placeholder="feature/my-changes"
+              value={branch}
+              onChange={(e) => onBranchChange(e.target.value)}
               disabled={isProcessing}
+              aria-required="true"
+              aria-invalid={
+                branchNameError || branchAlreadyExists ? true : undefined
+              }
+              aria-describedby="sync-branch-help"
             />
-          </div>
+          ) : (
+            <BranchSelect
+              branch={branch}
+              branches={branches}
+              branchesLoading={branchesLoading}
+              branchesError={branchesError}
+              onBranchesRetry={onBranchesRetry}
+              isProcessing={isProcessing}
+              onBranchChange={onBranchChange}
+            />
+          )
+        ) : (
+          <Input
+            id="sync-branch"
+            type="text"
+            placeholder={defaultBranch}
+            value={branch}
+            onChange={(e) => onBranchChange(e.target.value)}
+            disabled={isProcessing}
+            aria-required="true"
+            aria-describedby="sync-branch-help"
+          />
+        )}
+        {branchHelp && (
+          <p
+            id="sync-branch-help"
+            className={
+              branchNameError || branchAlreadyExists
+                ? "text-xs text-red-800 dark:text-red-200"
+                : "text-xs text-muted-foreground"
+            }
+          >
+            {branchHelp}
+          </p>
         )}
       </div>
 
@@ -195,6 +267,83 @@ export function GitLabSyncSyncForm({
   );
 }
 
+function BranchSelect({
+  branch,
+  branches,
+  branchesLoading,
+  branchesError,
+  onBranchesRetry,
+  isProcessing,
+  onBranchChange,
+}: {
+  branch: string;
+  branches: readonly string[] | undefined;
+  branchesLoading: boolean;
+  branchesError: Error | null;
+  onBranchesRetry: () => void;
+  isProcessing: boolean;
+  onBranchChange: (value: string) => void;
+}) {
+  if (branchesLoading) {
+    return (
+      <p className="text-sm text-muted-foreground" aria-live="polite">
+        Loading branches…
+      </p>
+    );
+  }
+
+  if (branchesError) {
+    return (
+      <div
+        role="alert"
+        className="rounded-md border border-destructive/40 p-3 text-sm text-destructive"
+      >
+        Could not load branches.{" "}
+        <Button
+          type="button"
+          variant="link"
+          className="h-auto p-0"
+          onClick={onBranchesRetry}
+        >
+          Retry
+        </Button>
+      </div>
+    );
+  }
+
+  if (!branches || branches.length === 0) {
+    return (
+      <div className="text-sm text-muted-foreground" aria-live="polite">
+        No branches found. Check that the linked repository has a default
+        branch.{" "}
+        <Button
+          type="button"
+          variant="link"
+          className="h-auto p-0"
+          onClick={onBranchesRetry}
+        >
+          Retry
+        </Button>
+      </div>
+    );
+  }
+
+  const options = branches.map((name) => ({ value: name, label: name }));
+
+  return (
+    <Select
+      id="sync-branch"
+      options={options}
+      value={branch || undefined}
+      onChange={onBranchChange}
+      placeholder="Select branch…"
+      disabled={isProcessing}
+      aria-required="true"
+      aria-label="Branch"
+    />
+  );
+}
+
 function branchHelpText({
   operationType,
   createNewBranch,
@@ -207,15 +356,16 @@ function branchHelpText({
   defaultBranch: string;
   branchNameError: string | null;
   branchAlreadyExists: boolean;
-}): string {
-  if (operationType === "import" || !createNewBranch) {
-    return `The GitLab branch to ${
-      operationType === "export" ? "push to" : "pull from"
-    }.`;
+}): string | null {
+  if (operationType === "import") {
+    return "The GitLab branch to pull from.";
   }
-  if (branchNameError) return branchNameError;
-  if (branchAlreadyExists) {
-    return "This branch already exists. Export will update it.";
+  if (createNewBranch) {
+    if (branchNameError) return branchNameError;
+    if (branchAlreadyExists) {
+      return "A branch with this name already exists. Choose an existing branch to export to it.";
+    }
+    return `Creates a branch from ${defaultBranch} and commits your changes to it.`;
   }
-  return `A new branch is created from ${defaultBranch} and your labels are committed onto it.`;
+  return null;
 }

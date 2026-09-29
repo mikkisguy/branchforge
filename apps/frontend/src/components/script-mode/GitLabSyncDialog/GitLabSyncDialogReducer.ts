@@ -17,6 +17,8 @@ export type SyncOperationType = "export" | "import";
 export interface SyncFormState {
   userBranch: string | null;
   createNewBranch: boolean;
+  lastExistingBranch: string | null;
+  lastNewBranchName: string;
   commitMessage: string;
   conflictResolution: ConflictResolution;
   showCharacterWizard: boolean;
@@ -26,6 +28,8 @@ export interface SyncFormState {
 export type SyncFormAction =
   | { type: "SET_USER_BRANCH"; value: string | null }
   | { type: "SET_CREATE_NEW_BRANCH"; value: boolean }
+  | { type: "RESET_BRANCH_MODE" }
+  | { type: "RESET_BRANCH_SELECTION" }
   | { type: "SET_COMMIT_MESSAGE"; value: string }
   | { type: "SET_CONFLICT_RESOLUTION"; value: ConflictResolution }
   | {
@@ -40,6 +44,8 @@ export function createInitialSyncFormState(
   return {
     userBranch: null,
     createNewBranch: false,
+    lastExistingBranch: null,
+    lastNewBranchName: "",
     commitMessage: `Sync ${operationType} from BranchForge`,
     conflictResolution: "branchforge_wins",
     showCharacterWizard: false,
@@ -53,9 +59,39 @@ export function syncFormReducer(
 ): SyncFormState {
   switch (action.type) {
     case "SET_USER_BRANCH":
-      return { ...state, userBranch: action.value };
+      return {
+        ...state,
+        userBranch: action.value,
+        lastExistingBranch: state.createNewBranch
+          ? state.lastExistingBranch
+          : action.value,
+        lastNewBranchName: state.createNewBranch
+          ? (action.value ?? "")
+          : state.lastNewBranchName,
+      };
     case "SET_CREATE_NEW_BRANCH":
-      return { ...state, createNewBranch: action.value };
+      return {
+        ...state,
+        createNewBranch: action.value,
+        userBranch: action.value
+          ? state.lastNewBranchName
+          : state.lastExistingBranch,
+      };
+    case "RESET_BRANCH_MODE":
+      return {
+        ...state,
+        createNewBranch: false,
+        userBranch: state.lastExistingBranch,
+        lastNewBranchName: "",
+      };
+    case "RESET_BRANCH_SELECTION":
+      return {
+        ...state,
+        userBranch: null,
+        createNewBranch: false,
+        lastExistingBranch: null,
+        lastNewBranchName: "",
+      };
     case "SET_COMMIT_MESSAGE":
       return { ...state, commitMessage: action.value };
     case "SET_CONFLICT_RESOLUTION":
