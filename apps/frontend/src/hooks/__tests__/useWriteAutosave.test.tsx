@@ -28,6 +28,8 @@ function createLabel(labelId: string, version: number, contentHash: string) {
 
   const detail: LabelDetail = {
     ...base,
+    lineNotes: {},
+    unattachedNotes: [],
     lines: [
       {
         id: `line-${labelId}`,
@@ -118,11 +120,11 @@ describe("useWriteAutosave", () => {
     expect(onUpdateDialogue).toHaveBeenNthCalledWith(
       1,
       "label-1",
-      [{ speakerId: null, text: "Edit 1" }],
-      {
+      [{ clientId: "line-1", speakerId: null, text: "Edit 1" }],
+      expect.objectContaining({
         expectedVersion: 3,
         expectedContentHash: "server-hash-3",
-      }
+      })
     );
 
     await waitFor(() => {
@@ -145,11 +147,11 @@ describe("useWriteAutosave", () => {
     expect(onUpdateDialogue).toHaveBeenNthCalledWith(
       2,
       "label-1",
-      [{ speakerId: null, text: "Edit 2" }],
-      {
+      [{ clientId: "line-1", speakerId: null, text: "Edit 2" }],
+      expect.objectContaining({
         expectedVersion: 4,
         expectedContentHash: "server-hash-4",
-      }
+      })
     );
 
     expect(showErrorToast).not.toHaveBeenCalled();
@@ -208,7 +210,7 @@ describe("useWriteAutosave", () => {
     });
     expect(onUpdateDialogue).toHaveBeenCalledWith(
       "label-shortcut-1",
-      [{ speakerId: null, text: "Saved with Ctrl+S" }],
+      [{ clientId: "line-1", speakerId: null, text: "Saved with Ctrl+S" }],
       expect.objectContaining({
         expectedVersion: 3,
         expectedContentHash: "server-hash-3",
@@ -237,7 +239,7 @@ describe("useWriteAutosave", () => {
     });
     expect(onUpdateDialogue).toHaveBeenCalledWith(
       "label-shortcut-1",
-      [{ speakerId: null, text: "Saved with Meta+S" }],
+      [{ clientId: "line-1", speakerId: null, text: "Saved with Meta+S" }],
       expect.objectContaining({
         expectedVersion: 4,
         expectedContentHash: "server-hash-4",
@@ -338,11 +340,17 @@ describe("useWriteAutosave", () => {
     expect(onUpdateDialogue).toHaveBeenNthCalledWith(
       2,
       "label-1",
-      [{ speakerId: null, text: "Retry with server token" }],
-      {
+      [
+        {
+          clientId: "line-1",
+          speakerId: null,
+          text: "Retry with server token",
+        },
+      ],
+      expect.objectContaining({
         expectedVersion: 9,
         expectedContentHash: "server-hash-9",
-      }
+      })
     );
 
     const refreshedLabel = createLabel("label-1", 10, "server-hash-10");
@@ -653,7 +661,12 @@ describe("useWriteAutosave", () => {
     });
 
     expect(serverEntries!).toEqual([
-      { id: "line-label-1", speakerId: null, text: "Server version" },
+      {
+        id: "line-label-1",
+        labelLineId: "line-label-1",
+        speakerId: null,
+        text: "Server version",
+      },
     ]);
 
     await waitFor(() => {

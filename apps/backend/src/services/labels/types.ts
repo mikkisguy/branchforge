@@ -5,7 +5,11 @@
  */
 
 import type { Label, LabelLine } from "../../db/schema/index.js";
-import type { PublicLabel, IncomingJump } from "@branchforge/shared";
+import type {
+  PublicLabel,
+  IncomingJump,
+  LabelLineNote,
+} from "@branchforge/shared";
 import type { Transaction } from "../../db/types.js";
 
 // Re-export PublicLabel from shared for route handlers
@@ -92,10 +96,14 @@ export interface LabelCharacterWithInfo {
 }
 
 /**
- * Detailed label information with lines and characters
+ * Detailed label information with lines, notes, and characters
  */
 export interface LabelDetail extends PublicLabel {
   lines: LabelLineWithSpeaker[];
+  /** Notes attached to lines, keyed by line ID */
+  lineNotes: Record<string, LabelLineNote>;
+  /** Notes whose line association is currently unresolved */
+  unattachedNotes: LabelLineNote[];
   characters: LabelCharacterWithInfo[];
 }
 

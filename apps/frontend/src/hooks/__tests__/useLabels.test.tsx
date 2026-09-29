@@ -59,6 +59,8 @@ const mockLabels: PublicLabel[] = [
 const mockLabelDetail: LabelDetail = {
   ...mockLabels[0],
   lines: [],
+  lineNotes: {},
+  unattachedNotes: [],
   characters: [],
 };
 

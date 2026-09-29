@@ -15,6 +15,7 @@ export interface DialogueLineProps {
   textareaRef?: (el: HTMLTextAreaElement | null) => void;
   technicalInfo?: DialogueEntry["technicalInfo"];
   showBadges?: boolean;
+  canEditNotes?: boolean;
 }
 
 function isEqualJson(a: unknown, b: unknown): boolean {
@@ -31,6 +32,7 @@ export function areDialogueLinePropsEqual(
     prev.entry.id === next.entry.id &&
     prev.entry.speakerId === next.entry.speakerId &&
     prev.entry.text === next.entry.text &&
+    isEqualJson(prev.entry.note, next.entry.note) &&
     prev.entry.choiceData?.lineId === next.entry.choiceData?.lineId &&
     prev.entry.choiceData?.targetLabelId ===
       next.entry.choiceData?.targetLabelId &&
@@ -51,6 +53,7 @@ export function areDialogueLinePropsEqual(
     prev.layoutMode === next.layoutMode &&
     prev.characters === next.characters &&
     prev.technicalInfo === next.technicalInfo &&
-    prev.showBadges === next.showBadges
+    prev.showBadges === next.showBadges &&
+    prev.canEditNotes === next.canEditNotes
   );
 }

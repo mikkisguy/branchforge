@@ -497,6 +497,7 @@ export function WriteMode({
           activeLabel={activeLabel}
           characters={characters}
           onChange={handleContentChange}
+          canEditNotes={currentProject.visibility === "OWNER"}
           editorSaveState={editorSaveState}
           onReloadScene={handleReloadScene}
           onDiscardDraft={handleDiscardDraft}

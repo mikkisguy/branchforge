@@ -7,6 +7,7 @@
 import {
   labels,
   labelLines,
+  labelLineNotes,
   characters,
   projectFiles,
 } from "../../db/schema/index.js";
@@ -78,6 +79,7 @@ export async function reconstructFileForLabel(
   // Join with characters to get Ren'Py tag from speakerId
   const allLabelLines = await db
     .select({
+      id: labelLines.id,
       labelId: labelLines.labelId,
       speakerId: labelLines.speakerId,
       speakerTag: characters.renpyTag,
@@ -99,10 +101,34 @@ export async function reconstructFileForLabel(
     )
     .orderBy(asc(labelLines.sequence));
 
+  const scriptNoteRows = await db
+    .select({
+      id: labelLineNotes.id,
+      lineId: labelLineNotes.labelLineId,
+      body: labelLineNotes.body,
+    })
+    .from(labelLineNotes)
+    .where(
+      and(
+        inArray(
+          labelLineNotes.labelId,
+          allLabels.map((label) => label.id)
+        ),
+        eq(labelLineNotes.storage, "SCRIPT"),
+        isNull(labelLineNotes.deletedAt)
+      )
+    );
+  const lineNotes = new Map(
+    scriptNoteRows
+      .filter((note) => note.lineId !== null)
+      .map((note) => [note.lineId!, { id: note.id, body: note.body }])
+  );
+
   // Group lines by labelId in-memory
   const linesByLabelId = new Map<
     string,
     Array<{
+      id: string;
       speaker: string | null;
       content: string;
       contentType: string;
@@ -113,6 +139,7 @@ export async function reconstructFileForLabel(
       linesByLabelId.set(line.labelId, []);
     }
     linesByLabelId.get(line.labelId)!.push({
+      id: line.id,
       // Use Ren'Py speaker tag for script-safe reconstruction
       speaker: line.speakerTag ?? null,
       content: line.content,
@@ -155,6 +182,7 @@ export async function reconstructFileForLabel(
           line.contentType === "DIALOGUE" || line.contentType === "NARRATION"
       )
       .map((line) => ({
+        lineId: line.id,
         speaker: line.speaker,
         text: line.content,
       }));
@@ -190,5 +218,6 @@ export async function reconstructFileForLabel(
     originalContent: reconstructionBaseContent,
     updatedDialogue,
     updatedMenuChoices,
+    lineNotes,
   });
 }

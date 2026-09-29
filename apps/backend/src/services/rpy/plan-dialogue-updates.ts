@@ -31,12 +31,14 @@ export interface PlannedDialogueUpdates {
   /** Existing rows to update (content / speaker) */
   updates: Array<{
     id: string;
+    incomingIndex: number;
     speakerId: string | null;
     text: string;
   }>;
   /** New prose rows to insert at the given sequence */
   inserts: Array<{
     sequence: number;
+    incomingIndex: number;
     speakerId: string | null;
     text: string;
   }>;
@@ -59,9 +61,15 @@ type ProseSlot =
       speakerId: string | null;
       text: string;
       insertIndex: number;
+      incomingIndex: number;
     };
 
-type MergedItem = { key: string; speakerId: string | null; text: string };
+type MergedItem = {
+  key: string;
+  speakerId: string | null;
+  text: string;
+  incomingIndex?: number;
+};
 
 function pushInsert(
   merged: MergedItem[],
@@ -69,6 +77,7 @@ function pushInsert(
 ) {
   merged.push({
     key: `insert:${slot.insertIndex}`,
+    incomingIndex: slot.incomingIndex,
     speakerId: slot.speakerId,
     text: slot.text,
   });
@@ -133,6 +142,7 @@ export function planDialogueLineUpdates(
       const entry = dialogue[op.updatedIndex];
       updates.push({
         id: row.id,
+        incomingIndex: op.updatedIndex,
         speakerId: entry.speakerId,
         text: entry.text,
       });
@@ -150,6 +160,7 @@ export function planDialogueLineUpdates(
       speakerId: entry.speakerId,
       text: entry.text,
       insertIndex: insertCount++,
+      incomingIndex: op.updatedIndex,
     });
   }
 
@@ -282,6 +293,7 @@ export function planDialogueLineUpdates(
     if (item.key.startsWith("insert:")) {
       inserts.push({
         sequence,
+        incomingIndex: item.incomingIndex!,
         speakerId: item.speakerId,
         text: item.text,
       });

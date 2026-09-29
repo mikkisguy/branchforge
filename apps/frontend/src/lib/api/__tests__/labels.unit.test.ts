@@ -52,6 +52,8 @@ describe("Labels API", () => {
   const mockLabelDetail: LabelDetail = {
     ...mockLabel,
     lines: [],
+    lineNotes: {},
+    unattachedNotes: [],
     characters: [],
   };
 

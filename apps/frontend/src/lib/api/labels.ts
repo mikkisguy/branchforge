@@ -10,6 +10,7 @@ import type {
   LabelDetail,
   LabelCharacter,
   VariableCondition,
+  UpdateLabelDialogueEntry,
 } from "@branchforge/shared";
 
 // ============================================================================
@@ -37,6 +38,7 @@ export type UpdateDialogueResponse =
       contentHash: string;
       fileContentHash: string;
       fileUpdatedAt: string;
+      lineIdMapping: Record<string, string>;
     }
   | {
       success: false;
@@ -119,7 +121,7 @@ export const labelsApi = {
    */
   async updateDialogue(
     labelId: string,
-    dialogue: Array<{ speakerId: string | null; text: string }>,
+    dialogue: UpdateLabelDialogueEntry[],
     options?: {
       expectedVersion?: number;
       expectedContentHash?: string;

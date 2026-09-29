@@ -116,3 +116,9 @@ export const projectFileOperationTypeEnum = pgEnum(
 // unlikely to change frequently. If future extensibility requires dynamic source types,
 // consider migrating to a lookup table approach.
 export const fileSourceEnum = pgEnum("file_source", ["GITLAB", "ZIP"]);
+
+// Note storage mode: private to BranchForge, or emitted as tagged Ren'Py comments.
+export const noteStorageEnum = pgEnum("note_storage", [
+  "BRANCHFORGE_ONLY",
+  "SCRIPT",
+]);

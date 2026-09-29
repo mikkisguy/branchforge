@@ -9,13 +9,14 @@ import { getDb } from "../../db/index.js";
 import {
   labels,
   labelLines,
+  labelLineNotes,
   characters,
   projects,
   projectUsers,
   projectFiles,
 } from "../../db/schema/index.js";
 import { eq, and, asc, or, isNull } from "drizzle-orm";
-import type { PublicLabel } from "@branchforge/shared";
+import type { PublicLabel, LabelLineNote } from "@branchforge/shared";
 import { normalizeStatCondition } from "../label-line-mapper.js";
 import { isValidLabelStatus } from "./validation.js";
 import { resolveJumpTargets } from "./jump-targets.js";
@@ -253,27 +254,39 @@ export async function getLabel(
 
   const { label, filePath } = labelResult[0];
 
-  // Fetch label lines, jump-target resolution set, and derived characters
-  // concurrently — all three are independent reads.
-  const [linesResult, allLabels, labelCharactersWithInfo] = await Promise.all([
-    db
-      .select({
-        line: labelLines,
-        speakerName: characters.displayName,
-        speakerTag: characters.renpyTag,
-      })
-      .from(labelLines)
-      .leftJoin(characters, eq(labelLines.speakerId, characters.id))
-      .where(and(eq(labelLines.labelId, labelId), isNull(labelLines.deletedAt)))
-      .orderBy(asc(labelLines.sequence)),
-    db
-      .select({ id: labels.id, labelName: labels.labelName })
-      .from(labels)
-      .where(
-        and(eq(labels.projectId, label.projectId), isNull(labels.deletedAt))
-      ),
-    getDerivedCharactersForLabel(labelId),
-  ]);
+  // Fetch label lines, notes, jump-target resolution set, and derived characters
+  // concurrently — all four are independent reads.
+  const [linesResult, allLabels, labelCharactersWithInfo, notesResult] =
+    await Promise.all([
+      db
+        .select({
+          line: labelLines,
+          speakerName: characters.displayName,
+          speakerTag: characters.renpyTag,
+        })
+        .from(labelLines)
+        .leftJoin(characters, eq(labelLines.speakerId, characters.id))
+        .where(
+          and(eq(labelLines.labelId, labelId), isNull(labelLines.deletedAt))
+        )
+        .orderBy(asc(labelLines.sequence)),
+      db
+        .select({ id: labels.id, labelName: labels.labelName })
+        .from(labels)
+        .where(
+          and(eq(labels.projectId, label.projectId), isNull(labels.deletedAt))
+        ),
+      getDerivedCharactersForLabel(labelId),
+      db
+        .select()
+        .from(labelLineNotes)
+        .where(
+          and(
+            eq(labelLineNotes.labelId, labelId),
+            isNull(labelLineNotes.deletedAt)
+          )
+        ),
+    ]);
 
   // Map results to the expected format
   const lines: LabelLineWithSpeaker[] = linesResult.map((row) => ({
@@ -286,9 +299,33 @@ export async function getLabel(
 
   const resolvedLines = resolveJumpTargets(lines, allLabels);
 
+  const notesByLineId = new Map<string, LabelLineNote>();
+  const unattachedNotes: LabelLineNote[] = [];
+  for (const row of notesResult) {
+    const note: LabelLineNote = {
+      ...row,
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
+    };
+    if (row.labelLineId) {
+      notesByLineId.set(row.labelLineId, note);
+    } else {
+      unattachedNotes.push(note);
+    }
+  }
+
+  const lineNotes: Record<string, LabelLineNote> = {};
+  for (const line of resolvedLines) {
+    if (notesByLineId.has(line.id)) {
+      lineNotes[line.id] = notesByLineId.get(line.id)!;
+    }
+  }
+
   return {
     ...mapToPublicLabel({ ...label, filePath }),
     lines: resolvedLines,
+    lineNotes,
+    unattachedNotes,
     characters: labelCharactersWithInfo,
   };
 }

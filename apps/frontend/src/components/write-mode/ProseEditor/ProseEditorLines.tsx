@@ -6,8 +6,9 @@
 
 import type React from "react";
 import { DialogueLine } from "../DialogueLine";
+import { UnattachedNotes } from "./UnattachedNotes";
 import type { DialogueEntry } from "@/lib/prose-types";
-import type { Character } from "@branchforge/shared";
+import type { Character, LabelLineNote } from "@branchforge/shared";
 import type { LineLayoutMode } from "./ProseEditor";
 
 interface ProseEditorLinesProps {
@@ -15,6 +16,8 @@ interface ProseEditorLinesProps {
   characters: Character[];
   layoutMode: LineLayoutMode;
   showBadges: boolean;
+  canEditNotes: boolean;
+  unattachedNotes: LabelLineNote[];
   isFocusMode: boolean;
   textareaRefs: React.MutableRefObject<Map<number, HTMLTextAreaElement> | null>;
   getTechnicalInfoForLine: (entryId: string) => DialogueEntry["technicalInfo"];
@@ -33,6 +36,8 @@ export function ProseEditorLines({
   characters,
   layoutMode,
   showBadges,
+  canEditNotes,
+  unattachedNotes,
   isFocusMode,
   textareaRefs,
   getTechnicalInfoForLine,
@@ -50,6 +55,17 @@ export function ProseEditorLines({
       }`}
     >
       <div className="mx-auto w-full max-w-[75ch] space-y-1 pb-20">
+        <UnattachedNotes
+          notes={unattachedNotes}
+          entries={entries}
+          canEdit={canEditNotes}
+          onAttach={(index, note) =>
+            onEntryChange(index, {
+              ...entries[index],
+              note: { id: note.id, text: note.body, storage: note.storage },
+            })
+          }
+        />
         {entries.map((entry, index) => {
           const technicalInfo = getTechnicalInfoForLine(entry.id);
           return (
@@ -67,6 +83,7 @@ export function ProseEditorLines({
               onAddLine={() => onAddLine(index)}
               technicalInfo={technicalInfo}
               showBadges={showBadges}
+              canEditNotes={canEditNotes}
               textareaRef={(el: HTMLTextAreaElement | null) => {
                 if (el) {
                   textareaRefs.current!.set(index, el);

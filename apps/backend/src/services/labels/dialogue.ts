@@ -12,10 +12,11 @@ import { getDb } from "../../db/index.js";
 import {
   labels,
   labelLines,
+  labelLineNotes,
   projectFiles,
   characters,
 } from "../../db/schema/index.js";
-import { eq, asc, inArray, isNull, and, sql } from "drizzle-orm";
+import { eq, asc, inArray, isNull, isNotNull, and, sql } from "drizzle-orm";
 import { calculateLinesHash, calculateContentHash } from "../../lib/hash.js";
 import { updateAuditFields } from "../../lib/audit.js";
 import {
@@ -26,6 +27,7 @@ import type { UpdateLabelDialogueInput } from "../../lib/validation.js";
 import { requireProjectOwnership } from "../authz.service.js";
 import { planDialogueLineUpdates } from "../rpy/plan-dialogue-updates.js";
 import { reconstructFileForLabel } from "./reconstruct.js";
+import { applyNoteChanges, type LineNoteChange } from "./notes.js";
 
 // ============================================================================
 // Types
@@ -41,6 +43,7 @@ export type UpdateLabelDialogueResult =
       contentHash: string;
       fileContentHash: string;
       fileUpdatedAt: string;
+      lineIdMapping: Record<string, string>;
     }
   | {
       type: "conflict";
@@ -229,8 +232,127 @@ export async function updateLabelDialogue(params: {
       .where(and(eq(labelLines.labelId, labelId), isNull(labelLines.deletedAt)))
       .orderBy(asc(labelLines.sequence));
 
+    const existingProse = existingLines.filter(
+      (line) =>
+        line.contentType === "DIALOGUE" || line.contentType === "NARRATION"
+    );
+    const proseUnchanged =
+      existingProse.length === dialogue.length &&
+      dialogue.every(
+        (entry, index) =>
+          entry.speakerId === existingProse[index].speakerId &&
+          entry.text === existingProse[index].content &&
+          (!entry.lineId || entry.lineId === existingProse[index].id)
+      );
+    const existingMenus = new Map(
+      existingLines
+        .filter((line) => line.contentType === "MENU")
+        .map((line) => [line.id, line.menuOptions])
+    );
+    const menusUnchanged = (menuBlocks ?? []).every(
+      (block) =>
+        existingMenus.has(block.lineId) &&
+        JSON.stringify(existingMenus.get(block.lineId)) ===
+          JSON.stringify(block.menuOptions)
+    );
+    const lineIdMapping: Record<string, string> = {};
+
+    // Notes alone use the same autosave endpoint, but private notes must not
+    // rewrite the script or mark prose rows as dirty.
+    if (proseUnchanged && menusUnchanged) {
+      const noteChanges: LineNoteChange[] = [];
+      dialogue.forEach((entry, index) => {
+        const lineId = existingProse[index].id;
+        if (entry.clientId) lineIdMapping[entry.clientId] = lineId;
+        if (entry.note !== undefined) {
+          noteChanges.push({ lineId, note: entry.note });
+        }
+      });
+      const noteResult = await applyNoteChanges(tx, labelId, noteChanges);
+      if (!noteResult.changed) {
+        return {
+          type: "success" as const,
+          version: lockedCurrentVersion,
+          contentHash: lockedLabel.contentHash ?? "",
+          fileContentHash: lockedProjectFile.contentHash,
+          fileUpdatedAt: lockedProjectFile.updatedAt.toISOString(),
+          lineIdMapping,
+        };
+      }
+
+      const auditFields = updateAuditFields(lockedCurrentVersion, userId);
+      await tx
+        .update(labels)
+        .set({
+          ...auditFields,
+          ...(noteResult.scriptChanged
+            ? { syncStatus: "MODIFIED_LOCAL" as const }
+            : {}),
+          updatedAt: new Date(),
+        })
+        .where(eq(labels.id, labelId));
+
+      if (!noteResult.scriptChanged) {
+        return {
+          type: "success" as const,
+          version: auditFields.version ?? lockedCurrentVersion,
+          contentHash: lockedLabel.contentHash ?? "",
+          fileContentHash: lockedProjectFile.contentHash,
+          fileUpdatedAt: lockedProjectFile.updatedAt.toISOString(),
+          lineIdMapping,
+        };
+      }
+
+      const content = await reconstructFileForLabel(lockedProjectFile.id, tx);
+      const fileUpdatedAt = new Date();
+      const fileContentHash = calculateContentHash(content);
+      await tx
+        .update(projectFiles)
+        .set({
+          content,
+          contentHash: fileContentHash,
+          updatedAt: fileUpdatedAt,
+        })
+        .where(eq(projectFiles.id, lockedProjectFile.id));
+      return {
+        type: "success" as const,
+        version: auditFields.version ?? lockedCurrentVersion,
+        contentHash: lockedLabel.contentHash ?? "",
+        fileContentHash,
+        fileUpdatedAt: fileUpdatedAt.toISOString(),
+        lineIdMapping,
+      };
+    }
+
     // 9. Align prose against the incoming list so mid-list inserts/deletes keep
     //    VISUAL/MENU rows interleaved correctly (not appended at max sequence).
+    const oldNotes = await tx
+      .select()
+      .from(labelLineNotes)
+      .where(
+        and(
+          eq(labelLineNotes.labelId, labelId),
+          isNotNull(labelLineNotes.labelLineId),
+          isNull(labelLineNotes.deletedAt)
+        )
+      );
+    const oldNotesByLineId = new Map(
+      oldNotes.map((note) => [note.labelLineId!, note])
+    );
+    // Detach before replacing rows, then restore each note to its incoming
+    // line. A line removed from the draft leaves its note unattached.
+    if (oldNotes.length > 0) {
+      await tx
+        .update(labelLineNotes)
+        .set({ labelLineId: null })
+        .where(
+          and(
+            eq(labelLineNotes.labelId, labelId),
+            isNotNull(labelLineNotes.labelLineId),
+            isNull(labelLineNotes.deletedAt)
+          )
+        );
+    }
     const plan = planDialogueLineUpdates(
       existingLines.map((line) => ({
         id: line.id,
@@ -268,23 +390,38 @@ export async function updateLabelDialogue(params: {
       )
     );
 
+    const persistedByIncomingIndex = new Map<number, string>(
+      plan.updates.map((update) => [update.incomingIndex, update.id])
+    );
+
     // 12. Insert new prose rows at planned sequences
     if (plan.inserts.length > 0) {
-      await tx.insert(labelLines).values(
-        plan.inserts.map((insert) => ({
-          labelId,
-          sequence: insert.sequence,
-          contentType: (insert.speakerId ? "DIALOGUE" : "NARRATION") as
-            "DIALOGUE" | "NARRATION",
-          content: insert.text,
-          speakerId: insert.speakerId,
-          demoNotes: null,
-          isDirty: true,
-          projectFileId: lockedProjectFile.id,
-          contentHash: calculateContentHash(insert.text),
-          lastSyncedHash: null,
-        }))
+      const inserted = await tx
+        .insert(labelLines)
+        .values(
+          plan.inserts.map((insert) => ({
+            labelId,
+            sequence: insert.sequence,
+            contentType: (insert.speakerId ? "DIALOGUE" : "NARRATION") as
+              "DIALOGUE" | "NARRATION",
+            content: insert.text,
+            speakerId: insert.speakerId,
+            demoNotes: null,
+            isDirty: true,
+            projectFileId: lockedProjectFile.id,
+            contentHash: calculateContentHash(insert.text),
+            lastSyncedHash: null,
+          }))
+        )
+        .returning({ id: labelLines.id, sequence: labelLines.sequence });
+      const idBySequence = new Map(
+        inserted.map((line) => [line.sequence, line.id])
       );
+      for (const insert of plan.inserts) {
+        const id = idBySequence.get(insert.sequence);
+        if (!id) throw new Error("Inserted prose line was not returned");
+        persistedByIncomingIndex.set(insert.incomingIndex, id);
+      }
     }
 
     // 13. Reindex non-prose rows that shifted due to inserts/deletes
@@ -340,6 +477,52 @@ export async function updateLabelDialogue(params: {
       }
     }
 
+    const updateByIncomingIndex = new Map(
+      plan.updates.map((update) => [update.incomingIndex, update.id])
+    );
+    const seenOriginalIds = new Set<string>();
+    const noteChanges: LineNoteChange[] = [];
+    for (let index = 0; index < dialogue.length; index++) {
+      const entry = dialogue[index];
+      const lineId = persistedByIncomingIndex.get(index);
+      if (!lineId) throw new Error("Prose line mapping is incomplete");
+      if (entry.clientId) lineIdMapping[entry.clientId] = lineId;
+
+      const originalId = entry.lineId ?? updateByIncomingIndex.get(index);
+      if (originalId) {
+        if (seenOriginalIds.has(originalId)) {
+          throw new ValidationError("Duplicate prose line ID");
+        }
+        seenOriginalIds.add(originalId);
+      }
+      const previousNote = originalId
+        ? oldNotesByLineId.get(originalId)
+        : undefined;
+      if (entry.note === null) {
+        if (previousNote) {
+          await tx
+            .update(labelLineNotes)
+            .set({ deletedAt: new Date(), updatedAt: new Date() })
+            .where(eq(labelLineNotes.id, previousNote.id));
+        }
+      } else if (entry.note) {
+        noteChanges.push({
+          lineId,
+          note: { ...entry.note, id: entry.note.id ?? previousNote?.id },
+        });
+      } else if (previousNote) {
+        noteChanges.push({
+          lineId,
+          note: {
+            id: previousNote.id,
+            text: previousNote.body,
+            storage: previousNote.storage,
+          },
+        });
+      }
+    }
+    await applyNoteChanges(tx, labelId, noteChanges);
+
     // 15. Compute content hash from the actual persisted label_lines
     //     (includes MENU/JUMP rows preserved during prose edits) so the hash
     //     stays consistent with sync/import flows that use calculateLinesHash.
@@ -383,6 +566,7 @@ export async function updateLabelDialogue(params: {
       contentHash,
       fileContentHash: newContentHash,
       fileUpdatedAt: fileUpdatedAt.toISOString(),
+      lineIdMapping,
     };
   });
 }

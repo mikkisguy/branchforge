@@ -128,13 +128,26 @@ const menuBlockSchema = z
   })
   .strict();
 
+const updateLabelDialogueNoteSchema = z
+  .object({
+    id: z.string().uuid().optional(),
+    text: z.string().trim().min(1, "Note text cannot be empty"),
+    storage: z.enum(["BRANCHFORGE_ONLY", "SCRIPT"]),
+  })
+  .strict();
+
 export const updateLabelDialogueBodySchema = z
   .object({
     dialogue: z.array(
       z
         .object({
+          clientId: z.string().trim().min(1).optional(),
+          lineId: z.string().uuid().optional(),
           speakerId: z.string().uuid().nullable(),
           text: z.string().trim().min(1, "Dialogue text cannot be empty"),
+          note: z
+            .union([updateLabelDialogueNoteSchema, z.literal(null)])
+            .optional(),
         })
         .strict()
     ),

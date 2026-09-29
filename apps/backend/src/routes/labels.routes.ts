@@ -189,6 +189,7 @@ async function updateLabelDialogueHandler(
       contentHash: result.contentHash,
       fileContentHash: result.fileContentHash,
       fileUpdatedAt: result.fileUpdatedAt,
+      lineIdMapping: result.lineIdMapping,
     });
   } catch (error) {
     request.log.error(error);
