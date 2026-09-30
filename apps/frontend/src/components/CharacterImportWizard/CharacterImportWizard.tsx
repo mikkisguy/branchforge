@@ -82,6 +82,7 @@ export function CharacterImportWizard({
   );
 
   const excludedTagSet = useMemo(() => new Set(excludedTags), [excludedTags]);
+  const narratorTagSet = useMemo(() => new Set(narratorTags), [narratorTags]);
 
   const handleImport = useCallback(async () => {
     dispatch({ type: "SET_IMPORTING", value: true });
@@ -98,11 +99,15 @@ export function CharacterImportWizard({
         isNarrator: c.isNarrator ?? false,
         nameType: c.nameType,
       }));
+      const detectedByTag = new Map<string, DetectedCharacter>();
+      for (const character of detectedCharacters) {
+        if (!detectedByTag.has(character.tag)) {
+          detectedByTag.set(character.tag, character);
+        }
+      }
       for (const c of state.groups.existing) {
         if (state.approvedUpdates.has(c.tag) && !excludedTagSet.has(c.tag)) {
-          const detected = detectedCharacters.find(
-            (char) => char.tag === c.tag
-          );
+          const detected = detectedByTag.get(c.tag);
           importData.push({
             tag: c.tag,
             name: c.detectedName,
@@ -306,7 +311,7 @@ export function CharacterImportWizard({
                     data-testid={`already-imported-badge-${char.tag}`}
                   >
                     <span className="font-mono">{char.tag}</span>
-                    {narratorTags.includes(char.tag) && (
+                    {narratorTagSet.has(char.tag) && (
                       <span className="ml-2 text-muted-foreground">
                         Narrator
                       </span>
