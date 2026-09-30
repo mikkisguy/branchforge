@@ -6,7 +6,6 @@ import {
   ChevronUp,
   BookOpen,
 } from "lucide-react";
-import { useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { getNameTypeBadge, type EditableCharacter } from "./wizard-store";
@@ -22,7 +21,6 @@ interface WizardNewCharactersProps {
     updates: Partial<EditableCharacter>
   ) => void;
   isImporting: boolean;
-  existingTags: string[];
 }
 
 export function WizardNewCharacters({
@@ -31,10 +29,7 @@ export function WizardNewCharacters({
   onToggle,
   updateCharacter,
   isImporting,
-  existingTags,
 }: WizardNewCharactersProps) {
-  const existingTagSet = useMemo(() => new Set(existingTags), [existingTags]);
-
   return (
     <div className="border border-border/30 rounded-md overflow-hidden">
       <button
@@ -90,15 +85,6 @@ export function WizardNewCharacters({
                       >
                         <BookOpen className="size-3" />
                         Narrator
-                      </span>
-                    )}
-                    {existingTagSet.has(char.tag) && (
-                      <span
-                        className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs rounded bg-muted text-muted-foreground border border-border/30"
-                        title="This character is already in the database. Re-confirming will update it (idempotent upsert)."
-                        data-testid={`already-imported-badge-${char.tag}`}
-                      >
-                        Already imported
                       </span>
                     )}
                     {badge && (

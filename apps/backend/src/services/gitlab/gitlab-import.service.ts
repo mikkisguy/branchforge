@@ -26,7 +26,10 @@ import {
 } from "../rpy-parser.service.js";
 import { updateIncomingJumpsForLabels } from "../labels.service.js";
 import { calculateLinesHash, calculateContentHash } from "../../lib/hash.js";
-import { type DetectedCharacter } from "../character-parser.service.js";
+import {
+  characterParserService,
+  type DetectedCharacter,
+} from "../character-parser.service.js";
 import type {
   ConflictResolution,
   SyncOperation,
@@ -35,7 +38,6 @@ import type {
 import {
   extractAndStripRpySymbols,
   DEFAULT_EXCLUDED_RENPY_TAGS,
-  type DetectedCharacterStatement,
   type DetectedDefaultStatement,
 } from "../rpy-statements.service.js";
 import { mapEntriesToLabelLineValues } from "../label-line-mapper.js";
@@ -66,6 +68,7 @@ import {
   NotFoundError,
   ConflictError,
 } from "../../middleware/error-handler.middleware.js";
+import type { DetectCharactersResponse } from "@branchforge/shared";
 
 /**
  * Helper function to fetch characters and build a Map of renpyTag -> id
@@ -234,6 +237,18 @@ export async function importFromGitlab(
   const operation = await createSyncOperation(projectId, "IMPORT", branch);
 
   try {
+    // Get project settings for excluded/narrator tags (used for character review)
+    const [settings] = await db
+      .select()
+      .from(projectSettings)
+      .where(eq(projectSettings.projectId, projectId))
+      .limit(1);
+
+    const excludedTags = new Set(
+      settings?.excludedCharacterTags || DEFAULT_EXCLUDED_RENPY_TAGS
+    );
+    const narratorTags = settings?.narratorCharacterTags || [];
+
     // Get the commit SHA for this branch at import time (non-fatal — metadata only)
     let importCommitSha: string | null = null;
     try {
@@ -260,7 +275,21 @@ export async function importFromGitlab(
     );
 
     if (rpyFiles.length === 0) {
-      // No files to import - mark as completed
+      // No files to import - mark as completed and return a character review
+      // based on the current pre-pull state.
+      const prePullCharacters = await db
+        .select()
+        .from(characters)
+        .where(eq(characters.projectId, projectId));
+
+      const characterReview: DetectCharactersResponse = {
+        characters: [],
+        excludedTags: Array.from(excludedTags),
+        narratorCharacterTags: narratorTags,
+        existingTags: prePullCharacters.map((c) => c.renpyTag),
+        conflicts: [],
+      };
+
       await updateSyncOperation(operation.id, {
         status: "COMPLETED",
         conflictCount: 0,
@@ -270,22 +299,12 @@ export async function importFromGitlab(
         ...operation,
         status: "COMPLETED",
         conflictCount: 0,
+        detectedCharacters: [],
+        characterReview,
       };
     }
 
     let conflictCount = 0;
-    let detectedCharacters: DetectedCharacter[] = [];
-
-    // Get project settings for excluded tags (for character import)
-    const [settings] = await db
-      .select()
-      .from(projectSettings)
-      .where(eq(projectSettings.projectId, projectId))
-      .limit(1);
-
-    const excludedTags = new Set(
-      settings?.excludedCharacterTags || DEFAULT_EXCLUDED_RENPY_TAGS
-    );
 
     // Fetch file contents (with true per-file metadata) in parallel with
     // concurrency limit. All fetches must succeed before any DB write.
@@ -383,6 +402,11 @@ export async function importFromGitlab(
       };
     }
 
+    // Character review and auto-promotion state. Populated inside the locked
+    // transaction against pre-pull rows so the response is transient and
+    // consistent.
+    let characterReview: DetectCharactersResponse | undefined;
+
     // Single project-locked transaction: file upserts, symbol promotion,
     // label import, and incoming-jump recompute all commit or roll back
     // together. Conflict resolution is applied consistently to file content
@@ -390,6 +414,14 @@ export async function importFromGitlab(
     await db.transaction(async (tx) => {
       await lockProject(tx, projectId);
       await assertNoPendingStructuralOperations(tx, projectId);
+
+      // Capture pre-pull character rows before any inserts so the review
+      // reflects the state the user will see in the wizard.
+      const prePullCharacters = await tx
+        .select()
+        .from(characters)
+        .where(eq(characters.projectId, projectId));
+      const prePullTagSet = new Set(prePullCharacters.map((c) => c.renpyTag));
 
       const existingRows = await tx
         .select()
@@ -404,10 +436,6 @@ export async function importFromGitlab(
         existingRows.map((row) => [row.filePath, row])
       );
 
-      const extractedCharactersByTag = new Map<
-        string,
-        DetectedCharacterStatement
-      >();
       const extractedVariablesByKey = new Map<
         string,
         DetectedDefaultStatement
@@ -419,6 +447,9 @@ export async function importFromGitlab(
         projectFile: ProjectFile;
         applyLabels: boolean;
       }> = [];
+
+      // Track which accepted files contribute to the character review.
+      const acceptedForCharacterReview: PreparedFile[] = [];
 
       for (const prepared of preparedFiles) {
         const existing = existingByPath.get(prepared.file.path) ?? null;
@@ -516,17 +547,14 @@ export async function importFromGitlab(
 
         filesForLabels.push({ prepared, projectFile, applyLabels });
 
-        // Only promote symbols from files whose content we accepted. Preserving
-        // local Script Mode content must not import remote define/default rows.
+        // Only promote symbols and review characters from files whose content
+        // we accepted. Preserved/rejected files must not leak their definitions.
         if (!applyLabels) {
           continue;
         }
 
-        for (const c of prepared.symbols.characters) {
-          if (!extractedCharactersByTag.has(c.tag)) {
-            extractedCharactersByTag.set(c.tag, c);
-          }
-        }
+        acceptedForCharacterReview.push(prepared);
+
         for (const v of prepared.symbols.variables) {
           if (!extractedVariablesByKey.has(v.key)) {
             extractedVariablesByKey.set(v.key, v);
@@ -539,25 +567,69 @@ export async function importFromGitlab(
         }
       }
 
-      const dedupedCharacters = Array.from(extractedCharactersByTag.values());
-      const dedupedVariables = Array.from(extractedVariablesByKey.values());
-      const dedupedStats = Array.from(extractedStatsByKey.values());
+      // Parse accepted remote content with the enhanced character parser and
+      // deduplicate by first tag in source order.
+      const seenTags = new Set<string>();
+      const acceptedDetectedCharacters: DetectedCharacter[] = [];
+      for (const prepared of acceptedForCharacterReview) {
+        const fileCharacters = characterParserService.parseWithExclusions(
+          prepared.content,
+          prepared.file.path,
+          excludedTags
+        );
+        for (const char of fileCharacters) {
+          if (!seenTags.has(char.tag)) {
+            seenTags.add(char.tag);
+            acceptedDetectedCharacters.push(char);
+          }
+        }
+      }
 
-      for (const c of dedupedCharacters) {
+      // Build the transient character review against pre-pull rows.
+      const conflicts = characterParserService.detectConflicts(
+        acceptedDetectedCharacters,
+        prePullCharacters.map((c) => ({
+          renpyTag: c.renpyTag,
+          name: c.name,
+          displayName: c.displayName,
+          color: c.color,
+          nameType: c.nameType,
+        }))
+      );
+
+      characterReview = {
+        characters: acceptedDetectedCharacters,
+        excludedTags: Array.from(excludedTags),
+        narratorCharacterTags: narratorTags,
+        existingTags: prePullCharacters.map((c) => c.renpyTag),
+        conflicts,
+      };
+
+      // Auto-promote newly detected characters using the enhanced source
+      // nameType and displayName, but never update existing rows.
+      for (const char of acceptedDetectedCharacters) {
+        if (prePullTagSet.has(char.tag)) {
+          continue;
+        }
         await tx
           .insert(characters)
           .values({
             projectId,
-            name: c.name ?? c.tag,
-            displayName: c.name ?? c.tag,
-            renpyTag: c.tag,
-            color: c.color || "#cfcfcf",
+            name: char.name ?? char.tag,
+            displayName: char.displayName || char.name || char.tag,
+            nameType: char.nameType,
+            renpyTag: char.tag,
+            color: char.color || "#cfcfcf",
             updatedAt: new Date(),
           })
           .onConflictDoNothing({
             target: [characters.projectId, characters.renpyTag],
           });
       }
+
+      const dedupedVariables = Array.from(extractedVariablesByKey.values());
+      const dedupedStats = Array.from(extractedStatsByKey.values());
+
       for (const v of dedupedVariables) {
         await tx
           .insert(variables)
@@ -714,32 +786,9 @@ export async function importFromGitlab(
       await updateIncomingJumpsForLabels(tx, allLabelIds, projectId);
     });
 
-    // Collect detected characters for return value (wizard still handles import).
-    const allDetected: DetectedCharacter[] = [];
-    for (const prepared of preparedFiles) {
-      allDetected.push(
-        ...prepared.parsed.characters.map((c) => ({
-          tag: c.tag,
-          name: c.name || null,
-          displayName: c.name || c.tag,
-          color: c.color || "#cfcfcf",
-          isSpecial: false,
-          sourceFile: "",
-          confidence: 1,
-          nameType: "literal" as const,
-        }))
-      );
-    }
-
-    const seenTags = new Set<string>();
-    const uniqueCharacters: DetectedCharacter[] = [];
-    for (const char of allDetected) {
-      if (!seenTags.has(char.tag) && !excludedTags.has(char.tag)) {
-        seenTags.add(char.tag);
-        uniqueCharacters.push(char);
-      }
-    }
-    detectedCharacters = uniqueCharacters;
+    // The accepted enhanced parser output is the canonical detectedCharacters
+    // result for this sync.
+    const detectedCharacters = characterReview?.characters ?? [];
 
     await updateSyncOperation(operation.id, {
       status: "COMPLETED",
@@ -751,6 +800,7 @@ export async function importFromGitlab(
       status: "COMPLETED",
       conflictCount,
       detectedCharacters,
+      characterReview,
     };
   } catch (error) {
     // Mark operation as failed

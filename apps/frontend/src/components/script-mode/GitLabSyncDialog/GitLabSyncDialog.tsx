@@ -18,7 +18,6 @@ import { gitlabApi } from "@/lib/api/gitlab";
 import { characterKeys, gitlabKeys, projectFilesKeys } from "@/lib/query-keys";
 import { formatGitLabSyncError } from "@/lib/format-gitlab-sync-error";
 import { CharacterImportWizard } from "@/components/CharacterImportWizard/CharacterImportWizard.lazy";
-import { charactersApi } from "@/lib/api/characters";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { GitLabSyncDialogProgress } from "./GitLabSyncDialogProgress";
@@ -210,23 +209,20 @@ export function GitLabSyncDialog({
         });
       }
 
-      // For import operations, show the character wizard if any
-      // characters were detected.
-      if (operationType === "import") {
-        try {
-          const detectionResult =
-            await charactersApi.detectCharacters(projectId);
-
-          if (detectionResult.characters.length > 0) {
-            dispatch({
-              type: "SET_CHARACTER_WIZARD",
-              show: true,
-              characters: detectionResult,
-            });
-            return;
-          }
-        } catch (err) {
-          console.error("Failed to detect characters:", err);
+      // Review only definitions accepted by this pull, against its pre-pull state.
+      const characterReview = result.characterReview;
+      if (operationType === "import" && characterReview) {
+        const existingTags = new Set(characterReview.existingTags);
+        const needsReview =
+          characterReview.conflicts.length > 0 ||
+          characterReview.characters.some((c) => !existingTags.has(c.tag));
+        if (needsReview) {
+          dispatch({
+            type: "SET_CHARACTER_WIZARD",
+            show: true,
+            characters: characterReview,
+          });
+          return;
         }
       }
 

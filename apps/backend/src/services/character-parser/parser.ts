@@ -1,9 +1,10 @@
 import { DEFAULT_EXCLUDED_TAGS } from "./constants.js";
 import type { DefaultExcludedTag } from "./constants.js";
-import { normalizeColor, extractColor } from "./color.js";
+import { normalizeColor, canonicalizeColor, extractColor } from "./color.js";
 import {
   resolveNameFromSource,
   buildDetectedCharacter,
+  inferNameTypeFromStoredName,
 } from "./name-resolution.js";
 import { parseCharacterLine } from "./matchers.js";
 import type {
@@ -13,6 +14,10 @@ import type {
   CharacterConflict,
   CharacterParseResult,
 } from "./types.js";
+import {
+  isValidCharacterNameType,
+  type CharacterNameType,
+} from "@branchforge/shared";
 
 /**
  * Character Parser Service
@@ -165,15 +170,20 @@ class CharacterParserService {
   }
 
   /**
-   * Detect conflicts between detected and existing characters
+   * Detect conflicts between detected and existing characters.
+   *
+   * Compares the semantic source name, nameType, and color. UI-only
+   * displayName differences are ignored. Colors are compared after
+   * normalizing case and short hex expansion.
    */
   detectConflicts(
     detected: DetectedCharacter[],
     existing: Array<{
       renpyTag: string;
-      name: string;
+      name: string | null;
       displayName: string;
       color: string;
+      nameType?: CharacterNameType | string | null;
     }>
   ): CharacterConflict[] {
     const conflicts: CharacterConflict[] = [];
@@ -183,25 +193,78 @@ class CharacterParserService {
       const existingChar = existingByTag.get(detectedChar.tag);
 
       if (existingChar) {
-        // Check for differences
-        const nameMismatch = detectedChar.name !== existingChar.name;
-        const displayNameMismatch =
-          detectedChar.displayName !== existingChar.displayName;
-        const colorMismatch = detectedChar.color !== existingChar.color;
+        const existingNameType = this.resolveExistingNameType(
+          existingChar.name,
+          existingChar.nameType
+        );
 
-        if (nameMismatch || displayNameMismatch || colorMismatch) {
+        const changedFields: Array<"name" | "nameType" | "color"> = [];
+
+        const existingSourceName =
+          existingNameType === "none"
+            ? null
+            : existingNameType === "empty"
+              ? ""
+              : existingChar.name;
+        const nameMismatch = detectedChar.name !== existingSourceName;
+        const nameTypeMismatch = detectedChar.nameType !== existingNameType;
+        const colorMismatch =
+          canonicalizeColor(detectedChar.color) !==
+          canonicalizeColor(existingChar.color);
+
+        if (nameMismatch) changedFields.push("name");
+        if (nameTypeMismatch) changedFields.push("nameType");
+        if (colorMismatch) changedFields.push("color");
+
+        if (nameMismatch || nameTypeMismatch || colorMismatch) {
           conflicts.push({
             tag: detectedChar.tag,
             detectedName: detectedChar.name,
-            existingName: existingChar.name,
+            existingName: existingChar.name ?? existingChar.renpyTag,
             detectedColor: detectedChar.color,
             existingColor: existingChar.color,
+            detectedNameType: detectedChar.nameType,
+            existingNameType: existingNameType,
+            existingDisplayName: existingChar.displayName,
+            changedFields,
           });
         }
       }
     }
 
     return conflicts;
+  }
+
+  /**
+   * Resolve the semantic nameType for a stored character.
+   *
+   * - `null` name is always "none".
+   * - `""` name is always "empty".
+   * - Legacy rows that stored "literal" for a dynamic name have their
+   *   nameType inferred from the stored name.
+   * - Otherwise the stored (or inferred) nameType is returned.
+   */
+  private resolveExistingNameType(
+    name: string | null,
+    storedNameType: CharacterNameType | string | null | undefined
+  ): CharacterNameType {
+    if (name === null) return "none";
+    if (name === "") return "empty";
+
+    const inferred = inferNameTypeFromStoredName(name);
+
+    if (storedNameType === "literal" && inferred !== "literal") {
+      return inferred;
+    }
+
+    if (
+      typeof storedNameType === "string" &&
+      isValidCharacterNameType(storedNameType)
+    ) {
+      return storedNameType;
+    }
+
+    return inferred;
   }
 
   /**

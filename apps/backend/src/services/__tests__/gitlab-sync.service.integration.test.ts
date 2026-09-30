@@ -43,6 +43,7 @@ import {
   exportToGitlab,
   importFromGitlab,
 } from "../gitlab-sync.service.js";
+import { charactersService } from "../characters.service.js";
 import type { ConflictResolution } from "../gitlab.types.js";
 import { testEmail, testUuid } from "../../utils/test-ids.js";
 import { calculateContentHash } from "../../lib/hash.js";
@@ -803,7 +804,7 @@ describe("GitLabSyncService (Integration)", () => {
         .mockResolvedValue("commit-managed");
 
       const first = await exportToGitlab(testProjectId, testUserId, testBranch);
-      expect(first.status).toBe("COMPLETED");
+      expect(first.status, first.errorMessage ?? undefined).toBe("COMPLETED");
       expect(commitSpy.mock.calls[0]?.[4]).toEqual(
         expect.arrayContaining([
           { action: "update", filePath: sourcePath, content: cleaned },
@@ -1969,6 +1970,226 @@ describe("GitLabSyncService (Integration)", () => {
   });
 
   describe("importFromGitlab", () => {
+    function mockCharacterPull(content: string) {
+      vi.spyOn(gitlabRepoService, "listRpyFiles").mockResolvedValue([
+        { name: "script.rpy", path: "game/script.rpy" },
+      ]);
+      vi.spyOn(
+        gitlabRepoService,
+        "getFileContentWithMetadata"
+      ).mockResolvedValue({
+        content,
+        lastCommitId: "character-review-rev",
+        contentSha256: null,
+        blobId: null,
+      });
+      vi.spyOn(rpyParserService, "parseRPYFileWithLabels").mockReturnValue({
+        labels: [],
+        characters: [],
+        fileType: "SETTINGS",
+      });
+    }
+
+    it("reviews auto-promoted discoveries against pre-pull rows and keeps repeated pulls unchanged", async () => {
+      const content = 'define boss = Character(boss_name, color="#ABC")\n';
+      mockCharacterPull(content);
+      const first = await importFromGitlab(
+        testProjectId,
+        testUserId,
+        testBranch,
+        "gitlab_wins"
+      );
+      expect(first.status, first.errorMessage ?? undefined).toBe("COMPLETED");
+      expect(first.characterReview).toMatchObject({
+        existingTags: [],
+        conflicts: [],
+        characters: [
+          expect.objectContaining({ tag: "boss", nameType: "variable" }),
+        ],
+      });
+      const [stored] = await db
+        .select()
+        .from(characters)
+        .where(eq(characters.projectId, testProjectId));
+      expect(stored).toMatchObject({
+        name: "boss_name",
+        nameType: "variable",
+        color: "#AABBCC",
+      });
+      await db
+        .update(characters)
+        .set({
+          displayName: "Custom boss",
+          isNarrator: true,
+          isLoveInterest: true,
+        })
+        .where(eq(characters.id, stored.id));
+      const repeated = await importFromGitlab(
+        testProjectId,
+        testUserId,
+        testBranch,
+        "gitlab_wins"
+      );
+      expect(repeated.characterReview).toMatchObject({
+        existingTags: ["boss"],
+        conflicts: [],
+      });
+      const [preserved] = await db
+        .select()
+        .from(characters)
+        .where(eq(characters.id, stored.id));
+      expect(preserved).toMatchObject({
+        displayName: "Custom boss",
+        isNarrator: true,
+        isLoveInterest: true,
+      });
+    });
+
+    it("shows source differences without applying them during pull", async () => {
+      await db
+        .insert(characters)
+        .values({ ...testCharacter, displayName: "My Sylvie" });
+      mockCharacterPull('define s = Character("Changed", color="#FF0000")\n');
+      const result = await importFromGitlab(
+        testProjectId,
+        testUserId,
+        testBranch,
+        "gitlab_wins"
+      );
+      expect(result.characterReview?.conflicts).toEqual([
+        expect.objectContaining({
+          tag: "s",
+          changedFields: ["name", "color"],
+          existingDisplayName: "My Sylvie",
+          detectedName: "Changed",
+        }),
+      ]);
+      const [stored] = await db
+        .select()
+        .from(characters)
+        .where(eq(characters.id, testCharacter.id));
+      expect(stored).toMatchObject({
+        name: "Sylvie",
+        displayName: "My Sylvie",
+        isLoveInterest: true,
+      });
+    });
+
+    it("omits character definitions from a rejected remote file", async () => {
+      const local = 'label start:\n    "Local edit"\n';
+      await db
+        .update(projectFiles)
+        .set({
+          content: local,
+          contentHash: calculateContentHash(local),
+          lastPushedContentHash: "older",
+          remoteContentHash: "older-remote",
+        })
+        .where(eq(projectFiles.id, testGitlabFileId));
+      mockCharacterPull('define remote_only = Character("Remote")\n');
+      const result = await importFromGitlab(
+        testProjectId,
+        testUserId,
+        testBranch,
+        "branchforge_wins"
+      );
+      expect(result.status, result.errorMessage ?? undefined).toBe("COMPLETED");
+      expect(result.characterReview).toMatchObject({
+        characters: [],
+        conflicts: [],
+      });
+      expect(
+        await db
+          .select()
+          .from(characters)
+          .where(eq(characters.projectId, testProjectId))
+      ).toEqual([]);
+    });
+
+    it.each([
+      {
+        scenario: "accepted raw remote content",
+        conflict: false,
+        diverged: false,
+        expectedTags: ["detected"],
+      },
+      {
+        scenario: "conflicting remote content",
+        conflict: true,
+        diverged: false,
+        expectedTags: [],
+      },
+      {
+        scenario: "remote content that differs from accepted content",
+        conflict: false,
+        diverged: true,
+        expectedTags: [],
+      },
+    ])(
+      "detects safely from $scenario",
+      async ({ conflict, diverged, expectedTags }) => {
+        const remote =
+          'define detected = Character("Detected")\nlabel start:\n    "Remote dialogue"\n';
+        const cleaned = extractAndStripRpySymbols(remote).cleanedContent;
+        const accepted = diverged
+          ? 'label start:\n    "Local dialogue"\n'
+          : cleaned;
+        await db
+          .update(projectFiles)
+          .set({
+            content: accepted,
+            // Detection must compare actual accepted content, not a stale stored hash.
+            contentHash: "stale-hash",
+            remoteContent: remote,
+            originalContent: 'define historical = Character("Historical")\n',
+            hasRemoteConflict: conflict,
+          })
+          .where(eq(projectFiles.id, testGitlabFileId));
+        const result = await charactersService.detectCharacters(
+          testProjectId,
+          testUserId
+        );
+        expect(result.characters.map((c) => c.tag)).toEqual(expectedTags);
+      }
+    );
+
+    it("does not resurrect historical definitions after a cleaned file returns from GitLab", async () => {
+      const cleaned = 'label start:\n    "Cleaned"\n';
+      const original = 'define old = Character("Old")\n' + cleaned;
+      await db
+        .update(projectFiles)
+        .set({
+          content: cleaned,
+          contentHash: calculateContentHash(cleaned),
+          lastPushedContentHash: calculateContentHash(cleaned),
+          originalContent: original,
+          remoteContentHash: calculateContentHash(original),
+        })
+        .where(eq(projectFiles.id, testGitlabFileId));
+      mockCharacterPull(cleaned);
+      const result = await importFromGitlab(
+        testProjectId,
+        testUserId,
+        testBranch,
+        "gitlab_wins"
+      );
+      expect(result.status, result.errorMessage ?? undefined).toBe("COMPLETED");
+      expect(result.characterReview).toMatchObject({
+        characters: [],
+        conflicts: [],
+      });
+      const detection = await charactersService.detectCharacters(
+        testProjectId,
+        testUserId
+      );
+      expect(detection.characters).toEqual([]);
+      const [stored] = await db
+        .select()
+        .from(projectFiles)
+        .where(eq(projectFiles.id, testGitlabFileId));
+      expect(stored.originalContent).toBe(original);
+    });
+
     it("should import files from GitLab", async () => {
       // Mock the GitLab service
       vi.spyOn(gitlabRepoService, "getBranchCommitSha").mockResolvedValue(

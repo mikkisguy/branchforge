@@ -11,6 +11,7 @@ import { getCsrfHeader } from "./csrf";
 import type {
   ProjectFilePendingStructuralSummary,
   ProjectFileOperation,
+  DetectCharactersResponse,
 } from "@branchforge/shared";
 
 // ============================================================================
@@ -42,6 +43,7 @@ export interface SyncOperation {
   errorMessage: string | null;
   startedAt: string;
   completedAt: string | null;
+  characterReview?: DetectCharactersResponse;
   detectedCharacters?: Array<{
     tag: string;
     name: string | null;
