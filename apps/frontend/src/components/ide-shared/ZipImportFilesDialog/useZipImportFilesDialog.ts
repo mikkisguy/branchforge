@@ -105,8 +105,14 @@ export function useZipImportFilesDialog(
     });
 
     try {
+      // The ZIP import can insert characters before detection runs.
+      // Keep the pre-import tags so those discoveries remain reviewable.
+      const existingCharacters = await charactersApi.listCharacters(projectId);
+      if (currentImportId !== importIdRef.current) return;
+      const existingTags = existingCharacters.map((c) => c.renpyTag);
       const result = await projectFilesApi.importZip(projectId, selectedFile, {
         onProgress: (loaded, total) => {
+          if (currentImportId !== importIdRef.current) return;
           const progress = total > 0 ? Math.round((loaded / total) * 100) : 0;
           dispatch({
             type: "UPDATE_UPLOAD_PROGRESS",
@@ -156,7 +162,7 @@ export function useZipImportFilesDialog(
                 excludedTags: detectionResult.excludedTags,
                 narratorCharacterTags: detectionResult.narratorCharacterTags,
                 conflicts: detectionResult.conflicts,
-                existingTags: detectionResult.existingTags,
+                existingTags,
               },
             });
             return;

@@ -15,7 +15,7 @@ export function WizardHeader({
 }: WizardHeaderProps) {
   const subtitle =
     detectedCount > 0
-      ? `Review and approve ${detectedCount} detected character(s)`
+      ? `Review new characters and source definition differences`
       : manualCount > 0
         ? `${manualCount} character(s) added manually`
         : "No characters detected - add them manually";
@@ -27,7 +27,7 @@ export function WizardHeader({
           <User className="size-5 text-primary" />
         </div>
         <div>
-          <h2 className="text-lg font-medium">Import Characters</h2>
+          <h2 className="text-lg font-medium">Review Characters</h2>
           <p className="text-sm text-muted-foreground mt-0.5">{subtitle}</p>
         </div>
       </div>

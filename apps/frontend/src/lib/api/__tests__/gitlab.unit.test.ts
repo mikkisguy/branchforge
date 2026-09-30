@@ -310,6 +310,33 @@ describe("GitLab API Client", () => {
   });
 
   describe("importFromGitlab", () => {
+    it("preserves an expected 409 recovery message", async () => {
+      const message =
+        "Push or discard your structural file changes before pulling from GitLab";
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 409,
+        json: async () => ({ error: "Conflict", message }),
+      } as Response);
+      await expect(
+        gitlabApi.importFromGitlab("project-123", "main", "branchforge_wins")
+      ).rejects.toThrow(message);
+    });
+
+    it("keeps unexpected server details out of the UI", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        json: async () => ({
+          error: "Failed to import from GitLab",
+          message: "Private database details",
+        }),
+      } as Response);
+      await expect(
+        gitlabApi.importFromGitlab("project-123", "main", "branchforge_wins")
+      ).rejects.toThrow("Failed to import from GitLab");
+    });
+
     it("should import from GitLab", async () => {
       const mockOperation = {
         id: "op-123",

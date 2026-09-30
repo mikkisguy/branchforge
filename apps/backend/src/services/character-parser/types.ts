@@ -1,4 +1,6 @@
 import type { CharacterNameType } from "@branchforge/shared";
+import type { CharacterConflict } from "@branchforge/shared";
+export type { CharacterConflict } from "@branchforge/shared";
 
 /**
  * Internal form discriminator for how the name was specified in the source.
@@ -62,17 +64,6 @@ export interface DetectedCharacter {
   isSpecial: boolean; // narration, unknown, etc.
   sourceFile: string;
   confidence: number; // 0-1 for fuzzy matches
-}
-
-/**
- * Conflict between detected and existing character
- */
-export interface CharacterConflict {
-  tag: string;
-  detectedName: string | null;
-  existingName: string;
-  detectedColor: string;
-  existingColor: string;
 }
 
 /**

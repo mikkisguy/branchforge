@@ -35,6 +35,7 @@ import {
   NotFoundError,
   ForbiddenError,
   ValidationError,
+  ConflictError,
 } from "../../middleware/error-handler.middleware.js";
 
 // Mock drizzle-orm's eq function
@@ -574,6 +575,53 @@ describe("GitLab Routes (Integration)", () => {
       expect(response.statusCode).toBe(400);
       expect(response.json()).toMatchObject({
         message: "Invalid request data",
+      });
+    });
+
+    it("should return 409 when structural file changes conflict", async () => {
+      vi.spyOn(gitlabSyncService, "importFromGitlab").mockRejectedValue(
+        new ConflictError(
+          "Push or discard your structural file changes before pulling from GitLab"
+        )
+      );
+
+      const response = await fastify.inject({
+        method: "POST",
+        url: "/api/gitlab/import",
+        payload: {
+          projectId: testProjectId,
+          branch: testBranch,
+          conflictResolution: "branchforge_wins",
+        },
+      });
+
+      expect(response.statusCode).toBe(409);
+      expect(response.json()).toMatchObject({
+        error: "Conflict",
+        message:
+          "Push or discard your structural file changes before pulling from GitLab",
+      });
+    });
+
+    it("should return generic 500 for unknown errors", async () => {
+      vi.spyOn(gitlabSyncService, "importFromGitlab").mockRejectedValue(
+        new Error("Something unexpected happened")
+      );
+
+      const response = await fastify.inject({
+        method: "POST",
+        url: "/api/gitlab/import",
+        payload: {
+          projectId: testProjectId,
+          branch: testBranch,
+          conflictResolution: "branchforge_wins",
+        },
+      });
+
+      expect(response.statusCode).toBe(500);
+      expect(response.json()).toEqual({
+        error: "Failed to import from GitLab",
+        message: "An internal error occurred",
       });
     });
   });

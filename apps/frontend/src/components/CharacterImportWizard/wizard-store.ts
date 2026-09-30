@@ -23,10 +23,11 @@ export interface NewCharacterDraft {
 export interface CharacterGroup {
   new: EditableCharacter[];
   existing: CharacterConflict[];
+  unchanged: DetectedCharacter[];
   special: EditableCharacter[];
 }
 
-export type CharacterGroups = Exclude<keyof CharacterGroup, "existing">;
+export type CharacterGroups = "new" | "special";
 
 export interface WizardState {
   groups: CharacterGroup;
@@ -35,9 +36,11 @@ export interface WizardState {
   isImporting: boolean;
   showAddForm: boolean;
   newCharacter: NewCharacterDraft;
+  approvedUpdates: Set<string>;
 }
 
 export type WizardAction =
+  | { type: "SET_DEFINITION_UPDATE"; tag: string; approved: boolean }
   | {
       type: "UPDATE_CHARACTER";
       group: CharacterGroups;
@@ -63,17 +66,20 @@ function groupCharacters(
   detected: DetectedCharacter[],
   conflicts: CharacterConflict[],
   excludedTags: string[],
-  narratorTags: string[]
+  narratorTags: string[],
+  existingTags: string[]
 ): CharacterGroup {
   const conflictTags = new Set(conflicts.map((c) => c.tag));
   const specialTags = new Set(["n", "u", "narrator", "extend"]);
   const excludedTagSet = new Set(excludedTags);
   const narratorTagSet = new Set(narratorTags);
   const conflictMap = new Map(conflicts.map((c) => [c.tag, c]));
+  const existingTagSet = new Set(existingTags);
 
   const result: CharacterGroup = {
     new: [],
     existing: [],
+    unchanged: [],
     special: [],
   };
 
@@ -93,6 +99,8 @@ function groupCharacters(
       if (conflict) {
         result.existing.push(conflict);
       }
+    } else if (existingTagSet.has(char.tag)) {
+      result.unchanged.push(char);
     } else if (isSpecial) {
       result.special.push(editable);
     } else {
@@ -166,19 +174,22 @@ export function createInitialWizardState(
   detectedCharacters: DetectedCharacter[],
   conflicts: CharacterConflict[],
   excludedTags: string[],
-  narratorTags: string[]
+  narratorTags: string[],
+  existingTags: string[] = []
 ): WizardState {
   return {
     groups: groupCharacters(
       detectedCharacters,
       conflicts,
       excludedTags,
-      narratorTags
+      narratorTags,
+      existingTags
     ),
     linkToLines: true,
     expandedGroups: new Set(["new", "existing", "special"]),
     isImporting: false,
     showAddForm: false,
+    approvedUpdates: new Set(),
     newCharacter: { tag: "", displayName: "", color: randomColor() },
   };
 }
@@ -188,6 +199,12 @@ export function wizardReducer(
   action: WizardAction
 ): WizardState {
   switch (action.type) {
+    case "SET_DEFINITION_UPDATE": {
+      const approvedUpdates = new Set(state.approvedUpdates);
+      if (action.approved) approvedUpdates.add(action.tag);
+      else approvedUpdates.delete(action.tag);
+      return { ...state, approvedUpdates };
+    }
     case "UPDATE_CHARACTER":
       return {
         ...state,

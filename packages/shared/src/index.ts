@@ -1027,6 +1027,10 @@ export interface CharacterConflict {
   existingName: string;
   detectedColor: string;
   existingColor: string;
+  detectedNameType?: CharacterNameType;
+  existingNameType?: CharacterNameType;
+  existingDisplayName?: string;
+  changedFields?: Array<"name" | "nameType" | "color">;
 }
 
 /**
@@ -1037,7 +1041,8 @@ export interface DetectCharactersResponse {
   excludedTags: string[];
   narratorCharacterTags: string[];
   conflicts: CharacterConflict[];
-  existingTags: string[]; // Tags of all characters that exist in database (not just conflicts)
+  /** All existing tags; a sync review uses the snapshot before the pull. */
+  existingTags: string[];
 }
 
 // ============================================================================

@@ -349,3 +349,72 @@ describe("characterParserService", () => {
     });
   });
 });
+
+describe("character source differences", () => {
+  it("ignores BranchForge aliases and equivalent color spellings", () => {
+    const detected = characterParserService.parseFile(
+      'define ne = Character("[persistent.pl_nickname]", color="#ABC")',
+      "characters.rpy"
+    );
+    expect(
+      characterParserService.detectConflicts(detected, [
+        {
+          renpyTag: "ne",
+          name: "[persistent.pl_nickname]",
+          displayName: "My player",
+          color: "#aabbcc",
+          nameType: "interpolated",
+        },
+      ])
+    ).toEqual([]);
+  });
+
+  it.each([
+    ["None", "n", "none"],
+    ['""', "n", "empty"],
+    ["player_name", "player_name", "variable"],
+    ['"[player_name]"', "[player_name]", "interpolated"],
+    ['"{b}Player{/b}"', "{b}Player{/b}", "tagged"],
+  ])("does not flag an unchanged %s name", (source, storedName, nameType) => {
+    const detected = characterParserService.parseFile(
+      `define n = Character(${source}, color="#ffffff")`,
+      "characters.rpy"
+    );
+    expect(
+      characterParserService.detectConflicts(detected, [
+        {
+          renpyTag: "n",
+          name: storedName,
+          nameType,
+          displayName: "Narrator",
+          color: "#FFFFFF",
+        },
+      ])
+    ).toEqual([]);
+  });
+
+  it("reports the precise changed fields while retaining the UI alias", () => {
+    const detected = characterParserService.parseFile(
+      'define e = Character(e_name, color="#ffffff")',
+      "characters.rpy"
+    );
+    expect(
+      characterParserService.detectConflicts(detected, [
+        {
+          renpyTag: "e",
+          name: "e_name",
+          displayName: "Eileen",
+          nameType: "literal",
+          color: "#FFFFFF",
+        },
+      ])
+    ).toEqual([
+      expect.objectContaining({
+        changedFields: ["nameType"],
+        existingDisplayName: "Eileen",
+        existingNameType: "literal",
+        detectedNameType: "variable",
+      }),
+    ]);
+  });
+});

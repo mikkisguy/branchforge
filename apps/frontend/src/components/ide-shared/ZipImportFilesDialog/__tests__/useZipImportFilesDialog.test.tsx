@@ -37,6 +37,7 @@ vi.mock("@/lib/api/project-files", () => ({
 
 vi.mock("@/lib/api/characters", () => ({
   charactersApi: {
+    listCharacters: vi.fn(),
     detectCharacters: vi.fn(),
   },
 }));
@@ -51,6 +52,7 @@ describe("useZipImportFilesDialog", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     queryClient.clear();
+    vi.mocked(charactersApi.listCharacters).mockResolvedValue([]);
     vi.mocked(charactersApi.detectCharacters).mockResolvedValue({
       characters: [],
       excludedTags: [],
@@ -60,12 +62,76 @@ describe("useZipImportFilesDialog", () => {
     });
   });
 
+  it("keeps auto-inserted discoveries out of the pre-import tag snapshot", async () => {
+    vi.mocked(charactersApi.listCharacters).mockResolvedValue([
+      {
+        id: "old-id",
+        projectId: "proj-1",
+        renpyTag: "old",
+        name: "Old",
+        displayName: "Old",
+        nameType: "literal",
+        color: "#ffffff",
+        isNarrator: false,
+        isLoveInterest: false,
+        avatarUrl: null,
+        notes: null,
+        createdAt: "",
+        updatedAt: "",
+      },
+    ]);
+    vi.mocked(projectFilesApi.importZip).mockResolvedValue({
+      success: true,
+      filesImported: 1,
+      filesUpdated: 0,
+      filesSkipped: 0,
+      filesFailed: 0,
+      labelsCreated: 0,
+    });
+    vi.mocked(charactersApi.detectCharacters).mockResolvedValue({
+      characters: [
+        {
+          tag: "new",
+          name: "New",
+          displayName: "New",
+          nameType: "literal",
+          color: "#ffffff",
+          sourceFile: "new.rpy",
+          isSpecial: false,
+          confidence: 1,
+        },
+      ],
+      excludedTags: [],
+      narratorCharacterTags: [],
+      conflicts: [],
+      existingTags: ["old", "new"],
+    });
+    const { result } = renderHook(
+      () => useZipImportFilesDialog(true, vi.fn(), "proj-1"),
+      { wrapper }
+    );
+    act(() =>
+      result.current.dispatch({
+        type: "SET_SELECTED_FILE",
+        file: new File(["zip"], "files.zip"),
+      })
+    );
+    await act(async () => {
+      await result.current.handleImport();
+    });
+    expect(result.current.showCharacterWizard).toBe(true);
+    expect(result.current.detectedCharacters?.existingTags).toEqual(["old"]);
+    expect(result.current.detectedCharacters?.characters[0].tag).toBe("new");
+  });
+
   it("ignores a stale import response after the dialog closes", async () => {
     let resolveImport: ((value: ImportZipResponse) => void) | undefined;
+    let reportProgress: ((loaded: number, total: number) => void) | undefined;
     vi.mocked(projectFilesApi.importZip).mockImplementation(
-      () =>
+      (_projectId, _file, options) =>
         new Promise((resolve) => {
           resolveImport = resolve;
+          reportProgress = options?.onProgress;
         })
     );
 
@@ -92,6 +158,9 @@ describe("useZipImportFilesDialog", () => {
     rerender({ open: false });
     onOpenChange.mockClear();
     rerender({ open: true });
+
+    act(() => reportProgress?.(50, 100));
+    expect(result.current.importState.status).toBe("idle");
 
     await act(async () => {
       resolveImport?.({

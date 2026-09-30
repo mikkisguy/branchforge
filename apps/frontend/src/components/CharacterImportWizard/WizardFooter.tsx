@@ -16,7 +16,7 @@ export function WizardFooter({
   return (
     <div className="p-6 border-t border-border/30 flex justify-between items-center shrink-0">
       <span className="text-sm text-muted-foreground">
-        {selectedCount} character(s) selected
+        {selectedCount} change{selectedCount !== 1 ? "s" : ""} selected
       </span>
       <div className="flex gap-2">
         <Button
@@ -25,18 +25,14 @@ export function WizardFooter({
           onClick={onClose}
           disabled={isImporting}
         >
-          Cancel
+          Close
         </Button>
         <Button
           type="button"
           onClick={onImport}
           disabled={isImporting || selectedCount === 0}
         >
-          {isImporting
-            ? "Importing..."
-            : `Import ${selectedCount} Character${
-                selectedCount !== 1 ? "s" : ""
-              }`}
+          {isImporting ? "Applying..." : "Apply Changes"}
         </Button>
       </div>
     </div>

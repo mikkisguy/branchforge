@@ -40,6 +40,8 @@ import {
 } from "@branchforge/shared";
 import { inferNameTypeFromStoredName } from "./character-parser/name-resolution.js";
 import { isVariableSafeIdentifier } from "./rpy-generator.service.js";
+import { calculateContentHash } from "../lib/hash.js";
+import { extractAndStripRpySymbols } from "./rpy-statements.service.js";
 import type {
   CreateCharacterInput,
   UpdateCharacterInput,
@@ -296,14 +298,32 @@ export class CharactersService {
 
     const allDetected: DetectedCharacter[] = [];
     for (const file of allProjectFiles) {
-      // The import path (issue #244) strips `define` / `default`
-      // statements from `content` and stores them in the database
-      // (the single source of truth). For the import wizard we
-      // still need to surface what *was* in the source file, so we
-      // read from `originalContent` when available and fall back
-      // to `content` for files created entirely from scratch (e.g.
-      // a brand-new BranchForge project).
-      const sourceContent = file.originalContent ?? file.content;
+      let sourceContent: string | null = null;
+
+      if (file.source === "GITLAB") {
+        // For GitLab files, avoid historical originalContent that may
+        // contain definitions since removed by BranchForge. Use the raw
+        // remote content only when its stripped form matches the accepted
+        // content; otherwise use the accepted cleaned content.
+        if (!file.hasRemoteConflict && file.remoteContent) {
+          const stripped = extractAndStripRpySymbols(
+            file.remoteContent
+          ).cleanedContent;
+          if (
+            file.content !== null &&
+            calculateContentHash(stripped) ===
+              calculateContentHash(file.content)
+          ) {
+            sourceContent = file.remoteContent;
+          }
+        }
+        sourceContent = sourceContent ?? file.content;
+      } else {
+        // Non-GitLab sources keep the historical behavior of reading the
+        // original imported content when available.
+        sourceContent = file.originalContent ?? file.content;
+      }
+
       if (sourceContent) {
         const fileCharacters = characterParserService.parseWithExclusions(
           sourceContent,
@@ -331,6 +351,7 @@ export class CharactersService {
         name: c.name,
         displayName: c.displayName,
         color: c.color,
+        nameType: c.nameType,
       }))
     );
 

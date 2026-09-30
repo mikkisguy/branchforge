@@ -55,13 +55,14 @@ export function CharacterImportWizard({
   const queryClient = useQueryClient();
   const [state, dispatch] = useReducer(
     wizardReducer,
-    { detectedCharacters, conflicts, excludedTags, narratorTags },
+    { detectedCharacters, conflicts, excludedTags, narratorTags, existingTags },
     (v) =>
       createInitialWizardState(
         v.detectedCharacters,
         v.conflicts,
         v.excludedTags,
-        v.narratorTags
+        v.narratorTags,
+        v.existingTags
       )
   );
 
@@ -81,41 +82,41 @@ export function CharacterImportWizard({
   );
 
   const excludedTagSet = useMemo(() => new Set(excludedTags), [excludedTags]);
+  const narratorTagSet = useMemo(() => new Set(narratorTags), [narratorTags]);
 
   const handleImport = useCallback(async () => {
     dispatch({ type: "SET_IMPORTING", value: true });
     try {
-      const charactersToImport = [
+      const importData: ImportCharacter[] = [
         ...state.groups.new.filter((c) => !c.excluded),
-      ];
-      for (const c of state.groups.existing) {
-        if (!excludedTagSet.has(c.tag)) {
-          charactersToImport.push({
-            tag: c.tag,
-            name: c.detectedName,
-            displayName: c.detectedName || c.tag,
-            color: c.detectedColor,
-            isSpecial: false,
-            sourceFile: "",
-            confidence: 1,
-            nameType: "literal",
-            isLoveInterest: false,
-            excluded: false,
-          });
-        }
-      }
-      charactersToImport.push(
-        ...state.groups.special.filter((c) => !c.excluded)
-      );
-      const importData: ImportCharacter[] = charactersToImport.map((c) => ({
+        ...state.groups.special.filter((c) => !c.excluded),
+      ].map((c) => ({
         tag: c.tag,
-        name: c.name ?? c.tag,
-        displayName: c.displayName,
+        name: c.name,
+        displayName: c.displayName || c.tag,
         color: c.color,
         isLoveInterest: c.isLoveInterest ?? false,
         isNarrator: c.isNarrator ?? false,
         nameType: c.nameType,
       }));
+      const detectedByTag = new Map<string, DetectedCharacter>();
+      for (const character of detectedCharacters) {
+        if (!detectedByTag.has(character.tag)) {
+          detectedByTag.set(character.tag, character);
+        }
+      }
+      for (const c of state.groups.existing) {
+        if (state.approvedUpdates.has(c.tag) && !excludedTagSet.has(c.tag)) {
+          const detected = detectedByTag.get(c.tag);
+          importData.push({
+            tag: c.tag,
+            name: c.detectedName,
+            displayName: c.existingDisplayName ?? c.existingName,
+            color: c.detectedColor,
+            nameType: c.detectedNameType ?? detected?.nameType,
+          });
+        }
+      }
       const newExcludedTags = new Set(excludedTags);
       const newNarratorTags = new Set(narratorTags);
       for (const c of state.groups.new) {
@@ -134,7 +135,7 @@ export function CharacterImportWizard({
         narratorTags: [...newNarratorTags],
         linkToLines: state.linkToLines,
       });
-      success(`Imported ${result.characters.length} character(s)`);
+      success(`Applied changes to ${result.characters.length} character(s)`);
       if (result.unmatched.length > 0) {
         error(`${result.unmatched.length} speaker(s) could not be matched`);
       }
@@ -158,6 +159,7 @@ export function CharacterImportWizard({
   }, [
     state,
     excludedTagSet,
+    detectedCharacters,
     excludedTags,
     narratorTags,
     projectId,
@@ -179,6 +181,7 @@ export function CharacterImportWizard({
       ...state.groups.new.map((c) => c.tag.toLowerCase()),
       ...state.groups.existing.map((c) => c.tag.toLowerCase()),
       ...state.groups.special.map((c) => c.tag.toLowerCase()),
+      ...existingTags.map((tag) => tag.toLowerCase()),
     ];
     if (allTags.includes(tag.toLowerCase())) return;
     dispatch({
@@ -195,16 +198,22 @@ export function CharacterImportWizard({
         excluded: false,
       },
     });
-  }, [state.newCharacter, state.groups]);
+  }, [state.newCharacter, state.groups, existingTags]);
 
   const newCount = state.groups.new.length;
   const existingCount = state.groups.existing.length;
   const specialCount = state.groups.special.length;
   const selectedCount =
     state.groups.new.filter((c) => !c.excluded).length +
-    state.groups.existing.filter((c) => !excludedTagSet.has(c.tag)).length +
+    state.groups.existing.filter(
+      (c) => state.approvedUpdates.has(c.tag) && !excludedTagSet.has(c.tag)
+    ).length +
     state.groups.special.filter((c) => !c.excluded).length;
-  const isEmpty = newCount === 0 && existingCount === 0 && specialCount === 0;
+  const isEmpty =
+    newCount === 0 &&
+    existingCount === 0 &&
+    specialCount === 0 &&
+    state.groups.unchanged.length === 0;
 
   return (
     <Dialog
@@ -212,7 +221,7 @@ export function CharacterImportWizard({
       onOpenChange={(n) => {
         if (!n) handleClose();
       }}
-      aria-label="Import Characters"
+      aria-label="Review Characters"
     >
       <DialogContent className="max-w-2xl w-full p-0 gap-0 max-h-[80vh] overflow-hidden flex flex-col">
         <WizardHeader
@@ -268,15 +277,49 @@ export function CharacterImportWizard({
               onToggle={() => toggleGroup("new")}
               updateCharacter={updateCharacter}
               isImporting={state.isImporting}
-              existingTags={existingTags}
             />
           )}
           {existingCount > 0 && (
             <WizardConflicts
               conflicts={state.groups.existing}
+              approvedUpdates={state.approvedUpdates}
+              isImporting={state.isImporting}
+              onChoose={(tag, approved) =>
+                dispatch({
+                  type: "SET_DEFINITION_UPDATE",
+                  tag,
+                  approved,
+                })
+              }
               expanded={state.expandedGroups.has("existing")}
               onToggle={() => toggleGroup("existing")}
             />
+          )}
+          {state.groups.unchanged.length > 0 && (
+            <details className="border border-border/30 rounded-md p-3">
+              <summary className="text-sm font-medium cursor-pointer">
+                Already imported ({state.groups.unchanged.length})
+              </summary>
+              <p className="text-xs text-muted-foreground mt-2">
+                These definitions match. Your BranchForge settings are
+                preserved.
+              </p>
+              <ul className="mt-2 space-y-1 text-sm">
+                {state.groups.unchanged.map((char) => (
+                  <li
+                    key={char.tag}
+                    data-testid={`already-imported-badge-${char.tag}`}
+                  >
+                    <span className="font-mono">{char.tag}</span>
+                    {narratorTagSet.has(char.tag) && (
+                      <span className="ml-2 text-muted-foreground">
+                        Narrator
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </details>
           )}
           {specialCount > 0 && (
             <WizardSpecialCharacters

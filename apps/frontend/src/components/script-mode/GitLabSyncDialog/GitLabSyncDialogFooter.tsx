@@ -17,6 +17,7 @@ interface GitLabSyncDialogFooterProps {
   operationStatus: string | undefined;
   branch: string;
   branchInvalid?: boolean;
+  syncBlocked?: boolean;
   createNewBranch: boolean;
   operationType: "export" | "import";
   onSync: () => void;
@@ -33,6 +34,7 @@ export function GitLabSyncDialogFooter({
   operationStatus,
   branch,
   branchInvalid = false,
+  syncBlocked = false,
   createNewBranch,
   operationType,
   onSync,
@@ -53,7 +55,7 @@ export function GitLabSyncDialogFooter({
           <Button
             type="button"
             onClick={onSync}
-            disabled={!branch.trim() || branchInvalid}
+            disabled={!branch.trim() || branchInvalid || syncBlocked}
             className="max-[380px]:w-full"
           >
             {submitLabel({ operationType, createNewBranch, branch })}

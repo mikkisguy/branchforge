@@ -12,7 +12,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { CharacterImportWizard } from "@/components/CharacterImportWizard";
-import type { DetectedCharacter } from "@branchforge/shared";
+import type { DetectedCharacter, CharacterConflict } from "@branchforge/shared";
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -59,7 +59,8 @@ function makeChar(
 
 function renderWizard(
   detectedCharacters: DetectedCharacter[],
-  existingTags: string[] = []
+  existingTags: string[] = [],
+  options: { conflicts?: CharacterConflict[]; narratorTags?: string[] } = {}
 ) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
@@ -77,9 +78,9 @@ function renderWizard(
           onOpenChange={onOpenChange}
           projectId="proj-1"
           detectedCharacters={detectedCharacters}
-          conflicts={[]}
+          conflicts={options.conflicts ?? []}
           excludedTags={[]}
-          narratorTags={[]}
+          narratorTags={options.narratorTags ?? []}
           existingTags={existingTags}
           onComplete={onComplete}
         />
@@ -305,7 +306,7 @@ describe("CharacterImportWizard — nameType warnings (issue #138)", () => {
     await user.type(displayNameInput, "Big Boss");
 
     const importButton = screen.getByRole("button", {
-      name: /Import 1 Character/,
+      name: "Apply Changes",
     });
     await user.click(importButton);
 
@@ -356,15 +357,6 @@ describe("CharacterImportWizard — excluded state", () => {
   });
 });
 
-/**
- * Regression for the wizard-not-showing bug introduced by PR #245.
- *
- * PR #245 promotes extracted characters into the `characters` table
- * during import, so by the time `detectCharacters` runs, all
- * detected tags are in `existingTags`. The wizard's "Already
- * imported" badge gives the user a clear signal that confirming the
- * import is a no-op for those rows.
- */
 describe("CharacterImportWizard — already-imported indicator", () => {
   it("shows an 'Already imported' badge for characters that are in the DB", () => {
     const chars: DetectedCharacter[] = [
@@ -382,7 +374,7 @@ describe("CharacterImportWizard — already-imported indicator", () => {
       }),
     ];
 
-    // "s" was inserted by PR #245's auto-promote; "boss" is brand new.
+    // "s" was already present before this import; "boss" is new.
     renderWizard(chars, ["s"]);
 
     expect(screen.getByTestId("already-imported-badge-s")).toBeInTheDocument();
@@ -448,5 +440,146 @@ describe("CharacterImportWizard — group assignment", () => {
     // the narrator's tag with '((unnamed))' (outer parens from the
     // row template, inner parens from the displayName fallback).
     expect(screen.getByText(/unnamed/)).toBeInTheDocument();
+  });
+});
+
+describe("CharacterImportWizard — safe source review", () => {
+  beforeEach(() => {
+    mockImport.mockReset();
+    mockImport.mockResolvedValue({ characters: [], linked: 0, unmatched: [] });
+  });
+
+  it("keeps an unchanged narrator out of new characters and the update payload", async () => {
+    renderWizard(
+      [
+        makeChar({ tag: "w", nameType: "literal", displayName: "Welcome!" }),
+        makeChar({ tag: "new", nameType: "literal" }),
+      ],
+      ["w"],
+      { narratorTags: ["w"] }
+    );
+
+    expect(
+      screen.queryByRole("checkbox", { name: "Include w" })
+    ).not.toBeInTheDocument();
+    expect(screen.getByText("1 change selected")).toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole("button", { name: "Apply Changes" })
+    );
+    expect(mockImport).toHaveBeenCalledWith(
+      "proj-1",
+      expect.objectContaining({
+        characters: [expect.objectContaining({ tag: "new" })],
+        narratorTags: ["w"],
+      })
+    );
+  });
+
+  it("applies an imported source only by explicit choice and preserves the alias and flags", async () => {
+    const character = makeChar({
+      tag: "ne",
+      name: "[nickname]",
+      nameType: "interpolated",
+      color: "#94B0B9",
+    });
+    renderWizard([character], ["ne"], {
+      narratorTags: ["ne"],
+      conflicts: [
+        {
+          tag: "ne",
+          existingName: "[old_nickname]",
+          detectedName: "[nickname]",
+          existingColor: "#94B0B9",
+          detectedColor: "#94B0B9",
+          existingDisplayName: "My player",
+          existingNameType: "interpolated",
+          detectedNameType: "interpolated",
+          changedFields: ["name"],
+        },
+      ],
+    });
+    const choice = screen.getByRole("combobox", {
+      name: "Definition to keep for ne",
+    });
+    expect(choice).toHaveValue("current");
+    expect(
+      screen.getByRole("button", { name: "Apply Changes" })
+    ).toBeDisabled();
+    expect(screen.queryByText("Color")).not.toBeInTheDocument();
+    await userEvent.selectOptions(choice, "imported");
+    expect(screen.getByText("1 change selected")).toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole("button", { name: "Apply Changes" })
+    );
+    const payload = mockImport.mock.calls[0][1];
+    expect(payload.characters).toEqual([
+      {
+        tag: "ne",
+        name: "[nickname]",
+        displayName: "My player",
+        color: "#94B0B9",
+        nameType: "interpolated",
+      },
+    ]);
+    expect(payload.narratorTags).toEqual(["ne"]);
+    expect(payload.characters[0]).not.toHaveProperty("isNarrator");
+    expect(payload.characters[0]).not.toHaveProperty("isLoveInterest");
+  });
+
+  it("can include an unnamed narrator without losing its None source name", async () => {
+    renderWizard(
+      [
+        makeChar({
+          tag: "n",
+          name: null,
+          displayName: "",
+          nameType: "none",
+          isSpecial: true,
+        }),
+      ],
+      [],
+      { narratorTags: ["n"] }
+    );
+    await userEvent.click(screen.getByRole("checkbox", { name: "Include n" }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "Apply Changes" })
+    );
+    expect(mockImport.mock.calls[0][1].characters).toEqual([
+      expect.objectContaining({
+        tag: "n",
+        name: null,
+        displayName: "n",
+        nameType: "none",
+        isNarrator: true,
+      }),
+    ]);
+  });
+
+  it("does not submit a kept definition when importing another character", async () => {
+    renderWizard(
+      [
+        makeChar({ tag: "old", nameType: "literal" }),
+        makeChar({ tag: "new", nameType: "literal" }),
+      ],
+      ["old"],
+      {
+        conflicts: [
+          {
+            tag: "old",
+            existingName: "Before",
+            detectedName: "After",
+            existingColor: "#ffffff",
+            detectedColor: "#ffffff",
+            changedFields: ["name"],
+          },
+        ],
+      }
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "Apply Changes" })
+    );
+    expect(mockImport.mock.calls[0][1].characters).toEqual([
+      expect.objectContaining({ tag: "new" }),
+    ]);
   });
 });

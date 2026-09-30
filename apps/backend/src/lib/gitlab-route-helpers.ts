@@ -10,6 +10,7 @@ import {
   NotFoundError,
   ForbiddenError,
   UnauthorizedError,
+  ConflictError,
 } from "../middleware/error-handler.middleware.js";
 
 /**
@@ -27,8 +28,9 @@ export function getAuthenticatedUserId(request: FastifyRequest): string {
 }
 
 /**
- * Handles NotFoundError (404) and ForbiddenError (403) for route catch blocks.
- * Returns true if the error was handled, false if the caller should handle it.
+ * Handles NotFoundError (404), ForbiddenError (403), and ConflictError (409)
+ * for route catch blocks. Returns true if the error was handled, false if the
+ * caller should handle it.
  */
 export function handleKnownRouteErrors(
   err: unknown,
@@ -40,6 +42,10 @@ export function handleKnownRouteErrors(
   }
   if (err instanceof ForbiddenError) {
     reply.status(403).send({ error: "Forbidden", message: err.message });
+    return true;
+  }
+  if (err instanceof ConflictError) {
+    reply.status(409).send({ error: "Conflict", message: err.message });
     return true;
   }
   return false;

@@ -1,4 +1,5 @@
 import type { DetectedCharacter } from "./character-parser.service.js";
+import type { DetectCharactersResponse } from "@branchforge/shared";
 
 // GitLab API response types
 
@@ -65,6 +66,7 @@ export interface SyncOperation {
   startedAt: Date;
   completedAt: Date | null;
   detectedCharacters?: DetectedCharacter[];
+  characterReview?: DetectCharactersResponse;
 }
 
 export type { Transaction } from "../db/types.js";
