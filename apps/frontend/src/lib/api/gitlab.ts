@@ -84,6 +84,7 @@ export interface RpyFile {
 
 interface ApiErrorPayload {
   error: string;
+  message?: string;
 }
 
 export interface LinkedRepository {
@@ -252,7 +253,7 @@ async function request<T>(
       .json()
       .catch(() => ({ error: "Unknown error" }));
     throw new ApiError(
-      payload.error || `Request failed with status ${response.status}`,
+      apiErrorMessage(payload, response.status),
       response.status,
       payload
     );
@@ -263,6 +264,18 @@ async function request<T>(
   }
 
   return response.json();
+}
+
+function apiErrorMessage(payload: ApiErrorPayload, status: number): string {
+  // Expected conflicts carry a safe recovery message from the route.
+  if (
+    status === 409 &&
+    typeof payload.message === "string" &&
+    payload.message.trim()
+  ) {
+    return payload.message;
+  }
+  return payload.error || `Request failed with status ${status}`;
 }
 
 async function requestNoContent(
@@ -281,7 +294,7 @@ async function requestNoContent(
       .json()
       .catch(() => ({ error: "Unknown error" }));
     throw new ApiError(
-      payload.error || `Request failed with status ${response.status}`,
+      apiErrorMessage(payload, response.status),
       response.status,
       payload
     );

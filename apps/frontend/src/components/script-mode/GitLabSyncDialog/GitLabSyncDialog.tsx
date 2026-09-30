@@ -60,8 +60,13 @@ export function GitLabSyncDialog({
   const { invalidateLabels, labels, isLoadingLabels } = useLabels();
   const exportDialogOpen = isExportDialogOpen(open, operationType);
   const pendingChanges = useGitLabPendingChanges(projectId, {
-    enabled: exportDialogOpen,
+    enabled: open,
   });
+  const structuralChanges = pendingChanges.changes.filter(
+    (change) => change.kind !== "MODIFIED"
+  );
+  const importBlocked =
+    operationType === "import" && structuralChanges.length > 0;
   const branchesQuery = useQuery({
     queryKey: gitlabKeys.branches(projectId),
     queryFn: () => gitlabApi.getBranches(projectId),
@@ -159,6 +164,11 @@ export function GitLabSyncDialog({
 
   /** Handle sync operation */
   const handleSync = useCallback(async () => {
+    if (
+      importBlocked ||
+      (operationType === "import" && pendingChanges.isLoading)
+    )
+      return;
     if (operationType === "export" && exportBranchInvalid) return;
     if (!branch.trim()) {
       error("Branch name is required");
@@ -181,6 +191,13 @@ export function GitLabSyncDialog({
             formState.commitMessage.trim() || undefined
           )
         : await importFromGitlab(projectId, branch.trim(), resolution);
+
+    // The sync hook already exposes request errors in the dialog.
+    // Refresh the list for a server-side conflict that raced our preflight.
+    if (!result) {
+      if (operationType === "import") void pendingChanges.refetch();
+      return;
+    }
 
     // Use the returned result for toast notifications
     if (result?.status === "COMPLETED") {
@@ -245,6 +262,7 @@ export function GitLabSyncDialog({
       error("Failed to complete sync operation");
     }
   }, [
+    importBlocked,
     branch,
     exportBranchInvalid,
     formState.commitMessage,
@@ -328,6 +346,54 @@ export function GitLabSyncDialog({
             />
           ) : (
             <>
+              {operationType === "import" && (
+                <>
+                  {pendingChanges.isLoading && (
+                    <p role="status" className="text-sm text-muted-foreground">
+                      Checking pending file changes…
+                    </p>
+                  )}
+                  {pendingChanges.error && (
+                    <div role="alert" className="text-sm">
+                      Could not check pending file changes.{" "}
+                      <Button
+                        type="button"
+                        variant="link"
+                        className="h-auto p-0"
+                        onClick={() => void pendingChanges.refetch()}
+                      >
+                        Retry
+                      </Button>
+                    </div>
+                  )}
+                  {importBlocked && (
+                    <section
+                      aria-label="File changes blocking pull"
+                      className="rounded-md border border-border/50 bg-muted/30 p-3 space-y-2"
+                    >
+                      <h3 className="text-sm font-medium">
+                        Push or discard file changes before pulling
+                      </h3>
+                      <p className="text-sm text-muted-foreground">
+                        These files were created, renamed, moved, or deleted
+                        locally. Open Export to GitLab to push them or discard
+                        the changes, then return here to pull.
+                      </p>
+                      <ul className="text-sm space-y-1">
+                        {structuralChanges.map((change) => (
+                          <li key={change.fileId} className="break-words">
+                            {change.kind === "CREATED"
+                              ? `Created: ${change.filePath}`
+                              : change.kind === "RENAMED"
+                                ? `Renamed: ${change.previousFilePath} → ${change.filePath}`
+                                : `Deleted: ${change.filePath}`}
+                          </li>
+                        ))}
+                      </ul>
+                    </section>
+                  )}
+                </>
+              )}
               {operationType === "export" && (
                 <PendingFileChangesSection
                   changes={pendingChanges.changes}
@@ -398,6 +464,10 @@ export function GitLabSyncDialog({
           operationStatus={state.operation?.status}
           branch={branch}
           branchInvalid={operationType === "export" && exportBranchInvalid}
+          syncBlocked={
+            operationType === "import" &&
+            (importBlocked || pendingChanges.isLoading)
+          }
           createNewBranch={formState.createNewBranch}
           operationType={operationType}
           onSync={handleSync}
