@@ -1,6 +1,7 @@
 import { countCharOutsideStrings } from "../rpy-helpers.js";
 import { RENPY_LABEL_REGEX } from "@branchforge/shared";
 import { isValidLabel, trackBlocks } from "./helpers.js";
+import { isSourceOwnedRpyFile } from "../rpy-statements.service.js";
 import type {
   RPYParsedData,
   LabeledDialogue,
@@ -657,16 +658,9 @@ export function parseRPYFileWithLabels(
   // Also capture skipLines for reuse below (avoid redundant computeSkipLines call)
   const { screenCount, labelCount, skipLines } = trackBlocks(lines, true);
 
-  // Check if filename indicates this is a screens/settings file
-  // Files named "screens.rpy" or "screen.rpy" are always SETTINGS
-  // We extract the basename to avoid matching directory paths like "gui/screens/dialogue.rpy"
-  const basename = filename
-    ? filename.split("/").pop()!.split("\\").pop()!
-    : "";
-  const isScreenFile = /^screens?\.rpy$/i.test(basename);
-
-  if (isScreenFile) {
-    // Filename-based detection: files named with "screen" are SETTINGS
+  // Standard UI/configuration files remain source-owned, including custom
+  // UI labels. A SETTINGS classification alone does not imply ownership.
+  if (filename && isSourceOwnedRpyFile(filename)) {
     result.fileType = "SETTINGS";
   } else if (screenCount > 0 && screenCount > labelCount * 2) {
     // Fallback: Files with significantly more screens than labels are SETTINGS files

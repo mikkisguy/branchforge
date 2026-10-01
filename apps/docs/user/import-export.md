@@ -32,6 +32,21 @@ The importer parses your RPY files and extracts:
 - Characters (auto-detected)
 - Labels for flow graph generation
 
+Ren'Py's standard UI and configuration files—`screens.rpy`, `screen.rpy`,
+`options.rpy`, and `gui.rpy`—stay editable in Script Mode and are exported
+with their content intact. BranchForge does not move their declarations
+into generated files or import their UI labels as story labels. This also
+applies when those files are in subdirectories or use different casing.
+
+Persistent settings (`default persistent.…`), string defaults, and name
+constants such as `define ne_first = "Nelson"` remain in your source files.
+
+If an older import removed a setting such as `default quick_menu = True`,
+restore it from your original project or reimport the original file.
+BranchForge preserves the restored value and excludes matching declarations
+from generated files, even if an older managed variable still exists.
+Previously removed declarations are not restored automatically.
+
 ## Zip Export
 
 <!-- screenshot: export-dialog.png — Export dialog, dark theme -->

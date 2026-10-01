@@ -41,7 +41,10 @@ import {
 import { inferNameTypeFromStoredName } from "./character-parser/name-resolution.js";
 import { isVariableSafeIdentifier } from "./rpy-generator.service.js";
 import { calculateContentHash } from "../lib/hash.js";
-import { extractAndStripRpySymbols } from "./rpy-statements.service.js";
+import {
+  extractAndStripRpySymbols,
+  isSourceOwnedRpyFile,
+} from "./rpy-statements.service.js";
 import type {
   CreateCharacterInput,
   UpdateCharacterInput,
@@ -298,6 +301,11 @@ export class CharactersService {
 
     const allDetected: DetectedCharacter[] = [];
     for (const file of allProjectFiles) {
+      // Source-owned files (screens.rpy, gui.rpy, ...) keep their
+      // declarations verbatim; their character definitions are never
+      // managed by BranchForge.
+      if (isSourceOwnedRpyFile(file.filePath)) continue;
+
       let sourceContent: string | null = null;
 
       if (file.source === "GITLAB") {
@@ -307,7 +315,8 @@ export class CharactersService {
         // content; otherwise use the accepted cleaned content.
         if (!file.hasRemoteConflict && file.remoteContent) {
           const stripped = extractAndStripRpySymbols(
-            file.remoteContent
+            file.remoteContent,
+            file.filePath
           ).cleanedContent;
           if (
             file.content !== null &&

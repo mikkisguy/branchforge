@@ -51,6 +51,8 @@ import {
 import {
   computeCommonDirectoryPrefix,
   extractAndStripRpySymbols,
+  isSourceOwnedRpyFile,
+  collectSourceOwnedRpySymbolKeys,
 } from "../rpy-statements.service.js";
 
 import type { SyncOperation } from "../gitlab.types.js";
@@ -220,27 +222,51 @@ async function buildGeneratedActions(
   userId: string,
   branch: string,
   fileDirPrefix: string,
-  generated: GeneratedExportData
+  generated: GeneratedExportData,
+  activeFiles: ProjectFileRow[]
 ): Promise<PlannedAction[]> {
+  // Plain names declared in the active source-owned files own the global
+  // store: generated declarations must not collide with them.
+  const sourceOwnedKeys = collectSourceOwnedRpySymbolKeys(
+    activeFiles.map((file) => ({
+      filePath: file.filePath,
+      content: file.content,
+    }))
+  );
+  // Candidate selection stays based on the ORIGINAL category length: when a
+  // category has DB rows whose symbols were all filtered, the generated file
+  // is still pushed (overwriting a stale remote copy that may otherwise
+  // collide with the protected declarations). Only a category with no DB
+  // rows at all produces no action.
+  const filteredVariables = generated.variables.filter(
+    (variable) => !sourceOwnedKeys.has(variable.key)
+  );
+  const filteredStats = generated.stats.filter(
+    (stat) => !sourceOwnedKeys.has(stat.key)
+  );
+  const filteredCharacters = generated.characters.filter(
+    (character) => !sourceOwnedKeys.has(character.renpyTag)
+  );
+
   const candidates: Array<{ filePath: string; content: string }> = [];
 
   if (generated.variables.length > 0) {
     candidates.push({
       filePath: `${fileDirPrefix}branchforge_variables.rpy`,
-      content: generateVariablesFile(generated.variables),
+      content: generateVariablesFile(filteredVariables),
     });
   }
   if (generated.stats.length > 0) {
     candidates.push({
       filePath: `${fileDirPrefix}branchforge_stats.rpy`,
-      content: generateStatsFile(generated.stats),
+      content: generateStatsFile(filteredStats),
     });
   }
   if (generated.characters.length > 0) {
     candidates.push({
       filePath: `${fileDirPrefix}branchforge_definitions.rpy`,
       content: generateCharacterDefinitionsFile(
-        generated.characters.map((character) => ({
+        filteredCharacters.map((character) => ({
           ...character,
           nameType: normalizeCharacterNameType(character.nameType),
         }))
@@ -299,10 +325,19 @@ function buildPushedContent(
     projectFileId: string | null;
   }>
 ): string {
+  // Source-owned files (screens.rpy, gui.rpy, ...) are pushed verbatim:
+  // no managed-statement strip and no variable patching, independent of
+  // any stale fileType.
+  if (isSourceOwnedRpyFile(file.filePath)) {
+    return file.content;
+  }
   if (file.content.length === 0) {
     return "";
   }
-  const baseContent = extractAndStripRpySymbols(file.content).cleanedContent;
+  const baseContent = extractAndStripRpySymbols(
+    file.content,
+    file.filePath
+  ).cleanedContent;
   if (labelsForFile.length === 0) {
     return baseContent;
   }
@@ -847,7 +882,8 @@ export async function exportToGitlab(
         variables: projectVariables,
         stats: projectStats,
         characters: projectCharacters,
-      }
+      },
+      activeFiles
     );
 
     const allActions = [...plan.actions, ...generatedActions];

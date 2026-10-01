@@ -256,7 +256,7 @@ export { calculateContentHash };
 function preProcessFiles(extractedFiles: ExtractedFile[]): PreProcessedFile[] {
   return extractedFiles.map((file) => {
     const parsed = parseRPYFileWithLabels(file.content, file.filePath);
-    const stripped = extractAndStripRpySymbols(file.content);
+    const stripped = extractAndStripRpySymbols(file.content, file.filePath);
     return {
       filePath: file.filePath,
       fileType: parsed.fileType,

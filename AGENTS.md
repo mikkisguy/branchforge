@@ -152,6 +152,14 @@ The script prints these instructions automatically if the CLI is absent.
 
 **Performance:** Use `Promise.all()` for parallel independent queries. Avoid N+1 patterns.
 
+**Ren'Py source ownership:** Standard UI/configuration files (`screens.rpy`,
+`screen.rpy`, `options.rpy`, and `gui.rpy`, matched by basename) remain
+source-owned. Preserve their content during import/export; do not promote
+their symbols or UI labels. Use the shared ownership helpers consistently
+in ZIP, GitLab, character detection, export previews, and sync baselines.
+Generated declarations must not duplicate global names in those active files.
+The `SETTINGS` file type alone does not determine symbol ownership.
+
 **Rate Limiting:** Required for auth endpoints, recommended for all public endpoints. Use `checkRateLimit()` from `src/services/rate-limiter.service.ts`.
 
 **Security:** Return generic error messages to clients. Log detailed errors server-side. Never expose internal implementation details.

@@ -8,6 +8,10 @@ All notable changes to BranchForge will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v1.0.0-beta.13 - 2026-10-01
+
+- Fixed generic GitLab pull errors and improved feedback.
+
 ## v1.0.0-beta.12 - 2026-09-29
 
 - Added branch selection to GitLab export.

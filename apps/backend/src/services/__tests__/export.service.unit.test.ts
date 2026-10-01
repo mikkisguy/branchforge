@@ -161,6 +161,62 @@ describe("ExportService", () => {
   // =========================================================================
 
   describe("generateExport", () => {
+    it("preserves restored UI source despite stale story labels and managed rows", async () => {
+      const generator = await vi.importActual<
+        typeof import("../rpy-generator.service.js")
+      >("../rpy-generator.service.js");
+      vi.mocked(generateVariablesFile).mockImplementationOnce(
+        generator.generateVariablesFile
+      );
+      const content =
+        "default quick_menu = True\r\nlabel ui_label:\r\n    return\r\n";
+      resolveQueue.push([
+        {
+          id: "ui-file",
+          filePath: "game/screens.rpy",
+          fileType: "STORY",
+          content,
+        },
+      ]);
+      resolveQueue.push([
+        {
+          projectFileId: "ui-file",
+          title: "UI",
+          labelName: "ui_label",
+          conditions: {},
+          effects: {},
+        },
+      ]);
+      resolveQueue.push([{ key: "quick_menu" }, { key: "met_nelson" }]);
+      resolveQueue.push([]);
+      resolveQueue.push([]);
+      resolveQueue.push([]);
+      mockDb.limit.mockResolvedValueOnce([{ name: "Protected UI" }]);
+      mockDb.returning.mockResolvedValueOnce([
+        {
+          id: EXPORT_ID,
+          fileName: "protected.zip",
+          format: "RENPY",
+          createdAt: new Date(),
+        },
+      ]);
+
+      await generateExport(PROJECT_ID, USER_ID);
+
+      const payload = mockDb.values.mock.calls[0][0] as { content: string };
+      const exported: Record<string, string> = JSON.parse(payload.content);
+      expect(exported["game/screens.rpy"]).toBe(content);
+      expect(exported["game/branchforge_variables.rpy"]).toContain(
+        "default met_nelson = False"
+      );
+      expect(exported["game/branchforge_variables.rpy"]).not.toContain(
+        "quick_menu"
+      );
+      expect(generateVariablesFile).toHaveBeenCalledWith([
+        { key: "met_nelson" },
+      ]);
+    });
+
     it("should generate an export successfully with story files and labels", async () => {
       const mockProject = { name: "My Project" };
       const mockFiles = [
@@ -928,6 +984,32 @@ describe("ExportService", () => {
   // =========================================================================
 
   describe("getExportPreview", () => {
+    it("previews only managed symbols not declared in protected source", async () => {
+      resolveQueue.push([{ key: "quick_menu" }, { key: "met_nelson" }]);
+      resolveQueue.push([{ key: "text_scale" }, { key: "trust" }]);
+      resolveQueue.push([
+        { renpyTag: "ui_character" },
+        { renpyTag: "ne", nameType: "literal" },
+      ]);
+      resolveQueue.push([
+        {
+          filePath: "game/screens.rpy",
+          content:
+            'default quick_menu = True\ndefault text_scale = 1.5\ndefine ui_character = Character("UI")',
+        },
+      ]);
+
+      await getExportPreview(PROJECT_ID, USER_ID);
+
+      expect(generateVariablesFile).toHaveBeenCalledWith([
+        { key: "met_nelson" },
+      ]);
+      expect(generateStatsFile).toHaveBeenCalledWith([{ key: "trust" }]);
+      expect(generateCharacterDefinitionsFile).toHaveBeenCalledWith([
+        { renpyTag: "ne", nameType: "literal" },
+      ]);
+    });
+
     it("should throw RateLimitError when rate limited", async () => {
       vi.mocked(checkRateLimit).mockReturnValueOnce({
         allowed: false,
@@ -975,17 +1057,17 @@ describe("ExportService", () => {
 
       expect(result.files[0].isEmpty).toBe(true);
       expect(result.files[0].emptyReason).toBe(
-        "No variables defined — this file will not be included in the export"
+        "No managed variable defaults to export"
       );
 
       expect(result.files[1].isEmpty).toBe(true);
       expect(result.files[1].emptyReason).toBe(
-        "No stats defined — this file will not be included in the export"
+        "No managed stat defaults to export"
       );
 
       expect(result.files[2].isEmpty).toBe(true);
       expect(result.files[2].emptyReason).toBe(
-        "No characters defined — this file will not be included in the export"
+        "No managed character definitions to export"
       );
     });
 
