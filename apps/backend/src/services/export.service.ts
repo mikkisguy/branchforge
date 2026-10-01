@@ -34,6 +34,8 @@ import {
 import {
   computeCommonDirectoryPrefix,
   extractAndStripRpySymbols,
+  isSourceOwnedRpyFile,
+  collectSourceOwnedRpySymbolKeys,
 } from "./rpy-statements.service.js";
 import { checkRateLimit } from "./rate-limiter.service.js";
 import { logInfo, logError, logWarn, LogEventType } from "../lib/logger.js";
@@ -123,6 +125,26 @@ async function fetchSupportingFileSources(projectId: string) {
   );
 
   return { projectVariables, projectStats, projectCharacters };
+}
+
+/**
+ * Collect the set of identifier names declared in source-owned RPY
+ * files (screens.rpy, options.rpy, gui.rpy, etc.). These names are
+ * owned by the user's project and must not be emitted by BranchForge
+ * generated files.
+ */
+function excludeSourceOwnedSymbols(
+  sources: Awaited<ReturnType<typeof fetchSupportingFileSources>>,
+  files: ReadonlyArray<{ filePath: string; content: string }>
+) {
+  const owned = collectSourceOwnedRpySymbolKeys(files);
+  return {
+    projectVariables: sources.projectVariables.filter((v) => !owned.has(v.key)),
+    projectStats: sources.projectStats.filter((s) => !owned.has(s.key)),
+    projectCharacters: sources.projectCharacters.filter(
+      (c) => !owned.has(c.renpyTag)
+    ),
+  };
 }
 
 // ============================================================================
@@ -275,9 +297,10 @@ export async function generateExport(
     // NOT touch `originalContent` — that field is preserved for
     // round-tripping and reconstruction.
     const strippedContent = extractAndStripRpySymbols(
-      file.content
+      file.content,
+      file.filePath
     ).cleanedContent;
-    if (file.fileType === "STORY") {
+    if (file.fileType === "STORY" && !isSourceOwnedRpyFile(file.filePath)) {
       const fileLabels = labelsByFileId.get(file.id) ?? [];
       if (fileLabels.length > 0) {
         patchedFiles[safePath] = patchRPYWithVariables(
@@ -297,6 +320,21 @@ export async function generateExport(
   const { projectVariables, projectStats, projectCharacters } =
     await fetchSupportingFileSources(projectId);
 
+  // Names declared in source-owned files (screens.rpy, options.rpy,
+  // gui.rpy, etc.) are owned by the user's project and must not be
+  // re-emitted by BranchForge generated files.
+  const {
+    projectVariables: filteredVariables,
+    projectStats: filteredStats,
+    projectCharacters: filteredCharacters,
+  } = excludeSourceOwnedSymbols(
+    { projectVariables, projectStats, projectCharacters },
+    Object.entries(patchedFiles).map(([filePath, content]) => ({
+      filePath,
+      content,
+    }))
+  );
+
   // Determine the directory prefix for generated files (e.g. "game/")
   // by computing a shared top-level directory segment from the
   // sanitized project file paths (not the raw `file.filePath`
@@ -307,19 +345,19 @@ export async function generateExport(
   const fileDirPrefix = computeCommonDirectoryPrefix(sanitizedPaths);
 
   // Generate additional RPY files
-  if (projectVariables.length > 0) {
+  if (filteredVariables.length > 0) {
     patchedFiles[`${fileDirPrefix}branchforge_variables.rpy`] =
-      generateVariablesFile(projectVariables);
+      generateVariablesFile(filteredVariables);
   }
 
-  if (projectStats.length > 0) {
+  if (filteredStats.length > 0) {
     patchedFiles[`${fileDirPrefix}branchforge_stats.rpy`] =
-      generateStatsFile(projectStats);
+      generateStatsFile(filteredStats);
   }
-  if (projectCharacters.length > 0) {
+  if (filteredCharacters.length > 0) {
     patchedFiles[`${fileDirPrefix}branchforge_definitions.rpy`] =
       generateCharacterDefinitionsFile(
-        projectCharacters.map((c) => ({
+        filteredCharacters.map((c) => ({
           ...c,
           nameType: normalizeCharacterNameType(c.nameType),
         }))
@@ -415,9 +453,29 @@ export async function getExportPreview(
   // Verify project access
   await requireProjectAccess(projectId, userId);
 
-  // Parallel DB selects — same field projections as generateExport
+  // Use the same ownership boundary as the ZIP export, including active
+  // source files. Old managed rows may still exist after a source restore.
+  const db = getDb();
+  const [sources, sourceFiles] = await Promise.all([
+    fetchSupportingFileSources(projectId),
+    db
+      .select({
+        filePath: projectFiles.filePath,
+        content: projectFiles.content,
+      })
+      .from(projectFiles)
+      .where(
+        and(
+          eq(projectFiles.projectId, projectId),
+          isNull(projectFiles.deletedAt)
+        )
+      ),
+  ]);
   const { projectVariables, projectStats, projectCharacters } =
-    await fetchSupportingFileSources(projectId);
+    excludeSourceOwnedSymbols(
+      sources,
+      sourceFiles.filter((file) => sanitizeZipEntryPath(file.filePath) !== null)
+    );
 
   const variablesEmpty = projectVariables.length === 0;
   const statsEmpty = projectStats.length === 0;
@@ -430,7 +488,7 @@ export async function getExportPreview(
       content: generateVariablesFile(projectVariables),
       isEmpty: variablesEmpty,
       emptyReason: variablesEmpty
-        ? "No variables defined — this file will not be included in the export"
+        ? "No managed variable defaults to export"
         : null,
     },
     {
@@ -438,9 +496,7 @@ export async function getExportPreview(
       fileName: "branchforge_stats.rpy",
       content: generateStatsFile(projectStats),
       isEmpty: statsEmpty,
-      emptyReason: statsEmpty
-        ? "No stats defined — this file will not be included in the export"
-        : null,
+      emptyReason: statsEmpty ? "No managed stat defaults to export" : null,
     },
     {
       kind: "definitions",
@@ -453,7 +509,7 @@ export async function getExportPreview(
       ),
       isEmpty: definitionsEmpty,
       emptyReason: definitionsEmpty
-        ? "No characters defined — this file will not be included in the export"
+        ? "No managed character definitions to export"
         : null,
     },
   ];

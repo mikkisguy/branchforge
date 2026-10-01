@@ -19,6 +19,7 @@ import {
   importZipFile,
 } from "../zip-import.service.js";
 import { getDb } from "../../db/index.js";
+import { parseRPYFileWithLabels } from "../rpy-parser.service.js";
 
 // Mock JSZip
 vi.mock("jszip");
@@ -486,6 +487,39 @@ describe("ZipImportService", () => {
     // duplicate `define` statements that would crash Ren'Py with
     // `NameError: name 'X' is already defined`.
     // ====================================================================
+
+    it.each(["screens.rpy", "options.rpy", "gui.rpy"])(
+      "preserves %s without promoting symbols or UI labels",
+      async (basename) => {
+        const parser = await vi.importActual<
+          typeof import("../rpy-parser.service.js")
+        >("../rpy-parser.service.js");
+        vi.mocked(parseRPYFileWithLabels).mockImplementationOnce(
+          parser.parseRPYFileWithLabels
+        );
+        const filePath = `game/${basename}`;
+        const content = [
+          "default quick_menu = True",
+          "default future_option = False",
+          "default future_size = 42",
+          'define ui_character = Character("UI")',
+          "label custom_ui:",
+          "    return",
+          "",
+        ].join("\r\n");
+        vi.mocked(JSZip.loadAsync).mockResolvedValue({
+          files: { [filePath]: createMockFile(filePath, content) },
+        } as unknown as JSZip);
+
+        await importZipFile(mockProjectId, Buffer.from("mock zip"));
+
+        expect(mockTx.values).toHaveBeenCalledTimes(1);
+        expect(mockTx.values).toHaveBeenCalledWith(
+          expect.objectContaining({ filePath, content, fileType: "SETTINGS" })
+        );
+        expect(syncLabelsFromFile).not.toHaveBeenCalled();
+      }
+    );
 
     it("strips define Character() and default lines from the content passed to the project_files insert", async () => {
       // The RPY file a user would drop into Ren'Py typically declares

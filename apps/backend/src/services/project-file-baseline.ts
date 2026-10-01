@@ -6,19 +6,47 @@
  */
 
 import { calculateContentHash } from "../lib/hash.js";
-import { extractAndStripRpySymbols } from "./rpy-statements.service.js";
+import {
+  BRANCHFORGE_MANAGED_NOTICE,
+  extractAndStripRpySymbols,
+} from "./rpy-statements.service.js";
 
 /**
  * Last-pushed LOCAL baseline for a file, falling back to import-time content.
+ * For source-owned files (screens.rpy, gui.rpy, ...) the raw content is the
+ * baseline because those files are never stripped.
  */
 export function localContentBaselineHash(file: {
+  filePath: string;
+  contentHash?: string;
   lastPushedContentHash: string | null;
   originalContent: string | null;
 }): string | null {
   if (file.lastPushedContentHash) return file.lastPushedContentHash;
   if (!file.originalContent) return null;
+  // Old imports without an explicit push baseline used the generic notice
+  // and stripped even standard UI files. Recognize that exact historical
+  // content only when it matches the current hash, so changing our ownership
+  // policy or notice wording does not invent a local edit. Ignoring the path
+  // here intentionally reproduces the legacy strip, never export behavior.
+  if (file.contentHash) {
+    const legacy = extractAndStripRpySymbols(file.originalContent);
+    if (
+      legacy.characters.length ||
+      legacy.variables.length ||
+      legacy.stats.length
+    ) {
+      const legacyContent = legacy.cleanedContent.replace(
+        /^[^\n]*\n/,
+        `${BRANCHFORGE_MANAGED_NOTICE}\n`
+      );
+      const legacyHash = calculateContentHash(legacyContent);
+      if (file.contentHash === legacyHash) return legacyHash;
+    }
+  }
   const cleaned = extractAndStripRpySymbols(
-    file.originalContent
+    file.originalContent,
+    file.filePath
   ).cleanedContent;
   return calculateContentHash(cleaned);
 }
@@ -27,6 +55,7 @@ export function localContentBaselineHash(file: {
  * True when the stored file content differs from the last-pushed baseline.
  */
 export function hasUnpushedLocalContent(file: {
+  filePath: string;
   contentHash: string;
   lastPushedContentHash: string | null;
   originalContent: string | null;

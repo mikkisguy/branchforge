@@ -20,6 +20,17 @@ import { countCharOutsideStrings } from "./rpy-helpers.js";
 export const DEFAULT_EXCLUDED_RENPY_TAGS = ["n", "u", "narrator", "extend"];
 
 /**
+ * Ren'Py source files whose declarations are owned by the user's project
+ * and must never be stripped or promoted by BranchForge.
+ */
+const SOURCE_OWNED_RPY_BASENAMES = new Set([
+  "screens.rpy",
+  "screen.rpy",
+  "options.rpy",
+  "gui.rpy",
+]);
+
+/**
  * A character definition detected in RPY content.
  *
  * Mirrors the columns of the `characters` table that are populated
@@ -70,6 +81,95 @@ export interface RpySymbolExtraction {
   variables: DetectedDefaultStatement[];
   /** Unique `default` statements whose value is numeric. */
   stats: DetectedDefaultStatement[];
+}
+
+// ============================================================================
+// Source ownership
+// ============================================================================
+
+/**
+ * True when the file is one of the Ren'Py standard configuration/UI
+ * files whose declarations are owned by the user's project.
+ *
+ * Matches case-insensitive exact basenames: `screens.rpy`,
+ * `screen.rpy` (an existing parser alias), `options.rpy`, and
+ * `gui.rpy`. Only the basename is considered; a directory named
+ * `screens` or a file like `my_screens.rpy` does not match.
+ */
+export function isSourceOwnedRpyFile(filePath: string): boolean {
+  const normalized = filePath.replace(/\\/g, "/");
+  const basename = normalized.split("/").pop() ?? "";
+  return SOURCE_OWNED_RPY_BASENAMES.has(basename.toLowerCase());
+}
+
+/**
+ * Collect the plain identifier names declared on the LHS of
+ * `define`/`default` assignments in source-owned RPY content.
+ *
+ * This is used to prevent BranchForge-managed symbols from colliding
+ * with names the user has already claimed in `screens.rpy`,
+ * `options.rpy`, `gui.rpy`, etc. Commented-out lines are ignored.
+ */
+export function collectSourceOwnedRpyDeclarations(
+  content: string
+): Set<string> {
+  const names = new Set<string>();
+  const lines = content.replace(/^\uFEFF/, "").split("\n");
+  let quote: string | null = null;
+  let screenIndent: number | null = null;
+  for (const line of lines) {
+    // Screen defaults are local, but declarations inside init blocks are
+    // global. Follow screen indentation rather than ignoring all indentation.
+    const trimmed = line.trim();
+    if (quote === null && trimmed !== "" && !trimmed.startsWith("#")) {
+      const indent = line.search(/\S/);
+      if (screenIndent !== null && indent <= screenIndent) screenIndent = null;
+      if (/^(?:init(?:\s+-?\d+)?\s+)?screen(?:\s+\d+)?\s+\w+/.test(trimmed)) {
+        screenIndent = indent;
+      }
+      if (screenIndent === null) {
+        // Require `=` so dotted names do not claim their root identifier.
+        const match = trimmed.match(
+          /^(?:init(?:\s+-?\d+)?\s+)?(?:define|default)\s+(?:-?\d+\s+)?([a-zA-Z_][a-zA-Z0-9_]*)\s*=/
+        );
+        if (match) names.add(match[1]);
+      }
+    }
+    // Multiline text can contain declaration examples. Track strings so
+    // those examples cannot suppress an unrelated managed declaration.
+    for (let i = 0; i < line.length; i += 1) {
+      if (quote !== null) {
+        if (line[i] === "\\") {
+          i += 1;
+        } else if (line.startsWith(quote, i)) {
+          i += quote.length - 1;
+          quote = null;
+        }
+      } else if (line[i] === "#") {
+        break;
+      } else if (line[i] === '"' || line[i] === "'") {
+        quote = line.startsWith(line[i].repeat(3), i)
+          ? line[i].repeat(3)
+          : line[i];
+        i += quote.length - 1;
+      }
+    }
+  }
+  return names;
+}
+
+/** Global store names owned by the active protected source files. */
+export function collectSourceOwnedRpySymbolKeys(
+  files: ReadonlyArray<{ filePath: string; content: string }>
+): Set<string> {
+  const names = new Set<string>();
+  for (const file of files) {
+    if (!isSourceOwnedRpyFile(file.filePath)) continue;
+    for (const name of collectSourceOwnedRpyDeclarations(file.content)) {
+      names.add(name);
+    }
+  }
+  return names;
 }
 
 // ============================================================================
@@ -136,17 +236,31 @@ export function computeCommonDirectoryPrefix(filePaths: string[]): string {
  * - If nothing managed was stripped, prior BranchForge notices and
  *   all other content are left unchanged.
  * - De-duplicates results by `tag` / `key` (first occurrence wins).
+ * - For source-owned files (`screens.rpy`, `options.rpy`, `gui.rpy`)
+ *   the content is returned byte-for-byte with empty symbol arrays.
  *
  * The function is intentionally permissive: it does not filter by
  * Ren'Py special tags ("n", "u", "narrator", "extend"). Callers that
  * need that filtering can drop unwanted entries from the result.
  *
  * @param content - The RPY file content to process
+ * @param filePath - Optional file path; when it is a source-owned
+ *   file the content is preserved verbatim.
  * @returns The cleaned content and the extracted symbols
  */
 export function extractAndStripRpySymbols(
-  content: string
+  content: string,
+  filePath?: string
 ): RpySymbolExtraction {
+  if (filePath && isSourceOwnedRpyFile(filePath)) {
+    return {
+      cleanedContent: content,
+      characters: [],
+      variables: [],
+      stats: [],
+    };
+  }
+
   const lines = content.split("\n");
   const output: string[] = [];
 
@@ -273,7 +387,14 @@ export function extractAndStripRpySymbols(
     while (cleaned.length > 0 && cleaned[0].trim() === "") {
       cleaned.shift();
     }
-    cleaned.unshift(BRANCHFORGE_MANAGED_NOTICE, "");
+    const categories: ManagedCategory[] = [];
+    if (charactersByTag.size > 0) categories.push("character definitions");
+    if (variablesByKey.size > 0) categories.push("boolean variable defaults");
+    if (statsByKey.size > 0) categories.push("numeric stat defaults");
+    const notice = buildManagedNotice(categories);
+    if (notice) {
+      cleaned.unshift(notice, "");
+    }
     return {
       cleanedContent: cleaned.join("\n"),
       characters: Array.from(charactersByTag.values()),
@@ -290,19 +411,50 @@ export function extractAndStripRpySymbols(
   };
 }
 
-/** Single top-of-file notice when managed symbols were stripped. */
+/** Legacy top-of-file notice kept for backward compatibility. */
 export const BRANCHFORGE_MANAGED_NOTICE =
   "# [BranchForge] Managed Character()/default statements were moved out of this file (exported as branchforge_*.rpy).";
+
+type ManagedCategory =
+  | "character definitions"
+  | "boolean variable defaults"
+  | "numeric stat defaults";
+
+const CATEGORY_TO_FILE: Record<ManagedCategory, string> = {
+  "character definitions": "branchforge_definitions.rpy",
+  "boolean variable defaults": "branchforge_variables.rpy",
+  "numeric stat defaults": "branchforge_stats.rpy",
+};
+
+function buildManagedNotice(categories: ManagedCategory[]): string | null {
+  if (categories.length === 0) return null;
+  const joined = joinManagedCategories(categories);
+  const files = [...new Set(categories.map((c) => CATEGORY_TO_FILE[c]))].join(
+    ", "
+  );
+  return `# [BranchForge] Managed ${joined} were moved out of this file (exported as ${files}).`;
+}
+
+function joinManagedCategories(categories: ManagedCategory[]): string {
+  if (categories.length === 1) return categories[0];
+  if (categories.length === 2) return `${categories[0]} and ${categories[1]}`;
+  const allButLast = categories.slice(0, -1).join(", ");
+  return `${allButLast}, and ${categories[categories.length - 1]}`;
+}
 
 /**
  * True for BranchForge import notices we own — the current top-of-file
  * notice and legacy per-symbol breadcrumbs from an earlier experiment.
  */
 function isBranchForgeImportNotice(trimmed: string): boolean {
-  if (trimmed === BRANCHFORGE_MANAGED_NOTICE) return true;
-  if (trimmed.startsWith("# [BranchForge] Managed Character()/default")) {
+  // New accurate notices and the legacy generic notice.
+  if (
+    trimmed.startsWith("# [BranchForge] Managed") &&
+    trimmed.includes("moved out of this file")
+  ) {
     return true;
   }
+  // Legacy per-symbol breadcrumb notices.
   return /^# \[BranchForge\] (Character|Variable|Stat) '.+' moved to /.test(
     trimmed
   );

@@ -15,6 +15,15 @@ import {
   extractAndStripRpySymbols,
 } from "../rpy-statements.service.js";
 
+const CHARACTER_NOTICE =
+  "# [BranchForge] Managed character definitions were moved out of this file (exported as branchforge_definitions.rpy).";
+const VARIABLE_NOTICE =
+  "# [BranchForge] Managed boolean variable defaults were moved out of this file (exported as branchforge_variables.rpy).";
+const STAT_NOTICE =
+  "# [BranchForge] Managed numeric stat defaults were moved out of this file (exported as branchforge_stats.rpy).";
+const CHARACTER_STAT_NOTICE =
+  "# [BranchForge] Managed character definitions and numeric stat defaults were moved out of this file (exported as branchforge_definitions.rpy, branchforge_stats.rpy).";
+
 describe("rpy-statements.service", () => {
   // ---------------------------------------------------------------------
   // computeCommonDirectoryPrefix
@@ -132,9 +141,7 @@ describe("rpy-statements.service", () => {
         { tag: "e", name: "Eileen", color: "#c8ffc8" },
       ]);
       expect(result.cleanedContent).not.toContain("define e = Character");
-      expect(result.cleanedContent.split("\n")[0]).toBe(
-        BRANCHFORGE_MANAGED_NOTICE
-      );
+      expect(result.cleanedContent.split("\n")[0]).toBe(CHARACTER_NOTICE);
       expect(result.cleanedContent.split("\n")[1]).toBe("");
       expect(result.cleanedContent).toContain("label start:");
       expect(result.cleanedContent).toContain('e "Hello."');
@@ -162,9 +169,7 @@ describe("rpy-statements.service", () => {
       expect(result.cleanedContent).not.toContain("define e = Character");
       expect(result.cleanedContent).not.toContain('"Eileen",');
       expect(result.cleanedContent).not.toContain("who_color=");
-      expect(result.cleanedContent.split("\n")[0]).toBe(
-        BRANCHFORGE_MANAGED_NOTICE
-      );
+      expect(result.cleanedContent.split("\n")[0]).toBe(CHARACTER_NOTICE);
       expect(result.cleanedContent.split("\n")[1]).toBe("");
       expect(result.cleanedContent).toContain("label start:");
     });
@@ -245,9 +250,7 @@ describe("rpy-statements.service", () => {
       expect(result.stats).toEqual([]);
       expect(result.cleanedContent).not.toContain("default met_alex");
       expect(result.cleanedContent).not.toContain("default has_key");
-      expect(result.cleanedContent.split("\n")[0]).toBe(
-        BRANCHFORGE_MANAGED_NOTICE
-      );
+      expect(result.cleanedContent.split("\n")[0]).toBe(VARIABLE_NOTICE);
       expect(result.cleanedContent.split("\n")[1]).toBe("");
     });
 
@@ -269,9 +272,7 @@ describe("rpy-statements.service", () => {
       ]);
       expect(result.variables).toEqual([]);
       expect(result.cleanedContent).not.toContain("default affection");
-      expect(result.cleanedContent.split("\n")[0]).toBe(
-        BRANCHFORGE_MANAGED_NOTICE
-      );
+      expect(result.cleanedContent.split("\n")[0]).toBe(STAT_NOTICE);
       expect(result.cleanedContent.split("\n")[1]).toBe("");
       expect(result.cleanedContent).not.toContain("default trust");
       expect(result.cleanedContent).not.toContain("default max_value");
@@ -348,7 +349,7 @@ describe("rpy-statements.service", () => {
       const result = extractAndStripRpySymbols(content);
       expect(result.cleanedContent).toBe(
         [
-          BRANCHFORGE_MANAGED_NOTICE,
+          CHARACTER_NOTICE,
           "",
           "# header comment",
           "",
@@ -378,9 +379,7 @@ describe("rpy-statements.service", () => {
       ]);
       expect(result.cleanedContent).not.toContain("define e = Character");
       expect(result.cleanedContent).not.toContain("default affection");
-      expect(result.cleanedContent.split("\n")[0]).toBe(
-        BRANCHFORGE_MANAGED_NOTICE
-      );
+      expect(result.cleanedContent.split("\n")[0]).toBe(CHARACTER_STAT_NOTICE);
       expect(result.cleanedContent.split("\n")[1]).toBe("");
       expect(result.cleanedContent).toContain("label start:");
       expect(result.cleanedContent).toContain("    return");
@@ -445,10 +444,10 @@ describe("rpy-statements.service", () => {
 
       const result = extractAndStripRpySymbols(content);
       const lines = result.cleanedContent.split("\n");
-      expect(lines[0]).toBe(BRANCHFORGE_MANAGED_NOTICE);
+      expect(lines[0]).toBe(CHARACTER_NOTICE);
       expect(lines[1]).toBe("");
       expect(lines.filter((l) => l.includes("# [BranchForge]"))).toEqual([
-        BRANCHFORGE_MANAGED_NOTICE,
+        CHARACTER_NOTICE,
       ]);
       expect(result.cleanedContent).not.toContain("define e = Character");
     });

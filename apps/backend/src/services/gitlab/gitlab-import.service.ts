@@ -37,6 +37,7 @@ import type {
 } from "../gitlab.types.js";
 import {
   extractAndStripRpySymbols,
+  isSourceOwnedRpyFile,
   DEFAULT_EXCLUDED_RENPY_TAGS,
   type DetectedDefaultStatement,
 } from "../rpy-statements.service.js";
@@ -374,7 +375,7 @@ export async function importFromGitlab(
       }
 
       const parsed = parseRPYFileWithLabels(content, file.path);
-      const symbols = extractAndStripRpySymbols(content);
+      const symbols = extractAndStripRpySymbols(content, file.path);
       const contentHash = calculateContentHash(symbols.cleanedContent);
       preparedFiles.push({
         file,
@@ -550,6 +551,13 @@ export async function importFromGitlab(
         // Only promote symbols and review characters from files whose content
         // we accepted. Preserved/rejected files must not leak their definitions.
         if (!applyLabels) {
+          continue;
+        }
+
+        // Source-owned files (screens.rpy, gui.rpy, ...) keep their
+        // declarations verbatim; they must never enter the character review
+        // or auto-promotion.
+        if (isSourceOwnedRpyFile(prepared.file.path)) {
           continue;
         }
 

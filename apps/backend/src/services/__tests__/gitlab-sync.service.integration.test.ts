@@ -36,7 +36,7 @@ import {
   projectFilePendingOperations,
   gitlabSyncOperations,
 } from "../../db/schema/index.js";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { NotFoundError } from "../../middleware/error-handler.middleware.js";
 import {
   detectConflicts,
@@ -1437,6 +1437,91 @@ describe("GitLabSyncService (Integration)", () => {
         await db.delete(labelsTable).where(eq(labelsTable.id, nullHashLabelId));
       }
     });
+
+    it("keeps a restored protected source verbatim and clears a stale generated quick_menu declaration", async () => {
+      const raw =
+        'default quick_menu = True\n\nscreen quick_menu():\n    text "Menu"\n';
+      await db.delete(variables).where(eq(variables.projectId, testProjectId));
+      await db
+        .update(projectFiles)
+        .set({
+          filePath: "game/gui.rpy",
+          fileType: "STORY",
+          content: raw,
+          contentHash: calculateContentHash(raw),
+          originalContent: raw,
+          lastPushedContentHash: calculateContentHash(raw),
+          remoteFilePath: "game/gui.rpy",
+          remoteContent: raw,
+          remoteContentHash: calculateContentHash(raw),
+        })
+        .where(eq(projectFiles.id, testGitlabFileId));
+      // Stale DB row left behind by an earlier import of the generated
+      // file or a previous parser version.
+      await db.insert(variables).values({
+        id: testUuid("76000000", 42),
+        projectId: testProjectId,
+        key: "quick_menu",
+      });
+
+      vi.spyOn(
+        gitlabRepoService,
+        "getFileContentWithMetadata"
+      ).mockImplementation(async (_p, _u, filePath) => ({
+        content:
+          filePath === "game/branchforge_variables.rpy"
+            ? "default quick_menu = False\n"
+            : filePath === "game/gui.rpy"
+              ? raw
+              : null,
+        lastCommitId: "remote-rev-stale",
+        contentSha256: null,
+        blobId: null,
+      }));
+      const commitSpy = vi
+        .spyOn(gitlabFileService, "batchCommitFiles")
+        .mockResolvedValue("commit-stale-generated");
+
+      const result = await exportToGitlab(
+        testProjectId,
+        testUserId,
+        testBranch,
+        "Stale generated push"
+      );
+
+      expect(result.status, result.errorMessage ?? undefined).toBe("COMPLETED");
+
+      const actions = commitSpy.mock.calls[0]?.[4] as Array<{
+        action: string;
+        filePath: string;
+        content?: string;
+      }>;
+      // The protected file itself stays untouched on the remote.
+      expect(
+        actions.find((a) => a.filePath === "game/gui.rpy")
+      ).toBeUndefined();
+
+      // The stale generated copy is overwritten WITHOUT the source-owned
+      // declaration, so no duplicate quick_menu remains on the remote.
+      const generatedUpdate = actions.find(
+        (a) => a.filePath === "game/branchforge_variables.rpy"
+      );
+      expect(generatedUpdate).toBeDefined();
+      expect(generatedUpdate?.action).toBe("update");
+      expect(generatedUpdate?.content).not.toContain("quick_menu");
+
+      // Row data remains untouched — no DB deletion of source values.
+      const [staleRow] = await db
+        .select()
+        .from(variables)
+        .where(
+          and(
+            eq(variables.projectId, testProjectId),
+            eq(variables.key, "quick_menu")
+          )
+        );
+      expect(staleRow).toBeDefined();
+    });
   });
 
   describe("exportToGitlab structural push", () => {
@@ -2783,6 +2868,90 @@ describe("GitLabSyncService (Integration)", () => {
       );
 
       expect(result.status).toBe("COMPLETED");
+    });
+
+    it("imports protected standard files verbatim without promoting symbols", async () => {
+      const { parseRPYFileWithLabels } = await import("../rpy/parser.js");
+      vi.spyOn(rpyParserService, "parseRPYFileWithLabels").mockImplementation(
+        parseRPYFileWithLabels
+      );
+      const remote =
+        'default quick_menu = True\ndefine screens_narrator = Character("Narrator")\n\nscreen quick_menu():\n    text "Menu"\n';
+      vi.spyOn(gitlabRepoService, "getBranchCommitSha").mockResolvedValue(
+        "abc123def456"
+      );
+      vi.spyOn(gitlabRepoService, "listRpyFiles").mockResolvedValue([
+        { name: "gui.rpy", path: "game/gui.rpy" },
+      ]);
+      vi.spyOn(
+        gitlabRepoService,
+        "getFileContentWithMetadata"
+      ).mockResolvedValue({
+        content: remote,
+        lastCommitId: "remote-rev-protected",
+        contentSha256: null,
+        blobId: null,
+      });
+
+      const result = await importFromGitlab(
+        testProjectId,
+        testUserId,
+        testBranch,
+        "gitlab_wins" as ConflictResolution
+      );
+
+      expect(result.status, result.errorMessage ?? undefined).toBe("COMPLETED");
+
+      const [file] = await db
+        .select()
+        .from(projectFiles)
+        .where(
+          and(
+            eq(projectFiles.projectId, testProjectId),
+            eq(projectFiles.filePath, "game/gui.rpy")
+          )
+        );
+      expect(file).toBeDefined();
+      expect(file?.content).toBe(remote);
+      expect(file?.fileType).toBe("SETTINGS");
+
+      expect(result.characterReview).toMatchObject({
+        characters: [],
+        conflicts: [],
+      });
+
+      const [promotedVariable] = await db
+        .select()
+        .from(variables)
+        .where(
+          and(
+            eq(variables.projectId, testProjectId),
+            eq(variables.key, "quick_menu")
+          )
+        );
+      expect(promotedVariable).toBeUndefined();
+
+      const [promotedCharacter] = await db
+        .select()
+        .from(characters)
+        .where(
+          and(
+            eq(characters.projectId, testProjectId),
+            eq(characters.renpyTag, "screens_narrator")
+          )
+        );
+      expect(promotedCharacter).toBeUndefined();
+
+      const promotedLabels = await db
+        .select()
+        .from(labelsTable)
+        .where(
+          and(
+            eq(labelsTable.projectId, testProjectId),
+            eq(labelsTable.projectFileId, file!.id)
+          )
+        );
+      expect(promotedLabels).toEqual([]);
     });
   });
 });

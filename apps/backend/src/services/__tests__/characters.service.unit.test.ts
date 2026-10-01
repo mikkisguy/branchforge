@@ -392,6 +392,65 @@ describe("CharactersService.importCharacters", () => {
   });
 });
 
+describe("CharactersService.detectCharacters", () => {
+  const projectId = "project-123";
+  const userId = "user-123";
+
+  beforeEach(() => {
+    // getProjectSettings inserts default settings when none exist
+    mockInsert.mockImplementation(() => ({
+      values: vi.fn(() => ({
+        onConflictDoNothing: vi.fn(() => Promise.resolve()),
+        onConflictDoUpdate: vi.fn(() => Promise.resolve()),
+        returning: vi.fn(() => Promise.resolve([] as unknown[])),
+      })),
+    }));
+    // Select order: projectSettings, characters, projectFiles
+    const settingsRow = {
+      projectId,
+      excludedCharacterTags: ["n", "u", "narrator", "extend"],
+      narratorCharacterTags: [],
+      autoLinkSpeakers: true,
+    };
+    const projectFilesRows = [
+      {
+        source: "GITLAB",
+        filePath: "game/gui.rpy",
+        content:
+          'define quick_menu = True\ndefine narrator_char = Character("Narrator")',
+        originalContent: null,
+        remoteContent: null,
+        hasRemoteConflict: false,
+      },
+      {
+        source: "GITLAB",
+        filePath: "game/script.rpy",
+        content: 'define story_char = Character("Story")',
+        originalContent: null,
+        remoteContent: null,
+        hasRemoteConflict: false,
+      },
+    ];
+    const selectResults = [[settingsRow], [], projectFilesRows];
+    let selectIndex = 0;
+    mockSelect.mockImplementation(() => {
+      const resolveValue = selectResults[selectIndex++] ?? [];
+      return createSelectChain(resolveValue);
+    });
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("excludes source-owned standard files from detection", async () => {
+    const result = await charactersService.detectCharacters(projectId, userId);
+
+    expect(result.characters.map((c) => c.tag)).toEqual(["story_char"]);
+    expect(result.characters.map((c) => c.tag)).not.toContain("narrator_char");
+  });
+});
+
 describe("CharactersService.updateCharacter", () => {
   const characterId = "char-boss";
   const userId = "user-123";
