@@ -4,6 +4,10 @@ All notable changes to BranchForge will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v1.0.0-beta.14 - 2026-10-01
+
+- Fixed Ren’Py imports and exports modifying defaults in standard UI and configuration files.
+
 ## v1.0.0-beta.13 - 2026-10-01
 
 - Fixed generic GitLab pull errors and improved feedback.
