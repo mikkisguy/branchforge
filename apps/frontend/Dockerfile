@@ -16,6 +16,9 @@ COPY tsconfig.base.json ./
 COPY scripts ./scripts
 COPY packages/shared ./packages/shared
 COPY apps/frontend ./apps/frontend
+# pnpm checks every locked workspace manifest during frozen installs.
+COPY apps/backend/package.json ./apps/backend/package.json
+COPY apps/docs/package.json ./apps/docs/package.json
 
 # Install dependencies
 RUN pnpm install --frozen-lockfile
