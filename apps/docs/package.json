@@ -14,7 +14,7 @@
   },
   "devDependencies": {
     "prettier": "^3.8.4",
-    "typescript": "^5.9.3",
+    "typescript": "^7.0.0",
     "vitepress": "^1.6.3"
   }
 }
