@@ -66,9 +66,9 @@ function validateRoute(form: RouteFormState): RouteFormErrors {
     errors.routeName = "Route name is required";
   }
 
-  if (!form.jumpPrefix.trim()) {
+  if (import.meta.env.DEV && !form.jumpPrefix.trim()) {
     errors.jumpPrefix = "Jump prefix is required";
-  } else if (!isValidJumpPrefix(form.jumpPrefix)) {
+  } else if (import.meta.env.DEV && !isValidJumpPrefix(form.jumpPrefix)) {
     errors.jumpPrefix =
       "Jump prefix can only contain letters, numbers, underscores, and hyphens";
   }
@@ -228,53 +228,56 @@ function RouteFormContent({
               </div>
             </div>
 
-            <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-3">
-              <div className="space-y-1">
-                <Label htmlFor="jump-prefix" className="text-xs">
-                  Jump Prefix *
-                </Label>
-                <Input
-                  id="jump-prefix"
-                  type="text"
-                  placeholder="hero_"
-                  value={form.jumpPrefix}
-                  onChange={(event) =>
-                    handleChange("jumpPrefix", event.target.value)
-                  }
-                  disabled={isSaving}
-                  aria-required="true"
-                  aria-invalid={!!errors.jumpPrefix}
-                  aria-describedby={
-                    errors.jumpPrefix ? "jump-prefix-error" : undefined
-                  }
-                />
-                <FormErrorMessage
-                  id="jump-prefix-error"
-                  message={errors.jumpPrefix}
-                />
-              </div>
+            {/* Development-only until naming/shared behavior is wired: https://github.com/mikkisguy/branchforge/issues/435 */}
+            {import.meta.env.DEV && (
+              <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-3">
+                <div className="space-y-1">
+                  <Label htmlFor="jump-prefix" className="text-xs">
+                    Jump Prefix *
+                  </Label>
+                  <Input
+                    id="jump-prefix"
+                    type="text"
+                    placeholder="hero_"
+                    value={form.jumpPrefix}
+                    onChange={(event) =>
+                      handleChange("jumpPrefix", event.target.value)
+                    }
+                    disabled={isSaving}
+                    aria-required="true"
+                    aria-invalid={!!errors.jumpPrefix}
+                    aria-describedby={
+                      errors.jumpPrefix ? "jump-prefix-error" : undefined
+                    }
+                  />
+                  <FormErrorMessage
+                    id="jump-prefix-error"
+                    message={errors.jumpPrefix}
+                  />
+                </div>
 
-              <div className="space-y-1">
-                <Label htmlFor="route-type" className="text-xs">
-                  Route Type
-                </Label>
-                <Select
-                  id="route-type"
-                  value={form.isShared ? "shared" : "exclusive"}
-                  onChange={(value) =>
-                    handleChange("isShared", value === "shared")
-                  }
-                  disabled={isSaving}
-                  options={[
-                    { value: "exclusive", label: "Exclusive Route" },
-                    { value: "shared", label: "Shared/Common Route" },
-                  ]}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Shared routes appear in all story branches
-                </p>
+                <div className="space-y-1">
+                  <Label htmlFor="route-type" className="text-xs">
+                    Route Type
+                  </Label>
+                  <Select
+                    id="route-type"
+                    value={form.isShared ? "shared" : "exclusive"}
+                    onChange={(value) =>
+                      handleChange("isShared", value === "shared")
+                    }
+                    disabled={isSaving}
+                    options={[
+                      { value: "exclusive", label: "Exclusive Route" },
+                      { value: "shared", label: "Shared/Common Route" },
+                    ]}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Shared routes appear in all story branches
+                  </p>
+                </div>
               </div>
-            </div>
+            )}
 
             <div className="flex justify-end gap-2">
               <Button
@@ -353,15 +356,21 @@ export function RouteEditDialog({
         if (id) {
           await updateRouteConfig(id, {
             routeName: formData.routeName.trim(),
-            jumpPrefix: formData.jumpPrefix.trim(),
-            isShared: formData.isShared,
+            ...(import.meta.env.DEV
+              ? {
+                  jumpPrefix: formData.jumpPrefix.trim(),
+                  isShared: formData.isShared,
+                }
+              : {}),
           });
         } else {
           await createRouteConfig({
             routeKey: formData.routeKey.trim(),
             routeName: formData.routeName.trim(),
-            jumpPrefix: formData.jumpPrefix.trim(),
-            isShared: formData.isShared,
+            jumpPrefix: import.meta.env.DEV
+              ? formData.jumpPrefix.trim()
+              : formData.routeKey.trim(),
+            isShared: import.meta.env.DEV ? formData.isShared : false,
           });
         }
       }}

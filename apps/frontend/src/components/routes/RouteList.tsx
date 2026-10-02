@@ -68,14 +68,19 @@ export function RouteList({
                 <span className="text-xs font-mono text-muted-foreground">
                   {route.routeKey}
                 </span>
-                <span className="text-xs px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground">
-                  {route.isShared ? "Shared" : "Exclusive"}
-                </span>
+                {/* Development-only route metadata: https://github.com/mikkisguy/branchforge/issues/435 */}
+                {import.meta.env.DEV && (
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground">
+                    {route.isShared ? "Shared" : "Exclusive"}
+                  </span>
+                )}
               </div>
-              <div className="text-xs text-muted-foreground mt-1">
-                Jump prefix:{" "}
-                <span className="font-mono">{route.jumpPrefix}</span>
-              </div>
+              {import.meta.env.DEV && (
+                <div className="text-xs text-muted-foreground mt-1">
+                  Jump prefix:{" "}
+                  <span className="font-mono">{route.jumpPrefix}</span>
+                </div>
+              )}
             </div>
             <div className="flex items-center gap-2">
               <Button

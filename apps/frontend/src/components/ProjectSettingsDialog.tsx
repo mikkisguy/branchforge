@@ -80,7 +80,10 @@ const TAB_ICONS: Record<
   visual: Wand2,
 };
 
-/** Visual System is stored but unused by authoring/export; hide it in production. */
+/**
+ * Visual System is stored but unused by authoring/export; hide it in production.
+ * Track completion: https://github.com/mikkisguy/branchforge/issues/435
+ */
 const SHOW_VISUAL_SYSTEM_TAB = import.meta.env.DEV;
 
 const TAB_ORDER: SettingsTab[] = [
