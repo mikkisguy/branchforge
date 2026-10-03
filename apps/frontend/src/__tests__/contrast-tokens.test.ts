@@ -23,6 +23,7 @@ import {
   type RGB,
 } from "@/test/contrast-utils";
 import { DARK_TOKENS, LIGHT_TOKENS } from "@/test/theme-tokens";
+import { buttonVariants } from "@/components/ui/button-variants";
 
 // ---------------------------------------------------------------------------
 // CSS token definitions
@@ -175,6 +176,54 @@ describe("Light mode token contrast (WCAG AA)", () => {
     assertContrast("accent-foreground", "accent", t, 4.5, m));
   it("destructive-foreground on destructive >= 4.5:1", () =>
     assertContrast("destructive-foreground", "destructive", t, 4.5, m));
+});
+
+describe("Destructive ghost button contrast", () => {
+  const classes = buttonVariants({ variant: "destructive-ghost" });
+  const text = classes.match(
+    /text-\[color-mix\(in_srgb,hsl\(var\(--([\w-]+)\)\),hsl\(var\(--([\w-]+)\)\)_(\d+)%\)\]/
+  );
+  const hover = classes.match(/hover:bg-([\w-]+)\/(\d+)/);
+
+  function mix(a: RGB, b: RGB, weight: number): RGB {
+    return {
+      r: a.r * (1 - weight) + b.r * weight,
+      g: a.g * (1 - weight) + b.g * weight,
+      b: a.b * (1 - weight) + b.b * weight,
+    };
+  }
+
+  for (const [mode, tokens] of [
+    ["dark", DARK_TOKENS],
+    ["light", LIGHT_TOKENS],
+  ] as const) {
+    it(`${mode}: normal and hovered text >= 4.5:1 on supported surfaces`, () => {
+      if (!text || !hover) {
+        throw new Error("Update contrast evaluation for the button's colors");
+      }
+      const fg = mix(
+        rgbFor(tokens, text[1]),
+        rgbFor(tokens, text[2]),
+        Number(text[3]) / 100
+      );
+      for (const surface of ["background", "panel", "raised"]) {
+        const bg = rgbFor(tokens, surface);
+        const hoveredBg = mix(
+          bg,
+          rgbFor(tokens, hover[1]),
+          Number(hover[2]) / 100
+        );
+        for (const background of [bg, hoveredBg]) {
+          const ratio = contrastRatioRgb(fg, background);
+          if (ratio < 4.5) {
+            throw new Error(
+              `${mode} ${surface}: ${ratio.toFixed(2)}:1 < 4.5:1`
+            );
+          }
+        }
+      }
+    });
+  }
 });
 
 // ---------------------------------------------------------------------------

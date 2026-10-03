@@ -595,9 +595,8 @@ function PendingFileChangesSection({
         {changes.length > 0 && (
           <Button
             type="button"
-            variant="outline"
+            variant="destructive-ghost"
             size="sm"
-            className="border-destructive-muted/50 bg-destructive/10 text-destructive-muted hover:bg-destructive/20 hover:text-destructive-muted"
             onClick={onDiscardAll}
           >
             <Trash2 aria-hidden="true" />

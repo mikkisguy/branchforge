@@ -151,12 +151,11 @@ export function SettingsModalUserTab({ user }: SettingsModalUserTabProps) {
                 <Tooltip content="Remove your profile image" side="top">
                   <Button
                     type="button"
-                    variant="ghost"
+                    variant="destructive-ghost"
                     size="sm"
                     onClick={() => deleteAvatar()}
                     disabled={isUserSectionBusy}
                     aria-label="Remove avatar"
-                    className="text-destructive hover:bg-destructive/10 hover:text-destructive"
                   >
                     <X className="size-4" />
                   </Button>
