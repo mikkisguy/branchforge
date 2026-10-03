@@ -4,6 +4,10 @@ All notable changes to BranchForge will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v1.0.0-beta.16 - 2026-10-03
+
+- Fixed character avatar display in sidebar and enhanced the avatar storage.
+
 ## v1.0.0-beta.15 - 2026-10-02
 
 - Cleaned up currently development only features
