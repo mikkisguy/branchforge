@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { BookOpen, Heart } from "lucide-react";
 import { CharacterAvatarChip } from "@/components/ui/CharacterAvatarChip";
 import { CollapsibleSection } from "@/components/ide-shared/CollapsibleSection";
@@ -8,6 +8,37 @@ interface LabelPropertiesPanelCharactersProps {
   activeLabel: LabelDetail;
   characters: Character[];
   onCharacterEdit?: (characterId: string) => void;
+}
+
+/**
+ * Circular character avatar for the label properties panel.
+ *
+ * Renders the avatar image when available and falls back to the colored
+ * initial circle when no avatar exists or when the image
+ * fails to load. The failure is tracked per URL, so a changed avatar URL
+ * retries automatically.
+ */
+function CharacterAvatar({ char }: { char: Character }) {
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
+  const showImage = char.avatarUrl !== null && char.avatarUrl !== failedUrl;
+
+  return (
+    <div
+      className="size-10 rounded-full overflow-hidden flex items-center justify-center text-white text-sm font-medium shrink-0 shadow-sm"
+      style={{ backgroundColor: char.color }}
+    >
+      {showImage && char.avatarUrl ? (
+        <img
+          src={char.avatarUrl}
+          alt=""
+          className="size-10 rounded-full object-cover"
+          onError={() => setFailedUrl(char.avatarUrl)}
+        />
+      ) : (
+        char.displayName[0] || "?"
+      )}
+    </div>
+  );
 }
 
 export function LabelPropertiesPanelCharacters({
@@ -50,12 +81,7 @@ export function LabelPropertiesPanelCharacters({
             {resolvedLabelChars.map((char) => {
               const content = (
                 <>
-                  <div
-                    className="size-10 rounded-full flex items-center justify-center text-white text-sm font-medium shrink-0 shadow-sm"
-                    style={{ backgroundColor: char.color }}
-                  >
-                    {char.displayName[0] || "?"}
-                  </div>
+                  <CharacterAvatar char={char} />
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium truncate">
                       {char.displayName}

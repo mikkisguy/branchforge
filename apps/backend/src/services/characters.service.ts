@@ -26,7 +26,7 @@ import {
 import { characterLinkerService } from "./character-linker.service.js";
 import { requireProjectOwnership } from "./authz.service.js";
 import { deleteAvatar as deleteAvatarFile } from "./image-processing.service.js";
-import { getAvatarFullPath } from "../lib/storage.js";
+import { tryGetAvatarFullPath } from "../lib/storage.js";
 import { logWarn, LogEventType } from "../lib/logger.js";
 import {
   uploadAvatar as uploadAvatarFile,
@@ -685,13 +685,18 @@ export class CharactersService {
     await db.delete(characters).where(eq(characters.id, characterId));
 
     if (character.avatarUrl) {
-      try {
-        await deleteAvatarFile(getAvatarFullPath(character.avatarUrl));
-      } catch {
-        logWarn(LogEventType.SERVICE_ERROR, {
-          message: `Failed to delete avatar file: ${character.avatarUrl}`,
-          characterId,
-        });
+      // Invalid/legacy stored values resolve to null: skip file deletion so
+      // flat legacy files are never touched.
+      const avatarPath = tryGetAvatarFullPath(character.avatarUrl, "character");
+      if (avatarPath) {
+        try {
+          await deleteAvatarFile(avatarPath);
+        } catch {
+          logWarn(LogEventType.SERVICE_ERROR, {
+            message: `Failed to delete avatar file: ${character.avatarUrl}`,
+            characterId,
+          });
+        }
       }
     }
   }

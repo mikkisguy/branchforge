@@ -2,7 +2,7 @@
  * Character Edit Dialog — Avatar Upload Section
  */
 
-import { Upload } from "lucide-react";
+import { Trash2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -64,12 +64,12 @@ export function CharacterEditDialogAvatarSection({
           {(form.avatarPreview || form.avatarUrl) && (
             <Button
               type="button"
-              variant="ghost"
+              variant="destructive-ghost"
               size="sm"
               onClick={handleAvatarRemove}
               disabled={isSaving}
-              className="text-destructive h-8 px-2 text-xs"
             >
+              <Trash2 aria-hidden="true" className="size-4" />
               Remove Avatar
             </Button>
           )}

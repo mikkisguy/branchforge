@@ -198,7 +198,7 @@ export function VisualPreviewModal({
               </Button>
               <Button
                 type="button"
-                variant="destructive"
+                variant="destructive-ghost"
                 onClick={handleDelete}
                 disabled={isBusy}
               >

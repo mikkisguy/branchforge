@@ -45,6 +45,7 @@ describe("WCAG AA Component Contrast", () => {
         <Button variant="secondary">Secondary</Button>
         <Button variant="outline">Outline</Button>
         <Button variant="destructive">Destructive</Button>
+        <Button variant="destructive-ghost">Remove Avatar</Button>
         <Button variant="ghost">Ghost</Button>
       </div>
     );

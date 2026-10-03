@@ -9,6 +9,8 @@ export const buttonVariants = cva(
           "bg-[var(--theme-color)] hover:bg-[var(--theme-color-hover)] text-[var(--theme-foreground)] hover:text-[var(--theme-foreground-hover)] shadow-md hover:shadow-lg transition-all duration-200",
         destructive:
           "bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90",
+        "destructive-ghost":
+          "text-[color-mix(in_srgb,hsl(var(--destructive-muted)),hsl(var(--foreground))_20%)] hover:bg-destructive/10",
         outline:
           "border border-border/30 bg-transparent hover:bg-accent hover:text-accent-foreground transition-all",
         secondary:

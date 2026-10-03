@@ -59,17 +59,19 @@ export function ProjectImagesList({
                 alt={`Preview for ${image.normalizedTarget}`}
                 className="size-full object-cover"
               />
-              <Button
-                type="button"
-                variant="secondary"
-                size="icon"
-                className="absolute top-1 right-1 size-7 text-destructive hover:text-destructive bg-background/90 hover:bg-background shadow-sm"
-                disabled={isDeleting}
-                onClick={() => setDeleteTarget(image)}
-                aria-label={`Delete ${image.originalFilename}`}
-              >
-                <Trash2 className="size-3.5" />
-              </Button>
+              <div className="absolute top-1 right-1 rounded-md bg-background/95 shadow-sm">
+                <Button
+                  type="button"
+                  variant="destructive-ghost"
+                  size="icon"
+                  className="h-7 w-7 min-w-7"
+                  disabled={isDeleting}
+                  onClick={() => setDeleteTarget(image)}
+                  aria-label={`Delete ${image.originalFilename}`}
+                >
+                  <Trash2 aria-hidden="true" className="size-3.5" />
+                </Button>
+              </div>
             </div>
             <div className="min-w-0 px-0.5">
               <p

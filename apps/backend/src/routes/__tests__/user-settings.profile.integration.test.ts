@@ -53,7 +53,7 @@ const testUser: NewUser = {
 
 const testUserSettings: NewUserSetting = {
   userId: testUserId,
-  avatarUrl: "some-file.webp",
+  avatarUrl: "users/some-file.webp",
   username: null,
   language: "en",
   theme: "periwinkle",
@@ -428,7 +428,7 @@ describe("User Settings Profile Routes (Integration)", () => {
       const body = getResponse.json();
       // Avatar URL includes BASE_PATH prefix (/api/)
       expect(body.avatarUrl).toMatch(
-        /^\/api\/uploads\/avatars\/some-file\.webp$/
+        /^\/api\/uploads\/avatars\/users\/some-file\.webp$/
       );
     });
   });
