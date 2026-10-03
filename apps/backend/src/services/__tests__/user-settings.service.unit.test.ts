@@ -182,7 +182,7 @@ describe("User Settings Service", () => {
       process.env.BASE_PATH = "/api/";
       const rowWithAvatar = {
         ...mockExistingRow,
-        avatarUrl: "test-avatar-123.webp",
+        avatarUrl: "users/test-avatar-123.webp",
       };
       mockDb._selectChain.limit.mockResolvedValueOnce([rowWithAvatar]);
 
@@ -191,11 +191,23 @@ describe("User Settings Service", () => {
       // toPublic must build a full URL path, not return the raw filename
       expect(result.avatarUrl).toContain("test-avatar-123.webp");
       expect(result.avatarUrl).not.toBe("test-avatar-123.webp");
-      expect(result.avatarUrl).toMatch(/\/uploads\/avatars\//);
+      expect(result.avatarUrl).toBe(
+        "/api/uploads/avatars/users/test-avatar-123.webp"
+      );
 
       delete process.env.BASE_PATH;
     });
   });
+
+  it.each(["legacy-avatar.webp", "characters/avatar.webp"])(
+    "returns null for unsupported user avatar value %s",
+    async (avatarUrl) => {
+      mockDb._selectChain.limit.mockResolvedValueOnce([
+        { ...mockExistingRow, avatarUrl },
+      ]);
+      expect((await getUserSettings(testUserId)).avatarUrl).toBeNull();
+    }
+  );
 
   // --------------------------------------------------------------------------
   // updateUserSettings

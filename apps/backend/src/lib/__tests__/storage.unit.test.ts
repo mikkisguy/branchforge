@@ -3,6 +3,9 @@ import {
   validateAvatarFilename,
   getAvatarPath,
   getAvatarFullPath,
+  buildAvatarStoredPath,
+  parseAvatarStoredPath,
+  tryGetAvatarFullPath,
   AvatarFilenameError,
 } from "../storage.js";
 
@@ -92,25 +95,161 @@ describe("validateAvatarFilename", () => {
   });
 });
 
+describe("buildAvatarStoredPath", () => {
+  it("builds users/ nested path for user kind", () => {
+    expect(buildAvatarStoredPath("user", "avatar.webp")).toBe(
+      "users/avatar.webp"
+    );
+  });
+
+  it("builds characters/ nested path for character kind", () => {
+    expect(buildAvatarStoredPath("character", "avatar.webp")).toBe(
+      "characters/avatar.webp"
+    );
+  });
+
+  it("rejects invalid leaf filenames", () => {
+    expect(() => buildAvatarStoredPath("user", "../etc/passwd")).toThrow(
+      AvatarFilenameError
+    );
+    expect(() => buildAvatarStoredPath("user", "sub/file.webp")).toThrow(
+      AvatarFilenameError
+    );
+  });
+});
+
+describe("parseAvatarStoredPath", () => {
+  it("accepts valid nested stored paths", () => {
+    expect(parseAvatarStoredPath("users/avatar.webp")).toEqual({
+      kind: "user",
+      leaf: "avatar.webp",
+    });
+    expect(parseAvatarStoredPath("characters/avatar.webp")).toEqual({
+      kind: "character",
+      leaf: "avatar.webp",
+    });
+  });
+
+  it("rejects bare legacy filenames (no directory component)", () => {
+    expect(() => parseAvatarStoredPath("avatar.webp")).toThrow(
+      AvatarFilenameError
+    );
+    expect(() => parseAvatarStoredPath("1234-uuid.webp")).toThrow(
+      AvatarFilenameError
+    );
+  });
+
+  it("rejects paths with more than two segments", () => {
+    expect(() => parseAvatarStoredPath("users/sub/avatar.webp")).toThrow(
+      AvatarFilenameError
+    );
+  });
+
+  it("rejects directories other than users/characters", () => {
+    expect(() => parseAvatarStoredPath("project-images/avatar.webp")).toThrow(
+      AvatarFilenameError
+    );
+    expect(() => parseAvatarStoredPath("user/avatar.webp")).toThrow(
+      AvatarFilenameError
+    );
+    expect(() => parseAvatarStoredPath("Users/avatar.webp")).toThrow(
+      AvatarFilenameError
+    );
+  });
+
+  it("rejects traversal sequences", () => {
+    expect(() => parseAvatarStoredPath("users/../secret.txt")).toThrow(
+      AvatarFilenameError
+    );
+    expect(() => parseAvatarStoredPath("../users/avatar.webp")).toThrow(
+      AvatarFilenameError
+    );
+    expect(() => parseAvatarStoredPath("users/../../etc/passwd")).toThrow(
+      AvatarFilenameError
+    );
+  });
+
+  it("rejects absolute paths", () => {
+    expect(() => parseAvatarStoredPath("/users/avatar.webp")).toThrow(
+      AvatarFilenameError
+    );
+    expect(() => parseAvatarStoredPath("C:\\users\\avatar.webp")).toThrow(
+      AvatarFilenameError
+    );
+  });
+
+  it("rejects backslashes", () => {
+    expect(() => parseAvatarStoredPath("users\\avatar.webp")).toThrow(
+      AvatarFilenameError
+    );
+  });
+
+  it("rejects unsafe leaf filenames", () => {
+    expect(() => parseAvatarStoredPath("users/.hidden")).toThrow(
+      AvatarFilenameError
+    );
+    expect(() => parseAvatarStoredPath("users/file name.webp")).toThrow(
+      AvatarFilenameError
+    );
+    expect(() => parseAvatarStoredPath("users/")).toThrow(AvatarFilenameError);
+  });
+
+  it("rejects non-string input", () => {
+    expect(() => parseAvatarStoredPath(null as unknown as string)).toThrow(
+      AvatarFilenameError
+    );
+    expect(() => parseAvatarStoredPath(undefined as unknown as string)).toThrow(
+      AvatarFilenameError
+    );
+  });
+
+  it("enforces expected kind when provided", () => {
+    expect(() =>
+      parseAvatarStoredPath("characters/avatar.webp", "user")
+    ).toThrow(AvatarFilenameError);
+    expect(parseAvatarStoredPath("users/avatar.webp", "user")).toEqual({
+      kind: "user",
+      leaf: "avatar.webp",
+    });
+  });
+});
+
 describe("getAvatarPath", () => {
+  it("rejects bare legacy filenames", () => {
+    expect(() => getAvatarPath("avatar.webp")).toThrow(AvatarFilenameError);
+  });
+
   it("rejects path traversal attempts", () => {
+    expect(() => getAvatarPath("users/../etc/passwd")).toThrow(
+      AvatarFilenameError
+    );
     expect(() => getAvatarPath("../etc/passwd")).toThrow(AvatarFilenameError);
   });
 
-  it("sanitizes and builds valid path", () => {
-    const result = getAvatarPath("avatar.webp", "/api");
-    expect(result).toBe("/api/uploads/avatars/avatar.webp");
+  it("builds nested URL for user avatars", () => {
+    const result = getAvatarPath("users/avatar.webp", "/api");
+    expect(result).toBe("/api/uploads/avatars/users/avatar.webp");
   });
 
-  it("handles basePath with trailing slash", () => {
-    const result = getAvatarPath("avatar.webp", "/api/");
-    expect(result).toBe("/api/uploads/avatars/avatar.webp");
+  it("builds nested URL for character avatars", () => {
+    const result = getAvatarPath("characters/avatar.webp", "/api/");
+    expect(result).toBe("/api/uploads/avatars/characters/avatar.webp");
+  });
+
+  it("rejects cross-kind reads when expected kind is provided", () => {
+    expect(() =>
+      getAvatarPath("characters/avatar.webp", "/api", "user")
+    ).toThrow(AvatarFilenameError);
   });
 });
 
 describe("getAvatarFullPath", () => {
+  it("rejects bare legacy filenames", () => {
+    expect(() => getAvatarFullPath("avatar.webp")).toThrow(AvatarFilenameError);
+  });
+
   it("rejects path traversal attempts", () => {
-    expect(() => getAvatarFullPath("../etc/passwd")).toThrow(
+    expect(() => getAvatarFullPath("users/../secret.txt")).toThrow(
       AvatarFilenameError
     );
     expect(() => getAvatarFullPath("../../secret.txt")).toThrow(
@@ -121,20 +260,55 @@ describe("getAvatarFullPath", () => {
   it("rejects paths that escape uploads directory", () => {
     // Even if somehow a crafted string passes initial validation,
     // the boundary check should catch it
-    expect(() => getAvatarFullPath("../../../etc/passwd")).toThrow(
+    expect(() => getAvatarFullPath("users/../../../etc/passwd")).toThrow(
       AvatarFilenameError
     );
   });
 
-  it("returns absolute path within uploads directory", () => {
-    const result = getAvatarFullPath("avatar.webp");
-    expect(result).toMatch(/uploads\/avatars\/avatar\.webp$/);
+  it("rejects other directories", () => {
+    expect(() => getAvatarFullPath("project-images/avatar.webp")).toThrow(
+      AvatarFilenameError
+    );
   });
 
-  it("ensures resolved path is within uploads directory", () => {
-    const result = getAvatarFullPath("safe-avatar.webp");
-    const uploadsDir = result.replace(/safe-avatar\.webp$/, "");
-    expect(uploadsDir).toMatch(/uploads\/avatars\/$/);
+  it("returns absolute path within users directory", () => {
+    const result = getAvatarFullPath("users/avatar.webp");
+    expect(result).toMatch(/uploads\/avatars\/users\/avatar\.webp$/);
+  });
+
+  it("returns absolute path within characters directory", () => {
+    const result = getAvatarFullPath("characters/avatar.webp");
+    expect(result).toMatch(/uploads\/avatars\/characters\/avatar\.webp$/);
+  });
+
+  it("rejects cross-kind access when expected kind is provided", () => {
+    expect(() => getAvatarFullPath("users/avatar.webp", "character")).toThrow(
+      AvatarFilenameError
+    );
+    expect(getAvatarFullPath("characters/avatar.webp", "character")).toMatch(
+      /uploads\/avatars\/characters\/avatar\.webp$/
+    );
+  });
+});
+
+describe("tryGetAvatarFullPath", () => {
+  it("returns null for null/empty stored values", () => {
+    expect(tryGetAvatarFullPath(null)).toBeNull();
+    expect(tryGetAvatarFullPath("")).toBeNull();
+  });
+
+  it("returns resolved path for valid nested stored values", () => {
+    const result = tryGetAvatarFullPath("users/avatar.webp", "user");
+    expect(result).toMatch(/uploads\/avatars\/users\/avatar\.webp$/);
+  });
+
+  it("returns null for legacy bare filenames instead of resolving flat files", () => {
+    expect(tryGetAvatarFullPath("legacy-avatar.webp", "user")).toBeNull();
+    expect(tryGetAvatarFullPath("legacy-avatar.webp", "character")).toBeNull();
+  });
+
+  it("returns null for cross-kind stored values", () => {
+    expect(tryGetAvatarFullPath("characters/avatar.webp", "user")).toBeNull();
   });
 });
 

@@ -1,3 +1,4 @@
+import { getUserSettings } from "../../services/user-settings.service.js";
 /**
  * User Settings Avatar Routes Integration Tests
  *
@@ -51,6 +52,15 @@ import { getUploadsDirPath } from "../../lib/storage.js";
 const testUserId = testUuid("02000000", 1);
 const otherUserId = testUuid("02000000", 2);
 
+/**
+ * Extract the nested stored path (e.g. "users/<uuid>.webp") from a returned
+ * avatar URL. The URL shape is "{basePath}/uploads/avatars/users/<file>.webp".
+ */
+function storedPathFromUrl(avatarUrl: string): string {
+  const segments = avatarUrl.split("/");
+  return `${segments[segments.length - 2]}/${segments[segments.length - 1]}`;
+}
+
 const testUser: NewUser = {
   id: testUserId,
   email: testEmail("user-settings-avatar", "owner"),
@@ -91,7 +101,7 @@ describe("User Settings Avatar Routes (Integration)", () => {
   let db: ReturnType<typeof getDb>;
   let fastify: ReturnType<typeof Fastify>;
   let originalBasePath: string | undefined;
-  // Track avatar filenames created during tests for cleanup
+  // Track nested avatar stored paths created during tests for cleanup
   const createdAvatarFiles = new Set<string>();
 
   // Helper to clean up orphaned avatar files from filesystem
@@ -102,14 +112,14 @@ describe("User Settings Avatar Routes (Integration)", () => {
 
     const avatarDirPath = path.join(getUploadsDirPath(), "avatars");
     await Promise.all(
-      [...createdAvatarFiles].map(async (filename) => {
-        const filePath = path.join(avatarDirPath, filename);
+      [...createdAvatarFiles].map(async (storedPath) => {
+        const filePath = path.join(avatarDirPath, storedPath);
         try {
           await fs.unlink(filePath);
         } catch (error) {
           // Ignore ENOENT (file already deleted) - this is fine
           if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
-            console.error(`Failed to delete avatar file ${filename}:`, error);
+            console.error(`Failed to delete avatar file ${storedPath}:`, error);
           }
         }
       })
@@ -303,11 +313,11 @@ describe("User Settings Avatar Routes (Integration)", () => {
       expect(response.statusCode).toBe(200);
       const body = response.json();
       expect(body.avatarUrl).toMatch(
-        /^(\/[\w-]+)*\/uploads\/avatars\/[\w-]+\.webp$/
+        /^(\/[\w-]+)*\/uploads\/avatars\/users\/[\w-]+\.webp$/
       );
 
       // Track the created file for cleanup
-      createdAvatarFiles.add(path.basename(body.avatarUrl));
+      createdAvatarFiles.add(storedPathFromUrl(body.avatarUrl));
 
       // Verify avatar was saved to database
       const [updatedSettings] = await db
@@ -316,8 +326,9 @@ describe("User Settings Avatar Routes (Integration)", () => {
         .where(eq(userSettings.userId, testUserId))
         .limit(1);
 
-      // The database stores just the filename, while the API returns the full URL
-      expect(updatedSettings.avatarUrl).toBe(path.basename(body.avatarUrl));
+      // The database stores the nested relative path, while the API returns the full URL
+      expect(updatedSettings.avatarUrl).toBe(storedPathFromUrl(body.avatarUrl));
+      expect(updatedSettings.avatarUrl).toMatch(/^users\/[\w-]+\.webp$/);
     });
 
     it(`should reject file larger than ${AVATAR_MAX_SIZE_MB}MB`, async () => {
@@ -411,15 +422,15 @@ describe("User Settings Avatar Routes (Integration)", () => {
       expect(firstResponse.statusCode).toBe(200);
       const firstBody = firstResponse.json();
       expect(firstBody.avatarUrl).toMatch(
-        /^(\/[\w-]+)*\/uploads\/avatars\/[\w-]+\.webp$/
+        /^(\/[\w-]+)*\/uploads\/avatars\/users\/[\w-]+\.webp$/
       );
 
       // Track the created file for cleanup
-      createdAvatarFiles.add(path.basename(firstBody.avatarUrl));
+      createdAvatarFiles.add(storedPathFromUrl(firstBody.avatarUrl));
 
       const firstAvatarUrl = firstBody.avatarUrl;
-      const firstAvatarFilename = path.basename(firstAvatarUrl);
-      const firstAvatarFullPath = getAvatarFullPath(firstAvatarFilename);
+      const firstAvatarStoredPath = storedPathFromUrl(firstAvatarUrl);
+      const firstAvatarFullPath = getAvatarFullPath(firstAvatarStoredPath);
 
       // Verify the first file exists
       await expect(fs.access(firstAvatarFullPath)).resolves.not.toThrow();
@@ -444,11 +455,11 @@ describe("User Settings Avatar Routes (Integration)", () => {
       expect(secondResponse.statusCode).toBe(200);
       const secondBody = secondResponse.json();
       expect(secondBody.avatarUrl).toMatch(
-        /^(\/[\w-]+)*\/uploads\/avatars\/[\w-]+\.webp$/
+        /^(\/[\w-]+)*\/uploads\/avatars\/users\/[\w-]+\.webp$/
       );
 
       // Track the created file for cleanup
-      createdAvatarFiles.add(path.basename(secondBody.avatarUrl));
+      createdAvatarFiles.add(storedPathFromUrl(secondBody.avatarUrl));
 
       const secondAvatarUrl = secondBody.avatarUrl;
 
@@ -462,20 +473,119 @@ describe("User Settings Avatar Routes (Integration)", () => {
         .where(eq(userSettings.userId, testUserId))
         .limit(1);
 
-      // The database stores just the filename, while the API returns the full URL
-      expect(updatedSettings.avatarUrl).toBe(path.basename(secondAvatarUrl));
+      // The database stores the nested relative path, while the API returns the full URL
+      expect(updatedSettings.avatarUrl).toBe(
+        storedPathFromUrl(secondAvatarUrl)
+      );
 
       // Verify the old file no longer exists
       await expect(fs.access(firstAvatarFullPath)).rejects.toThrow();
 
       // Verify the new file exists
-      const secondAvatarFilename = path.basename(secondAvatarUrl);
-      const secondAvatarFullPath = getAvatarFullPath(secondAvatarFilename);
+      const secondAvatarFullPath = getAvatarFullPath(
+        storedPathFromUrl(secondAvatarUrl)
+      );
       await expect(fs.access(secondAvatarFullPath)).resolves.not.toThrow();
+    });
+
+    it("should replace legacy flat avatar row without touching flat files", async () => {
+      const auth = await createAuthenticatedRequest(testUserId);
+
+      // Seed a legacy flat stored value (pre-nesting row) and a decoy flat
+      // file that must never be resolved or deleted.
+      const legacyStoredValue = "legacy-avatar.webp";
+      const legacyFlatPath = path.join(
+        getUploadsDirPath(),
+        "avatars",
+        legacyStoredValue
+      );
+      await db
+        .update(userSettings)
+        .set({ avatarUrl: legacyStoredValue })
+        .where(eq(userSettings.userId, testUserId));
+      await fs.mkdir(path.dirname(legacyFlatPath), { recursive: true });
+      await fs.writeFile(legacyFlatPath, "decoy");
+
+      try {
+        // GET settings: legacy stored value produces a null public URL
+        expect((await getUserSettings(testUserId)).avatarUrl).toBeNull();
+
+        // Upload replacement avatar
+        const formData = new FormData();
+        formData.append(
+          "avatar",
+          new Blob([minimalPng], { type: "image/png" }),
+          "avatar.png"
+        );
+
+        const response = await fastify.inject({
+          method: "POST",
+          url: "/api/user/settings/avatar",
+          headers: {
+            Cookie: `${SESSION_COOKIE_NAME}=${auth.sessionId}`,
+          },
+          payload: formData as unknown as Record<string, unknown>,
+        });
+
+        expect(response.statusCode).toBe(200);
+        const body = response.json();
+        expect(body.avatarUrl).toMatch(
+          /^(\/[\w-]+)*\/uploads\/avatars\/users\/[\w-]+\.webp$/
+        );
+        createdAvatarFiles.add(storedPathFromUrl(body.avatarUrl));
+
+        // DB now holds the nested value
+        const [updatedSettings] = await db
+          .select()
+          .from(userSettings)
+          .where(eq(userSettings.userId, testUserId))
+          .limit(1);
+        expect(updatedSettings.avatarUrl).toBe(
+          storedPathFromUrl(body.avatarUrl)
+        );
+
+        // The flat legacy file was never resolved or deleted
+        await expect(fs.access(legacyFlatPath)).resolves.not.toThrow();
+      } finally {
+        await fs.rm(legacyFlatPath, { force: true });
+      }
     });
   });
 
   describe("DELETE /user/settings/avatar", () => {
+    it("should clear legacy avatar without deleting the flat file", async () => {
+      const auth = await createAuthenticatedRequest(testUserId);
+      const legacyStoredValue = "legacy-delete-avatar.webp";
+      const legacyFlatPath = path.join(
+        getUploadsDirPath(),
+        "avatars",
+        legacyStoredValue
+      );
+      await fs.mkdir(path.dirname(legacyFlatPath), { recursive: true });
+      await fs.writeFile(legacyFlatPath, "decoy");
+      try {
+        await db
+          .update(userSettings)
+          .set({ avatarUrl: legacyStoredValue })
+          .where(eq(userSettings.userId, testUserId));
+        const response = await fastify.inject({
+          method: "DELETE",
+          url: `/api/user/settings/avatar`,
+          headers: { Cookie: `${SESSION_COOKIE_NAME}=${auth.sessionId}` },
+        });
+        expect(response.statusCode).toBe(204);
+        const [row] = await db
+          .select()
+          .from(userSettings)
+          .where(eq(userSettings.userId, testUserId))
+          .limit(1);
+        expect(row.avatarUrl).toBeNull();
+        expect(await fs.readFile(legacyFlatPath, "utf8")).toBe("decoy");
+      } finally {
+        await fs.rm(legacyFlatPath, { force: true });
+      }
+    });
+
     it("should delete an existing avatar", async () => {
       const auth = await createAuthenticatedRequest(testUserId);
 
@@ -499,15 +609,15 @@ describe("User Settings Avatar Routes (Integration)", () => {
       expect(uploadResponse.statusCode).toBe(200);
       const uploadBody = uploadResponse.json();
       expect(uploadBody.avatarUrl).toMatch(
-        /^(\/[\w-]+)*\/uploads\/avatars\/[\w-]+\.webp$/
+        /^(\/[\w-]+)*\/uploads\/avatars\/users\/[\w-]+\.webp$/
       );
 
       // Track the created file for cleanup (though it should be deleted by the test)
-      createdAvatarFiles.add(path.basename(uploadBody.avatarUrl));
+      createdAvatarFiles.add(storedPathFromUrl(uploadBody.avatarUrl));
 
       // Capture the avatar file path before deletion
-      const avatarFilename = path.basename(uploadBody.avatarUrl);
-      const avatarFullPath = getAvatarFullPath(avatarFilename);
+      const avatarStoredPath = storedPathFromUrl(uploadBody.avatarUrl);
+      const avatarFullPath = getAvatarFullPath(avatarStoredPath);
 
       // Verify the file exists before deletion
       await expect(fs.access(avatarFullPath)).resolves.not.toThrow();

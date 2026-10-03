@@ -14,9 +14,12 @@ import {
   deleteAvatar as deleteAvatarFile,
 } from "../image-processing.service.js";
 import {
-  ensureAvatarDir,
+  buildAvatarStoredPath,
+  ensureAvatarKindDir,
   getAvatarPath,
   getAvatarFullPath,
+  tryGetAvatarFullPath,
+  type AvatarKind,
 } from "../../lib/storage.js";
 import { getBasePath } from "../../lib/config.js";
 import { logWarn, LogEventType } from "../../lib/logger.js";
@@ -30,10 +33,20 @@ import type { Transaction } from "../../db/types.js";
 // Helpers
 // ============================================================================
 
-/** Build public avatar URL from stored filename. */
-export function buildAvatarUrl(filename: string | null): string | null {
-  if (!filename) return null;
-  return getAvatarPath(filename, getBasePath());
+const CHARACTER_AVATAR_KIND: AvatarKind = "character";
+
+/**
+ * Build public avatar URL from stored nested path.
+ * Invalid/legacy stored values (e.g. bare legacy filenames) produce null
+ * instead of resolving flat legacy files.
+ */
+export function buildAvatarUrl(storedPath: string | null): string | null {
+  if (!storedPath) return null;
+  try {
+    return getAvatarPath(storedPath, getBasePath(), CHARACTER_AVATAR_KIND);
+  } catch {
+    return null;
+  }
 }
 
 // ============================================================================
@@ -57,14 +70,19 @@ export async function uploadAvatar(
   // Process image
   const result = await validateAndProcessAvatar(buffer, mimetype);
 
-  // Ensure upload directory exists
-  await ensureAvatarDir();
+  // Ensure the character avatars directory exists
+  await ensureAvatarKindDir(CHARACTER_AVATAR_KIND);
+
+  // Resolve previous avatar file path. Invalid/legacy stored values resolve
+  // to null: skip backup/delete so flat legacy files are never touched.
+  const previousAvatarPath = tryGetAvatarFullPath(
+    character.avatarUrl,
+    CHARACTER_AVATAR_KIND
+  );
 
   // Backup existing avatar file
   let previousAvatarBackupPath: string | undefined;
-  let previousAvatarPath: string | undefined;
-  if (character.avatarUrl) {
-    previousAvatarPath = getAvatarFullPath(character.avatarUrl);
+  if (previousAvatarPath) {
     previousAvatarBackupPath = `${previousAvatarPath}.backup-${crypto.randomUUID()}`;
     try {
       await fs.copyFile(previousAvatarPath, previousAvatarBackupPath);
@@ -83,14 +101,18 @@ export async function uploadAvatar(
     }
   }
 
-  // Write new file
-  const filePath = getAvatarFullPath(result.filename);
+  // Write new file under uploads/avatars/characters/
+  const newStoredPath = buildAvatarStoredPath(
+    CHARACTER_AVATAR_KIND,
+    result.filename
+  );
+  const filePath = getAvatarFullPath(newStoredPath, CHARACTER_AVATAR_KIND);
   await fs.writeFile(filePath, result.buffer);
 
-  // Remove old avatar file
-  if (character.avatarUrl) {
+  // Remove old avatar file (only when it resolved to a valid nested path)
+  if (previousAvatarPath) {
     try {
-      await deleteAvatarFile(getAvatarFullPath(character.avatarUrl));
+      await deleteAvatarFile(previousAvatarPath);
     } catch {
       logWarn(LogEventType.SERVICE_ERROR, {
         message: `Failed to delete old avatar (backup preserved): ${character.avatarUrl}`,
@@ -99,11 +121,11 @@ export async function uploadAvatar(
     }
   }
 
-  // Update DB
+  // Update DB (stores the nested relative value, e.g. "characters/<uuid>.webp")
   try {
     const [updatedCharacter] = await db
       .update(characters)
-      .set({ avatarUrl: result.filename, updatedAt: new Date() })
+      .set({ avatarUrl: newStoredPath, updatedAt: new Date() })
       .where(eq(characters.id, characterId))
       .returning();
 
@@ -180,13 +202,21 @@ export async function deleteAvatar(
     .where(eq(characters.id, characterId));
 
   if (character.avatarUrl) {
-    try {
-      await deleteAvatarFile(getAvatarFullPath(character.avatarUrl));
-    } catch {
-      logWarn(LogEventType.SERVICE_ERROR, {
-        message: `Failed to delete avatar file: ${character.avatarUrl}`,
-        characterId,
-      });
+    // Invalid/legacy stored values resolve to null: skip file deletion so
+    // flat legacy files are never touched.
+    const avatarPath = tryGetAvatarFullPath(
+      character.avatarUrl,
+      CHARACTER_AVATAR_KIND
+    );
+    if (avatarPath) {
+      try {
+        await deleteAvatarFile(avatarPath);
+      } catch {
+        logWarn(LogEventType.SERVICE_ERROR, {
+          message: `Failed to delete avatar file: ${character.avatarUrl}`,
+          characterId,
+        });
+      }
     }
   }
 }
