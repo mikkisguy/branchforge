@@ -27,6 +27,7 @@ import {
   Search,
   X,
 } from "lucide-react";
+import { LabelRowMenu } from "@/components/write-mode/LabelRowMenu";
 import { LabelContextMenu } from "@/components/write-mode/LabelContextMenu";
 import { buildFileMenuItems } from "@/components/ide-shared/file-menu-items";
 import {
@@ -141,6 +142,8 @@ interface LabelItemProps {
   onSelect: () => void;
   onContextMenu: (e: React.MouseEvent, label: PublicLabel) => void;
   onDoubleClick: (label: PublicLabel) => void;
+  onEditDetails?: (label: PublicLabel) => void;
+  onDelete?: (label: PublicLabel) => void;
   isRenaming: boolean;
   onRenameSave: (value: string) => Promise<void>;
   onRenameCancel: () => void;
@@ -153,6 +156,8 @@ function LabelItem({
   onSelect,
   onContextMenu,
   onDoubleClick,
+  onEditDetails,
+  onDelete,
   isRenaming,
   onRenameSave,
   onRenameCancel,
@@ -188,43 +193,53 @@ function LabelItem({
     : label.title;
 
   return (
-    <Tooltip content={tooltipContent}>
-      <button
-        type="button"
-        onClick={onSelect}
-        onContextMenu={(e) => onContextMenu(e, label)}
-        onDoubleClick={() => onDoubleClick(label)}
-        aria-pressed={isActive}
-        className={`
-        relative w-full flex items-center gap-2.5 px-2.5 py-2 rounded-md border transition-all
+    <div className="group/row relative [&>span]:block">
+      <Tooltip content={tooltipContent}>
+        <button
+          type="button"
+          onClick={onSelect}
+          onContextMenu={(e) => onContextMenu(e, label)}
+          onDoubleClick={() => onDoubleClick(label)}
+          aria-pressed={isActive}
+          className={`
+        relative w-full min-h-11 [@media(min-width:768px)_and_(hover:hover)_and_(pointer:fine)]:min-h-0 flex items-center gap-2.5 px-2.5 py-2 pr-12 rounded-md border transition-all
         ${
           isActive
             ? `${ACTIVE_NAVIGATOR_ITEM_CLASSNAME} border-transparent`
             : "bg-card/80 border-transparent hover:border-border hover:bg-accent/50"
         }
       `}
-      >
-        {/* Status dot on the left */}
-        <div
-          className="size-1.5 rounded-full flex-shrink-0 ring-[1.5px] ring-background"
-          style={{
-            backgroundColor: statusColor,
-          }}
-          title={`Status: ${label.status ?? "DRAFT"}`}
-        />
+        >
+          {/* Status dot on the left */}
+          <div
+            className="size-1.5 rounded-full flex-shrink-0 ring-[1.5px] ring-background"
+            style={{
+              backgroundColor: statusColor,
+            }}
+            title={`Status: ${label.status ?? "DRAFT"}`}
+          />
 
-        {/* Label Title */}
-        <div className="flex-1 min-w-0 text-left">
-          <h3
-            className={`text-sm font-medium truncate ${
-              isActive ? "text-foreground" : "text-muted-foreground"
-            }`}
-          >
-            {label.title}
-          </h3>
-        </div>
-      </button>
-    </Tooltip>
+          {/* Label Title */}
+          <div className="flex-1 min-w-0 text-left">
+            <h3
+              className={`text-sm font-medium truncate ${
+                isActive ? "text-foreground" : "text-muted-foreground"
+              }`}
+            >
+              {label.title}
+            </h3>
+          </div>
+        </button>
+      </Tooltip>
+      <div className="absolute right-0.5 top-1/2 -translate-y-1/2">
+        <LabelRowMenu
+          title={label.title}
+          onRename={() => onDoubleClick(label)}
+          onEditDetails={() => onEditDetails?.(label)}
+          onDelete={() => onDelete?.(label)}
+        />
+      </div>
+    </div>
   );
 }
 
@@ -341,6 +356,8 @@ interface FileGroupProps {
   isCreatingLabel?: boolean;
   onLabelContextMenu: (e: React.MouseEvent, label: PublicLabel) => void;
   onLabelDoubleClick: (label: PublicLabel) => void;
+  onEditLabel?: (label: PublicLabel) => void;
+  onDeleteRequest?: (label: PublicLabel) => void;
   renamingLabelId: string | null;
   onRenameSave: (labelId: string, value: string) => Promise<void>;
   onRenameCancel: () => void;
@@ -360,6 +377,8 @@ function FileGroup({
   isCreatingLabel,
   onLabelContextMenu,
   onLabelDoubleClick,
+  onEditLabel,
+  onDeleteRequest,
   renamingLabelId,
   onRenameSave,
   onRenameCancel,
@@ -422,6 +441,8 @@ function FileGroup({
             onSelect={() => onLabelSelect(label.id)}
             onContextMenu={onLabelContextMenu}
             onDoubleClick={onLabelDoubleClick}
+            onEditDetails={onEditLabel}
+            onDelete={onDeleteRequest}
             isRenaming={renamingLabelId === label.id}
             onRenameSave={(value) => onRenameSave(label.id, value)}
             onRenameCancel={onRenameCancel}
@@ -784,6 +805,8 @@ export function LabelNavigator({
                   onSelect={() => onSelect(label.id)}
                   onContextMenu={handleContextMenu}
                   onDoubleClick={handleDoubleClick}
+                  onEditDetails={onEditLabel}
+                  onDelete={onDeleteRequest}
                   isRenaming={renamingLabelId === label.id}
                   onRenameSave={(value) => handleRenameSave(label.id, value)}
                   onRenameCancel={handleRenameCancel}
@@ -871,6 +894,8 @@ export function LabelNavigator({
                     isCreatingLabel={isCreatingLabel}
                     onLabelContextMenu={handleContextMenu}
                     onLabelDoubleClick={handleDoubleClick}
+                    onEditLabel={onEditLabel}
+                    onDeleteRequest={onDeleteRequest}
                     renamingLabelId={renamingLabelId}
                     onRenameSave={handleRenameSave}
                     onRenameCancel={handleRenameCancel}

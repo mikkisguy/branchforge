@@ -4,7 +4,8 @@
  * Accessible per-file actions used by both Script Mode (ProjectFileTree) and
  * Write Mode (LabelNavigator) file rows:
  *
- * - `FileRowMenu` — a hover/focus-revealed trailing action button backed by
+ * - `FileRowMenu` — a trailing action button (always visible on mobile/touch,
+ *   hover/focus-revealed on desktop) backed by
  *   the shared Menu primitives.
  * - `FileContextMenu` — the same actions on right-click, rendered in a
  *   portal at the pointer position with keyboard navigation.
@@ -18,6 +19,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { MoreHorizontal } from "lucide-react";
 import { Menu, MenuContent, MenuItem, MenuTrigger } from "@/components/ui/menu";
+import { ROW_MENU_TRIGGER_CLASSNAME } from "./row-menu-styles";
 import type { FileMenuItem } from "./file-menu-items";
 
 // Re-exported as types only; the item-building helper lives in
@@ -29,7 +31,7 @@ export type {
 } from "./file-menu-items";
 
 // ============================================================================
-// Three-dot menu (hover / keyboard-focus reveal)
+// Three-dot menu (persistent on mobile/touch; hover/focus reveal on desktop)
 // ============================================================================
 
 export interface FileRowMenuProps {
@@ -51,7 +53,7 @@ export function FileRowMenu({ fileName, items, disabled }: FileRowMenuProps) {
       <MenuTrigger
         variant="ghost"
         size="icon"
-        className="size-6 shrink-0 rounded-md text-muted-foreground/70 opacity-0 transition-[opacity,color,background-color] hover:bg-muted hover:text-foreground focus-visible:bg-muted focus-visible:opacity-100 group-hover/row:opacity-100 [&[aria-expanded=true]]:bg-muted [&[aria-expanded=true]]:text-foreground [&[aria-expanded=true]]:opacity-100"
+        className={ROW_MENU_TRIGGER_CLASSNAME}
         aria-label={`File actions for ${fileName}`}
         disabled={disabled}
         onClick={(event) => event.stopPropagation()}

@@ -414,6 +414,123 @@ describe("LabelNavigator", () => {
     });
   });
 
+  describe("label action menus", () => {
+    it.each(["sequence", "lastUpdated"])(
+      "opens details for an unselected label in %s order without selecting it",
+      async (sortMode) => {
+        const user = userEvent.setup();
+        const onSelect = vi.fn();
+        const onEditLabel = vi.fn();
+        render(
+          <LabelNavigator
+            labels={labelsFromMultipleFiles}
+            storyFiles={storyFilesFromLabels}
+            activeLabelId="1"
+            onSelect={onSelect}
+            onEditLabel={onEditLabel}
+          />
+        );
+        if (sortMode === "lastUpdated") {
+          await user.click(
+            screen.getByRole("button", { name: /sort mode: sequence order/i })
+          );
+        }
+        const trigger = screen.getByRole("button", {
+          name: "Label actions for Label B",
+        });
+        expect(trigger.parentElement?.closest("button")).toBeNull();
+        await user.click(trigger);
+        await user.click(
+          screen.getByRole("menuitem", { name: "Edit Details" })
+        );
+        expect(onEditLabel).toHaveBeenCalledExactlyOnceWith(
+          labelsFromMultipleFiles[1]
+        );
+        expect(onSelect).not.toHaveBeenCalled();
+        expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+      }
+    );
+
+    it("renames the targeted label through the menu", async () => {
+      const user = userEvent.setup();
+      const onUpdateLabel = vi
+        .fn()
+        .mockResolvedValue(labelsFromMultipleFiles[1]);
+      const onSelect = vi.fn();
+      render(
+        <LabelNavigator
+          labels={labelsFromMultipleFiles}
+          storyFiles={storyFilesFromLabels}
+          activeLabelId="1"
+          onSelect={onSelect}
+          onUpdateLabel={onUpdateLabel}
+        />
+      );
+      await user.click(
+        screen.getByRole("button", { name: "Label actions for Label B" })
+      );
+      await user.click(screen.getByRole("menuitem", { name: "Rename" }));
+      const input = screen.getByRole("textbox", { name: "Rename label" });
+      await user.clear(input);
+      await user.type(input, "Renamed scene{Enter}");
+      expect(onUpdateLabel).toHaveBeenCalledExactlyOnceWith("2", {
+        title: "Renamed scene",
+      });
+      expect(onSelect).not.toHaveBeenCalled();
+    });
+
+    it("supports keyboard deletion and restores focus to its trigger", async () => {
+      const user = userEvent.setup();
+      const onDeleteRequest = vi.fn();
+      const onSelect = vi.fn();
+      render(
+        <LabelNavigator
+          labels={labelsFromMultipleFiles}
+          storyFiles={storyFilesFromLabels}
+          activeLabelId="1"
+          onSelect={onSelect}
+          onDeleteRequest={onDeleteRequest}
+        />
+      );
+      const trigger = screen.getByRole("button", {
+        name: "Label actions for Label C",
+      });
+      trigger.focus();
+      await user.keyboard("{Enter}{End}{Enter}");
+      expect(onDeleteRequest).toHaveBeenCalledExactlyOnceWith(
+        labelsFromMultipleFiles[2]
+      );
+      expect(onSelect).not.toHaveBeenCalled();
+      expect(trigger).toHaveFocus();
+    });
+
+    it("preserves right-click details and double-click rename", async () => {
+      const user = userEvent.setup();
+      const onEditLabel = vi.fn();
+      render(
+        <LabelNavigator
+          labels={labelsFromMultipleFiles}
+          storyFiles={storyFilesFromLabels}
+          activeLabelId={null}
+          onSelect={vi.fn()}
+          onEditLabel={onEditLabel}
+        />
+      );
+      fireEvent.contextMenu(screen.getByText("Label B"), {
+        clientX: 100,
+        clientY: 100,
+      });
+      await user.click(screen.getByRole("menuitem", { name: "Edit Details" }));
+      expect(onEditLabel).toHaveBeenCalledExactlyOnceWith(
+        labelsFromMultipleFiles[1]
+      );
+      await user.dblClick(screen.getByText("Label C"));
+      expect(screen.getByRole("textbox", { name: "Rename label" })).toHaveValue(
+        "Label C"
+      );
+    });
+  });
+
   describe("edge cases", () => {
     it("renders with labels from a single file", () => {
       const singleFileLabels = [
