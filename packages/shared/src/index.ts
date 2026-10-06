@@ -1289,6 +1289,26 @@ export interface ExportPreviewResponse {
 }
 
 // ============================================================================
+// GitLab Sync Outcome Types
+// ============================================================================
+
+/**
+ * Optional outcome flag for a completed GitLab export.
+ *
+ * - `noChanges` is present and true when the export completed synchronously
+ *   without producing any remote commit because every candidate action was
+ *   already up to date on the target branch (or its base branch when the
+ *   target does not exist). No commit or new branch is created in this case.
+ *
+ * Consumers must NOT infer this state from a missing `commitId`; real exports
+ * and imports may legitimately lack a `commitId` during reconciliation or async
+ * hand-off while still containing changes.
+ */
+export interface GitLabExportOutcome {
+  noChanges?: boolean;
+}
+
+// ============================================================================
 // Flow Graph Types (Route Visualization)
 // ============================================================================
 

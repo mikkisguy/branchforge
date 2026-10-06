@@ -33,7 +33,7 @@ export interface GitLabRepository {
   web_url?: string;
 }
 
-export interface SyncOperation {
+export interface SyncOperation extends GitLabExportOutcome {
   id: string;
   projectId: string;
   operation: "EXPORT" | "IMPORT";
@@ -107,7 +107,7 @@ export interface ImportProjectBody {
   conflictResolution: ConflictResolution;
 }
 
-import type { PublicProject } from "@branchforge/shared";
+import type { PublicProject, GitLabExportOutcome } from "@branchforge/shared";
 
 export interface ImportProjectResponse {
   project: PublicProject;

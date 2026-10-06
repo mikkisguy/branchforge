@@ -5,13 +5,14 @@
  * during GitLab export/import operations.
  */
 
-import { CheckCircle2, AlertCircle } from "lucide-react";
+import type { GitLabExportOutcome } from "@branchforge/shared";
+import { CheckCircle2, AlertCircle, Info } from "lucide-react";
 import { formatGitLabSyncError } from "@/lib/format-gitlab-sync-error";
 // ============================================================================
 // Types
 // ============================================================================
 
-interface SyncOperation {
+interface SyncOperation extends GitLabExportOutcome {
   status: string;
   conflictCount?: number;
 }
@@ -22,6 +23,7 @@ interface GitLabSyncDialogProgressProps {
   progress: number;
   error: string | null;
   operationType: "export" | "import";
+  createNewBranch?: boolean;
 }
 
 // ============================================================================
@@ -34,7 +36,9 @@ export function GitLabSyncDialogProgress({
   progress,
   error: syncError,
   operationType,
+  createNewBranch = false,
 }: GitLabSyncDialogProgressProps) {
+  const noChanges = operationType === "export" && operation?.noChanges === true;
   const failureMessage = formatGitLabSyncError(syncError, operationType);
 
   return (
@@ -44,13 +48,28 @@ export function GitLabSyncDialogProgress({
         <div
           className={
             operation.status === "COMPLETED"
-              ? "text-green-600"
+              ? noChanges
+                ? "text-foreground"
+                : "text-green-600"
               : operation.status === "FAILED"
                 ? "text-red-600"
                 : "text-amber-600"
           }
         >
-          {operation.status === "COMPLETED" && (
+          {operation.status === "COMPLETED" && noChanges && (
+            <div role="status" className="space-y-1 text-sm">
+              <div className="flex items-center gap-2">
+                <Info className="size-4" aria-hidden="true" />
+                <span className="font-medium">No changes to push.</span>
+              </div>
+              <p className="text-muted-foreground">
+                {createNewBranch
+                  ? "No commit or new branch was created."
+                  : "No commit was created."}
+              </p>
+            </div>
+          )}
+          {operation.status === "COMPLETED" && !noChanges && (
             <div className="flex items-center gap-2 text-sm">
               <CheckCircle2 className="size-4" />
               <span>

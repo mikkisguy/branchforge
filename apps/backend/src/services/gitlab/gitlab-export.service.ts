@@ -274,21 +274,32 @@ async function buildGeneratedActions(
     });
   }
 
-  return Promise.all(
-    candidates.map(async ({ filePath, content }) => {
-      // A 404 (including for a new branch) is represented as content: null.
-      const remoteFile = await getFileContentWithMetadata(
-        projectId,
-        userId,
-        filePath,
-        branch
-      );
-      return {
-        action: remoteFile.content === null ? "create" : "update",
-        filePath,
-        content,
-      };
-    })
+  const generatedActions = await Promise.all(
+    candidates.map(
+      async ({ filePath, content }): Promise<PlannedAction | null> => {
+        // A 404 (including for a new branch) is represented as content: null.
+        const remoteFile = await getFileContentWithMetadata(
+          projectId,
+          userId,
+          filePath,
+          branch
+        );
+        if (remoteFile.content === null) {
+          return { action: "create", filePath, content };
+        }
+        if (remoteFile.content === content) {
+          // Generated content already matches the remote exactly: avoid a
+          // no-op update. Symbol ownership/filtering and empty-generated
+          // cleanup are handled before this point.
+          return null;
+        }
+        return { action: "update", filePath, content };
+      }
+    )
+  );
+
+  return generatedActions.filter(
+    (action): action is PlannedAction => action !== null
   );
 }
 
@@ -419,7 +430,7 @@ async function preflightConflicts(
   branch: string,
   files: ProjectFileRow[],
   plan: ExportPlan
-): Promise<void> {
+): Promise<Map<string, string | null>> {
   const filesByRemoteBasePath = new Map<string, ProjectFileRow>();
   for (const f of files) {
     filesByRemoteBasePath.set(f.remoteFilePath ?? f.filePath, f);
@@ -457,6 +468,8 @@ async function preflightConflicts(
   }
   // Generated files are managed content and are overwritten unconditionally.
 
+  const remoteContents = new Map<string, string | null>();
+
   for (const remotePath of mustExist) {
     const meta = await getFileContentWithMetadata(
       projectId,
@@ -469,6 +482,7 @@ async function preflightConflicts(
         `Conflict: expected source file not found on the remote: ${remotePath}`
       );
     }
+    remoteContents.set(remotePath, meta.content);
     const storedFile = filesByRemoteBasePath.get(remotePath);
     const expectedHash = storedFile
       ? remoteContentBaselineHash(storedFile)
@@ -495,6 +509,35 @@ async function preflightConflicts(
         `Conflict: file already exists on the remote: ${remotePath}`
       );
     }
+  }
+
+  return remoteContents;
+}
+
+/**
+ * Advance local baselines for content-only files whose update was omitted
+ * because the remote already matches the desired content. Preserves the
+ * existing remoteRevision rather than overwriting it with null, since no new
+ * commit was created.
+ */
+async function advanceContentUpdatedBaselines(
+  tx: ExportTx,
+  contentUpdatedFiles: Array<{ file: ProjectFileRow; content: string }>,
+  branch: string
+): Promise<void> {
+  for (const { file, content } of contentUpdatedFiles) {
+    await tx
+      .update(projectFiles)
+      .set({
+        remoteFilePath: file.filePath,
+        remoteBranch: branch,
+        remoteContent: content,
+        remoteContentHash: calculateContentHash(content),
+        lastPushedContentHash: file.contentHash,
+        hasRemoteConflict: false,
+        updatedAt: new Date(),
+      })
+      .where(eq(projectFiles.id, file.id));
   }
 }
 
@@ -533,13 +576,20 @@ async function finalizeSuccessfulPush(
   }
 
   // Content-only updated files advance their local baseline too.
+  const updatedPaths = new Set(
+    plan.actions
+      .filter((action) => action.action === "update")
+      .map((action) => action.filePath)
+  );
   for (const { file, content } of plan.contentUpdatedFiles) {
     await tx
       .update(projectFiles)
       .set({
         remoteFilePath: file.filePath,
         remoteBranch: branch,
-        remoteRevision: commitId,
+        remoteRevision: updatedPaths.has(file.filePath)
+          ? commitId
+          : file.remoteRevision,
         remoteContent: content,
         remoteContentHash: calculateContentHash(content),
         lastPushedContentHash: file.contentHash,
@@ -886,13 +936,31 @@ export async function exportToGitlab(
       activeFiles
     );
 
+    // Preflight each affected source against the stored per-file remote
+    // content baseline. The preflight also returns the actual remote content
+    // for update paths so identical plain updates can be dropped after
+    // conflict checks succeed.
+    if (plan.actions.length > 0) {
+      const remoteContents = await preflightConflicts(
+        projectId,
+        userId,
+        contentBranch,
+        files,
+        plan
+      );
+
+      // Keep contentUpdatedFiles so omitted updates still advance baselines.
+      // Structural actions always remain in the atomic commit.
+      plan.actions = plan.actions.filter(
+        (action) =>
+          action.action !== "update" ||
+          remoteContents.get(action.filePath) !== action.content
+      );
+    }
+
     const allActions = [...plan.actions, ...generatedActions];
 
     if (allActions.length > 0) {
-      // Preflight each affected source against the stored per-file remote
-      // content baseline.
-      await preflightConflicts(projectId, userId, contentBranch, files, plan);
-
       // Durably mark the exact planned attempt BEFORE the remote call.
       const plannedIds = plan.operations.map((item) => item.op.id);
       if (plannedIds.length > 0) {
@@ -954,7 +1022,24 @@ export async function exportToGitlab(
       };
     }
 
-    // Nothing to push
+    // Nothing to push: advance baselines for content-only files whose update
+    // was omitted because the remote is already up to date.
+    if (plan.contentUpdatedFiles.length > 0) {
+      await db.transaction(async (tx) => {
+        await lockProject(tx, projectId);
+        await advanceContentUpdatedBaselines(
+          tx,
+          plan.contentUpdatedFiles,
+          contentBranch
+        );
+      });
+
+      const contentUpdatedFileIds = plan.contentUpdatedFiles.map(
+        (item) => item.file.id
+      );
+      await advanceLabelBaselines(db, projectId, contentUpdatedFileIds);
+    }
+
     await updateSyncOperation(operation.id, {
       status: "COMPLETED",
       conflictCount: 0,
@@ -963,6 +1048,7 @@ export async function exportToGitlab(
       ...operation,
       status: "COMPLETED",
       conflictCount: 0,
+      noChanges: true,
     };
   } catch (error) {
     const errorMessage = toUserFacingExportError(error);

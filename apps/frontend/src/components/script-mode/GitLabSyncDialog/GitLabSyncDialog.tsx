@@ -201,11 +201,7 @@ export function GitLabSyncDialog({
 
     // Use the returned result for toast notifications
     if (result?.status === "COMPLETED") {
-      success(
-        `${
-          operationType === "export" ? "Export" : "Import"
-        } completed successfully`
-      );
+      const noChanges = operationType === "export" && result.noChanges === true;
 
       await invalidateLabels();
       pendingChanges.refetch();
@@ -225,6 +221,18 @@ export function GitLabSyncDialog({
           queryKey: projectFilesKeys.lists(projectId),
         });
       }
+
+      if (noChanges) {
+        // Keep the dialog open and show an explicit no-changes notice. The
+        // progress view is already rendered by the sync hook state.
+        return;
+      }
+
+      success(
+        `${
+          operationType === "export" ? "Export" : "Import"
+        } completed successfully`
+      );
 
       // Review only definitions accepted by this pull, against its pre-pull state.
       const characterReview = result.characterReview;
@@ -343,6 +351,7 @@ export function GitLabSyncDialog({
               progress={state.progress}
               error={state.error}
               operationType={operationType}
+              createNewBranch={formState.createNewBranch}
             />
           ) : (
             <>

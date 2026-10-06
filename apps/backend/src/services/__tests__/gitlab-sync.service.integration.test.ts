@@ -32,6 +32,7 @@ import {
   labelLines,
   characters,
   variables,
+  stats,
   projectFiles,
   projectFilePendingOperations,
   gitlabSyncOperations,
@@ -750,6 +751,18 @@ describe("GitLabSyncService (Integration)", () => {
         .where(eq(projectFiles.id, fileId));
     }
 
+    async function setOlderRemoteBaseline(fileId: string): Promise<string> {
+      const content = `${testGitlabFile.content}\n# older remote version`;
+      await db
+        .update(projectFiles)
+        .set({
+          remoteContent: content,
+          remoteContentHash: calculateContentHash(content),
+        })
+        .where(eq(projectFiles.id, fileId));
+      return content;
+    }
+
     function mockRemoteContent(content: string): void {
       vi.spyOn(
         gitlabRepoService,
@@ -926,7 +939,7 @@ describe("GitLabSyncService (Integration)", () => {
         "commit123"
       );
       await makeFileContentModified(testGitlabFileId);
-      mockRemoteContent(testGitlabFile.content);
+      mockRemoteContent(await setOlderRemoteBaseline(testGitlabFileId));
 
       const result = await exportToGitlab(
         testProjectId,
@@ -991,7 +1004,7 @@ describe("GitLabSyncService (Integration)", () => {
       const contentSpy = vi
         .spyOn(gitlabRepoService, "getFileContentWithMetadata")
         .mockResolvedValue({
-          content: testGitlabFile.content,
+          content: await setOlderRemoteBaseline(testGitlabFileId),
           lastCommitId: "remote-rev-1",
           contentSha256: null,
           blobId: null,
@@ -1070,8 +1083,22 @@ describe("GitLabSyncService (Integration)", () => {
         "commit124"
       );
       await makeFileContentModified(testGitlabFileId);
-      await makeFileContentModified(emptyFile.id);
-      mockRemoteContent("");
+      await db.insert(projectFilePendingOperations).values({
+        projectId: testProjectId,
+        projectFileId: emptyFile.id,
+        operation: "CREATE",
+        remoteBasePath: emptyFile.filePath,
+        localPath: emptyFile.filePath,
+      });
+      vi.spyOn(
+        gitlabRepoService,
+        "getFileContentWithMetadata"
+      ).mockImplementation(async (_projectId, _userId, filePath) => ({
+        content: filePath === emptyFile.filePath ? null : "",
+        lastCommitId: "remote-rev-1",
+        contentSha256: null,
+        blobId: null,
+      }));
 
       const result = await exportToGitlab(
         testProjectId,
@@ -1098,7 +1125,7 @@ describe("GitLabSyncService (Integration)", () => {
             filePath: testGitlabFile.filePath,
             content: testGitlabFile.content,
           },
-          { action: "update", filePath: "game/new_chapter.rpy", content: "" },
+          { action: "create", filePath: "game/new_chapter.rpy", content: "" },
         ])
       );
 
@@ -1139,7 +1166,7 @@ describe("GitLabSyncService (Integration)", () => {
         new Error("GitLab API Error")
       );
       await makeFileContentModified(testGitlabFileId);
-      mockRemoteContent(testGitlabFile.content);
+      mockRemoteContent(await setOlderRemoteBaseline(testGitlabFileId));
 
       const result = await exportToGitlab(
         testProjectId,
@@ -1162,6 +1189,164 @@ describe("GitLabSyncService (Integration)", () => {
         .from(projectFiles)
         .where(eq(projectFiles.id, testGitlabFileId));
       expect(file?.lastPushedContentHash).toBe("stale-pushed-baseline");
+    });
+
+    it("skips identical generated files after a push and still exports later changes", async () => {
+      await db
+        .insert(variables)
+        .values({ projectId: testProjectId, key: "has_key" });
+      await db
+        .insert(stats)
+        .values({ projectId: testProjectId, key: "trust", name: "Trust" });
+      await db.insert(characters).values(testCharacter);
+      await makeFileContentModified(testGitlabFileId);
+      await db
+        .update(projectFiles)
+        .set({ remoteRevision: "script-revision" })
+        .where(eq(projectFiles.id, testGitlabFileId));
+      const remoteFiles = new Map<string, string>([
+        [testGitlabFile.filePath, testGitlabFile.content],
+      ]);
+      vi.spyOn(
+        gitlabRepoService,
+        "getFileContentWithMetadata"
+      ).mockImplementation(async (_projectId, _userId, filePath) => ({
+        content: remoteFiles.get(filePath) ?? null,
+        lastCommitId: "remote-rev-1",
+        contentSha256: null,
+        blobId: null,
+      }));
+      const commitSpy = vi
+        .spyOn(gitlabFileService, "batchCommitFiles")
+        .mockImplementation(
+          async (_projectId, _userId, _branch, _message, actions) => {
+            for (const action of actions) {
+              if (action.content !== undefined)
+                remoteFiles.set(action.filePath, action.content);
+            }
+            return "generated-commit";
+          }
+        );
+      const first = await exportToGitlab(testProjectId, testUserId, testBranch);
+      expect(first.status).toBe("COMPLETED");
+      expect(first.noChanges).not.toBe(true);
+      expect(commitSpy.mock.calls[0][4]).toHaveLength(3);
+      expect(
+        commitSpy.mock.calls[0][4].every((action) => action.action === "create")
+      ).toBe(true);
+
+      const [scriptFile] = await db
+        .select()
+        .from(projectFiles)
+        .where(eq(projectFiles.id, testGitlabFileId));
+      expect(scriptFile.lastPushedContentHash).toBe(testGitlabFile.contentHash);
+      expect(scriptFile.remoteRevision).toBe("script-revision");
+
+      const second = await exportToGitlab(
+        testProjectId,
+        testUserId,
+        testBranch
+      );
+      expect(second).toMatchObject({ status: "COMPLETED", noChanges: true });
+      expect(commitSpy).toHaveBeenCalledTimes(1);
+
+      await db
+        .update(variables)
+        .set({ key: "has_map" })
+        .where(eq(variables.projectId, testProjectId));
+      const third = await exportToGitlab(testProjectId, testUserId, testBranch);
+      expect(third.status).toBe("COMPLETED");
+      expect(commitSpy).toHaveBeenCalledTimes(2);
+      expect(commitSpy.mock.calls[1][4]).toEqual([
+        expect.objectContaining({
+          action: "update",
+          filePath: "game/branchforge_variables.rpy",
+        }),
+      ]);
+    });
+
+    it("advances a no-op local baseline without overwriting the remote revision", async () => {
+      const localContent = `default has_key = False\n${testGitlabFile.content}`;
+      const exportedContent =
+        extractAndStripRpySymbols(localContent).cleanedContent;
+      await db
+        .update(projectFiles)
+        .set({
+          content: localContent,
+          contentHash: calculateContentHash(localContent),
+          lastPushedContentHash: "stale-baseline",
+          remoteContent: exportedContent,
+          remoteContentHash: calculateContentHash(exportedContent),
+          remoteRevision: "existing-revision",
+        })
+        .where(eq(projectFiles.id, testGitlabFileId));
+      mockRemoteContent(exportedContent);
+      const commitSpy = vi.spyOn(gitlabFileService, "batchCommitFiles");
+      const result = await exportToGitlab(
+        testProjectId,
+        testUserId,
+        testBranch
+      );
+      expect(result).toMatchObject({ status: "COMPLETED", noChanges: true });
+      expect(commitSpy).not.toHaveBeenCalled();
+      const [file] = await db
+        .select()
+        .from(projectFiles)
+        .where(eq(projectFiles.id, testGitlabFileId));
+      expect(file.lastPushedContentHash).toBe(
+        calculateContentHash(localContent)
+      );
+      expect(file.remoteRevision).toBe("existing-revision");
+      expect(file.remoteContent).toBe(exportedContent);
+    });
+
+    it("does not create a new branch for an identical export", async () => {
+      vi.spyOn(gitlabRepoService, "getBranchCommitSha").mockImplementation(
+        async (_projectId, _userId, branch) => {
+          if (branch === "feature/no-changes")
+            throw new NotFoundError("Branch");
+          return "base-sha";
+        }
+      );
+      vi.spyOn(gitlabRepoService, "getRepositoryLink").mockResolvedValue({
+        id: 1,
+        projectId: testProjectId,
+        gitlabProjectId: 42,
+        repositoryName: "test/repo",
+        defaultBranch: "main",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      } as never);
+      await makeFileContentModified(testGitlabFileId);
+      mockRemoteContent(testGitlabFile.content);
+      const commitSpy = vi.spyOn(gitlabFileService, "batchCommitFiles");
+      const result = await exportToGitlab(
+        testProjectId,
+        testUserId,
+        "feature/no-changes"
+      );
+      expect(result).toMatchObject({ status: "COMPLETED", noChanges: true });
+      expect(commitSpy).not.toHaveBeenCalled();
+      const [file] = await db
+        .select()
+        .from(projectFiles)
+        .where(eq(projectFiles.id, testGitlabFileId));
+      expect(file.remoteBranch).toBe("main");
+    });
+
+    it("rejects remote drift even when desired content already matches GitLab", async () => {
+      await makeFileContentModified(testGitlabFileId);
+      await setOlderRemoteBaseline(testGitlabFileId);
+      mockRemoteContent(testGitlabFile.content);
+      const commitSpy = vi.spyOn(gitlabFileService, "batchCommitFiles");
+      const result = await exportToGitlab(
+        testProjectId,
+        testUserId,
+        testBranch
+      );
+      expect(result.status).toBe("FAILED");
+      expect(result.errorMessage).toContain("remote file changed");
+      expect(commitSpy).not.toHaveBeenCalled();
     });
 
     it("creates generated files when absent and updates them after export", async () => {
@@ -1229,7 +1414,7 @@ describe("GitLabSyncService (Integration)", () => {
         "commit125"
       );
       await makeFileContentModified(testGitlabFileId);
-      mockRemoteContent(testGitlabFile.content);
+      mockRemoteContent(await setOlderRemoteBaseline(testGitlabFileId));
 
       await exportToGitlab(testProjectId, testUserId, testBranch);
 
@@ -1255,7 +1440,7 @@ describe("GitLabSyncService (Integration)", () => {
         .mockResolvedValue("commit126");
       await makeFileContentModified(testGitlabFileId);
       await makeFileContentModified(testGitlabFile2.id);
-      mockRemoteContent(testGitlabFile.content);
+      mockRemoteContent(await setOlderRemoteBaseline(testGitlabFileId));
 
       const result = await exportToGitlab(
         testProjectId,
