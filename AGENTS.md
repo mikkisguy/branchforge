@@ -168,6 +168,14 @@ declaration snapshots must follow import conflict decisions. Legacy recovery
 is performed once, only with evidence of an untouched source baseline, and
 must never resurrect later source deletions. Omitted import/settings ownership
 fields preserve current settings; explicit empty arrays clear them.
+Default character exclusions are shared from `@branchforge/shared` and include
+only `narrator` and `extend`; `n` and `u` are ordinary project tags. Preserve
+explicit exclusions. Export must reject excluded project characters missing
+current source declarations, even if saved templates exist; Ren'Py's built-in
+speakers may fall back to their engine definitions after custom source deletion.
+New labels use `pass` as their placeholder so they can fall through. Preserve
+authored returns/jumps/calls and never rewrite historical returns without evidence
+of the author's intended flow.
 
 **Rate Limiting:** Required for auth endpoints, recommended for all public endpoints. Use `checkRateLimit()` from `src/services/rate-limiter.service.ts`.
 

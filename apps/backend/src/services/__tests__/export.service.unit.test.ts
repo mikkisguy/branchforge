@@ -70,6 +70,7 @@ import { requireProjectAccess } from "../authz.service.js";
 import {
   NotFoundError,
   RateLimitError,
+  ConflictError,
 } from "../../middleware/error-handler.middleware.js";
 import {
   generateVariablesFile,
@@ -220,6 +221,168 @@ describe("ExportService", () => {
       expect(generateVariablesFile).toHaveBeenCalledWith([
         { key: "met_nelson" },
       ]);
+    });
+
+    it("renders the default-policy unknown-speaker fixture in the definitions file", async () => {
+      // User fixture regression: `define u = Character("???", color="#E4E4E4")`
+      // used to disappear from branchforge_definitions.rpy because the old
+      // default exclusions contained `u`. The defaults are now exactly
+      // `narrator` and `extend`, so the DB row must be exported.
+      const generator = await vi.importActual<
+        typeof import("../rpy-generator.service.js")
+      >("../rpy-generator.service.js");
+      vi.mocked(generateCharacterDefinitionsFile).mockImplementationOnce(
+        generator.generateCharacterDefinitionsFile
+      );
+      const mockProject = { name: "Unknown Speaker" };
+      const mockFiles = [
+        {
+          id: "file-1",
+          projectId: PROJECT_ID,
+          filePath: "game/script.rpy",
+          fileType: "STORY",
+          content: "label start:\n    return",
+          contentHash: "abc",
+          source: "manual",
+        },
+      ];
+      const mockExportRecord = {
+        id: EXPORT_ID,
+        projectId: PROJECT_ID,
+        format: "RENPY",
+        fileName: "unknown_speaker.zip",
+        content: "",
+        fileSize: 0,
+        createdAt: new Date("2024-01-01T00:00:00Z"),
+      };
+
+      resolveQueue.push([]); // project settings (defaults apply)
+      resolveQueue.push([mockProject]); // project
+      resolveQueue.push(mockFiles); // files
+      resolveQueue.push([]); // labels
+      resolveQueue.push([]); // variables
+      resolveQueue.push([]); // stats
+      resolveQueue.push([
+        {
+          renpyTag: "u",
+          name: "???",
+          nameType: "unknown",
+          color: "#E4E4E4",
+          isNarrator: false,
+          displayName: "u",
+          sourceDefinition: null,
+        },
+      ]); // characters
+      resolveQueue.push([]); // cleanup
+
+      mockDb.returning.mockResolvedValueOnce([mockExportRecord]);
+
+      await generateExport(PROJECT_ID, USER_ID);
+
+      const insertPayload = mockDb.values.mock.calls[0][0] as {
+        content: string;
+      };
+      const savedContent = JSON.parse(insertPayload.content);
+      expect(savedContent["game/branchforge_definitions.rpy"]).toContain(
+        'define u = Character("???", color="#E4E4E4")'
+      );
+    });
+
+    it("conflicts when an explicitly excluded character has no source declaration", async () => {
+      resolveQueue.push([{ excludedCharacterTags: ["narrator", "u"] }]); // project settings (explicit legacy array)
+      resolveQueue.push([{ name: "Legacy" }]); // project
+      resolveQueue.push([
+        {
+          id: "file-1",
+          projectId: PROJECT_ID,
+          filePath: "game/script.rpy",
+          fileType: "STORY",
+          content: "label start:\n    return",
+          contentHash: "abc",
+          source: "manual",
+        },
+      ]); // files
+      resolveQueue.push([]); // labels
+      resolveQueue.push([]); // variables
+      resolveQueue.push([]); // stats
+      resolveQueue.push([
+        {
+          renpyTag: "u",
+          name: "???",
+          nameType: "unknown",
+          color: "#E4E4E4",
+          isNarrator: false,
+          displayName: "u",
+          sourceDefinition: null,
+        },
+      ]); // characters
+
+      await expect(generateExport(PROJECT_ID, USER_ID)).rejects.toThrow(
+        ConflictError
+      );
+      // No export record must be written.
+      expect(mockDb.values).not.toHaveBeenCalled();
+    });
+
+    it("preserves an explicitly excluded character declared in source", async () => {
+      const mockProject = { name: "Explicit" };
+      const mockFiles = [
+        {
+          id: "file-1",
+          projectId: PROJECT_ID,
+          filePath: "game/script.rpy",
+          fileType: "STORY",
+          content:
+            'define u = Character("???", color="#E4E4E4")\nlabel start:\n    return',
+          contentHash: "abc",
+          source: "manual",
+        },
+      ];
+      const mockExportRecord = {
+        id: EXPORT_ID,
+        projectId: PROJECT_ID,
+        format: "RENPY",
+        fileName: "explicit.zip",
+        content: "",
+        fileSize: 0,
+        createdAt: new Date("2024-01-01T00:00:00Z"),
+      };
+
+      resolveQueue.push([{ excludedCharacterTags: ["narrator", "u"] }]); // project settings
+      resolveQueue.push([mockProject]); // project
+      resolveQueue.push(mockFiles); // files
+      resolveQueue.push([]); // labels
+      resolveQueue.push([]); // variables
+      resolveQueue.push([]); // stats
+      resolveQueue.push([
+        {
+          renpyTag: "u",
+          name: "???",
+          nameType: "unknown",
+          color: "#E4E4E4",
+          isNarrator: false,
+          displayName: "u",
+          sourceDefinition: null,
+        },
+      ]); // characters
+      resolveQueue.push([]); // cleanup
+
+      mockDb.returning.mockResolvedValueOnce([mockExportRecord]);
+
+      await generateExport(PROJECT_ID, USER_ID);
+
+      const insertPayload = mockDb.values.mock.calls[0][0] as {
+        content: string;
+      };
+      const savedContent = JSON.parse(insertPayload.content);
+      // The declaration stays source-owned in the user file...
+      expect(savedContent["game/script.rpy"]).toContain(
+        'define u = Character("???", color="#E4E4E4")'
+      );
+      // ...and no generated definitions file is emitted for it.
+      expect(savedContent).not.toHaveProperty(
+        "game/branchforge_definitions.rpy"
+      );
     });
 
     it("should generate an export successfully with story files and labels", async () => {
@@ -1022,6 +1185,94 @@ describe("ExportService", () => {
       expect(generateCharacterDefinitionsFile).toHaveBeenCalledWith([
         { renpyTag: "ne", nameType: "literal" },
       ]);
+    });
+
+    it("previews the default-policy unknown-speaker character", async () => {
+      const generator = await vi.importActual<
+        typeof import("../rpy-generator.service.js")
+      >("../rpy-generator.service.js");
+      vi.mocked(generateCharacterDefinitionsFile).mockImplementationOnce(
+        generator.generateCharacterDefinitionsFile
+      );
+      resolveQueue.push([]); // project settings (defaults apply)
+      resolveQueue.push([]); // variables
+      resolveQueue.push([]); // stats
+      resolveQueue.push([
+        {
+          renpyTag: "u",
+          name: "???",
+          nameType: "unknown",
+          color: "#E4E4E4",
+          isNarrator: false,
+          displayName: "u",
+          sourceDefinition: null,
+        },
+      ]); // characters
+      resolveQueue.push([]); // source files
+
+      const result: ExportPreviewResponse = await getExportPreview(
+        PROJECT_ID,
+        USER_ID
+      );
+
+      expect(result.files[2].content).toContain(
+        'define u = Character("???", color="#E4E4E4")'
+      );
+      expect(result.files[2].isEmpty).toBe(false);
+    });
+
+    it("conflicts on preview when an excluded character has no source declaration", async () => {
+      resolveQueue.push([{ excludedCharacterTags: ["narrator", "u"] }]); // project settings
+      resolveQueue.push([]); // variables
+      resolveQueue.push([]); // stats
+      resolveQueue.push([
+        {
+          renpyTag: "u",
+          name: "???",
+          nameType: "unknown",
+          color: "#E4E4E4",
+          isNarrator: false,
+          displayName: "u",
+          sourceDefinition: null,
+        },
+      ]); // characters
+      resolveQueue.push([]); // source files
+
+      await expect(getExportPreview(PROJECT_ID, USER_ID)).rejects.toThrow(
+        ConflictError
+      );
+    });
+
+    it("previews an excluded character preserved in source without conflict", async () => {
+      resolveQueue.push([{ excludedCharacterTags: ["narrator", "u"] }]); // project settings
+      resolveQueue.push([]); // variables
+      resolveQueue.push([]); // stats
+      resolveQueue.push([
+        {
+          renpyTag: "u",
+          name: "???",
+          nameType: "unknown",
+          color: "#E4E4E4",
+          isNarrator: false,
+          displayName: "u",
+          sourceDefinition: null,
+        },
+      ]); // characters
+      resolveQueue.push([
+        {
+          filePath: "game/script.rpy",
+          content:
+            'define u = Character("???", color="#E4E4E4")\nlabel start:\n    return',
+        },
+      ]); // source files
+
+      const result: ExportPreviewResponse = await getExportPreview(
+        PROJECT_ID,
+        USER_ID
+      );
+
+      // Source-owned: the definitions preview stays empty.
+      expect(result.files[2].isEmpty).toBe(true);
     });
 
     it("should throw RateLimitError when rate limited", async () => {

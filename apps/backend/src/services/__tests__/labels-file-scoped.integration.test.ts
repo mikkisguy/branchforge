@@ -21,8 +21,13 @@ import type {
   NewProject,
   NewProjectFile,
 } from "../../db/schema/index.js";
-import { eq, inArray } from "drizzle-orm";
-import { createLabel } from "../labels.service.js";
+import { and, eq, inArray } from "drizzle-orm";
+import {
+  createLabel,
+  syncLabelsFromFile,
+  updateLabelDialogue,
+} from "../labels.service.js";
+import { generateExport, getExportForDownload } from "../export.service.js";
 import { testEmail, testUuid } from "../../utils/test-ids.js";
 import { calculateContentHash } from "../../lib/hash.js";
 import {
@@ -509,6 +514,75 @@ describe("LabelsService - File Scoped (Integration)", () => {
     });
 
     describe("RPY content updates", () => {
+      it("preserves fallthrough after creating, populating, and exporting a label", async () => {
+        const initialContent = `label first:
+    "Before"
+
+label second:
+    jump ending
+
+label ending:
+    return`;
+        const fileId = testUuid("13000005", 1);
+        const filePath = "labels/act_i.rpy";
+        await db.insert(projectFiles).values({
+          id: fileId,
+          projectId: testProject.id!,
+          filePath,
+          fileType: "STORY",
+          content: initialContent,
+          source: "ZIP",
+          contentHash: calculateContentHash(initialContent),
+        });
+        const sync = await syncLabelsFromFile(
+          testProject.id!,
+          { filePath, fileType: "STORY" },
+          initialContent,
+          fileId
+        );
+        expect(sync.success).toBe(true);
+        const [first] = await db
+          .select()
+          .from(labels)
+          .where(
+            and(eq(labels.projectFileId, fileId), eq(labels.labelName, "first"))
+          );
+        const created = await createLabel(testUserId, {
+          projectId: testProject.id!,
+          projectFileId: fileId,
+          title: "Middle",
+          afterLabelId: first.id,
+        });
+        for (const text of ["New dialogue", "Updated dialogue"]) {
+          const result = await updateLabelDialogue({
+            userId: testUserId,
+            labelId: created.id,
+            dialogue: [{ speakerId: null, text }],
+          });
+          expect(result.type).toBe("success");
+        }
+        const [file] = await db
+          .select()
+          .from(projectFiles)
+          .where(eq(projectFiles.id, fileId));
+        expect(file.contentHash).toBe(calculateContentHash(file.content));
+        expect(file.content).toContain('    "Updated dialogue"');
+        expect(file.content.match(/^\s*return$/gm)).toHaveLength(1);
+        expect(file.content.match(/^\s*jump ending$/gm)).toHaveLength(1);
+        expect(file.content.indexOf("label middle:")).toBeLessThan(
+          file.content.indexOf("label second:")
+        );
+        const exported = await generateExport(testProject.id!, testUserId);
+        const download = await getExportForDownload(
+          exported.id,
+          testProject.id!,
+          testUserId
+        );
+        expect(JSON.parse(download.content)).toMatchObject({
+          [filePath]: file.content,
+        });
+      });
+
       it("should insert label into RPY content when creating file-scoped label", async () => {
         const initialContent = 'label start:\n    "Hello World"\n    return';
         const projectFile: NewProjectFile = {

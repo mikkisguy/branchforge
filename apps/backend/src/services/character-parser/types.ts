@@ -52,7 +52,7 @@ export interface CharacterPatternMatch {
  *   should derive a fallback (the tag, or `"(unnamed)"`) for display.
  * - nameType: How the name was specified — drives import-wizard warnings.
  * - color: Hex color for dialogue display
- * - isSpecial: Whether this is a system character (narration, unknown speaker)
+ * - isSpecial: Whether this is a built-in system speaker (narrator or extend)
  * - sourceFile: Which RPY file this was detected in
  * - confidence: Detection confidence (0-1, lower for variable references)
  */
@@ -62,7 +62,7 @@ export interface DetectedCharacter {
   displayName: string;
   nameType: CharacterNameType;
   color: string;
-  isSpecial: boolean; // narration, unknown, etc.
+  isSpecial: boolean;
   sourceFile: string;
   confidence: number; // 0-1 for fuzzy matches
   sourceDefinition?: CharacterSourceDefinition;

@@ -1,5 +1,6 @@
-// Default excluded character tags (special Ren'Py characters)
-export const DEFAULT_EXCLUDED_TAGS = ["n", "u", "narrator", "extend"] as const;
+import { DEFAULT_EXCLUDED_CHARACTER_TAGS } from "@branchforge/shared";
+
+export const DEFAULT_EXCLUDED_TAGS = DEFAULT_EXCLUDED_CHARACTER_TAGS;
 export type DefaultExcludedTag = (typeof DEFAULT_EXCLUDED_TAGS)[number];
 
 /**

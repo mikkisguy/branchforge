@@ -27,6 +27,12 @@ waits for the affected file's autosave before either action; resolve a save
 error before renaming. Deleting another file never discards an unrelated
 draft.
 
+New labels contain a `pass` placeholder. Execution continues into the next
+statement or label in the file unless you add an explicit transfer in Script
+Mode. Use `jump ending` to go to a chosen ending, or `return` to return from a
+called scene (or to the main menu when there is no caller). Existing returns are
+preserved when you edit dialogue.
+
 ## Writing Dialogue
 
 <!-- screenshot: write-mode-dialogue.png — Write Mode dialogue lines, dark theme, docs demo -->

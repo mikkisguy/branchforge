@@ -1509,6 +1509,40 @@ label chapter1:
   });
 
   describe("addLabelToRPYContent", () => {
+    it("keeps a populated new label fallthrough without changing authored exits", () => {
+      const content = `label first:
+    "Before"
+
+label second:
+    jump ending
+
+label ending:
+    return`;
+      const created = addLabelToRPYContent(content, "middle", "first");
+      expect(created).toContain("label middle:\n    pass");
+
+      const populated = reconstructRPYFile({
+        originalContent: created,
+        updatedDialogue: new Map([
+          ["middle", [{ speaker: null, text: "New dialogue" }]],
+        ]),
+      });
+      expect(populated).toContain('    "New dialogue"');
+      expect(populated.match(/^\s*return$/gm)).toHaveLength(1);
+      expect(populated.match(/^\s*jump ending$/gm)).toHaveLength(1);
+      expect(populated.indexOf("label middle:")).toBeLessThan(
+        populated.indexOf("label second:")
+      );
+    });
+
+    it("appends a neutral placeholder even after a called scene", () => {
+      const content = "label helper:\n    return 42\n";
+      const result = addLabelToRPYContent(content, "new_label");
+      expect(result).toContain("label helper:\n    return 42");
+      expect(result).toContain("label new_label:\n    pass");
+      expect(result).not.toMatch(/label new_label:[\s\S]*\breturn\b/);
+    });
+
     it("should insert label at end when afterLabelName is null", () => {
       const content = `label first:
     return`;
@@ -1549,13 +1583,14 @@ label second:
       const content = `label first:
     return`;
       const result = addLabelToRPYContent(content, "second");
-      expect(result).toMatch(/label second:\n {4}return/);
+      expect(result).toMatch(/label second:\n {4}pass/);
     });
 
     it("should handle empty file", () => {
       const result = addLabelToRPYContent("", "first_label");
       expect(result).toContain("label first_label:");
-      expect(result).toContain("return");
+      expect(result).toContain("pass");
+      expect(result).not.toContain("return");
     });
 
     it("should handle file with no labels", () => {
@@ -1603,12 +1638,12 @@ label second:
   return`;
       const result = addLabelToRPYContent(content, "second");
       // Should use 2 spaces if that's what the existing label uses
-      expect(result).toMatch(/label second:\n {2}return/);
+      expect(result).toMatch(/label second:\n {2}pass/);
     });
 
     it("should default to 4 spaces when no indentation can be detected", () => {
       const result = addLabelToRPYContent("", "first_label");
-      expect(result).toMatch(/label first_label:\n {4}return/);
+      expect(result).toMatch(/label first_label:\n {4}pass/);
     });
   });
 

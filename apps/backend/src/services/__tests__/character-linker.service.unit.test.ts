@@ -130,3 +130,31 @@ describe("CharacterLinkerService.applySpeakerUpdates", () => {
     expect(mockWhere).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("CharacterLinkerService.shouldLinkTag policy", () => {
+  // The linker's default-exclusion policy must treat `n` and `u` as
+  // ordinary tags (they link when not explicitly excluded); only
+  // `narrator` and `extend` are implicitly skipped.
+  const svc = characterLinkerService as unknown as {
+    shouldLinkTag: (
+      speakerTag: string | null,
+      excludedTags: Set<string>
+    ) => boolean;
+  };
+
+  it("links ordinary n and u tags when not explicitly excluded", () => {
+    expect(svc.shouldLinkTag("n", new Set())).toBe(true);
+    expect(svc.shouldLinkTag("u", new Set())).toBe(true);
+  });
+
+  it("still skips narrator and extend by default", () => {
+    expect(svc.shouldLinkTag("narrator", new Set())).toBe(false);
+    expect(svc.shouldLinkTag("extend", new Set())).toBe(false);
+  });
+
+  it("respects explicit exclusions for any tag", () => {
+    expect(svc.shouldLinkTag("n", new Set(["n"]))).toBe(false);
+    expect(svc.shouldLinkTag("u", new Set(["u"]))).toBe(false);
+    expect(svc.shouldLinkTag("s", new Set(["s"]))).toBe(false);
+  });
+});

@@ -1,7 +1,8 @@
-import type {
-  DetectedCharacter,
-  CharacterConflict,
-  CharacterNameType,
+import {
+  DEFAULT_EXCLUDED_CHARACTER_TAGS,
+  type DetectedCharacter,
+  type CharacterConflict,
+  type CharacterNameType,
 } from "@branchforge/shared";
 
 // ============================================================================
@@ -70,7 +71,9 @@ function groupCharacters(
   existingTags: string[]
 ): CharacterGroup {
   const conflictTags = new Set(conflicts.map((c) => c.tag));
-  const specialTags = new Set(["n", "u", "narrator", "extend"]);
+  // Shared policy: only the Ren'Py system speakers are special. `n` and
+  // `u` are ordinary tags and must never be auto-excluded here.
+  const specialTags = new Set<string>(DEFAULT_EXCLUDED_CHARACTER_TAGS);
   const excludedTagSet = new Set(excludedTags);
   const narratorTagSet = new Set(narratorTags);
   const conflictMap = new Map(conflicts.map((c) => [c.tag, c]));

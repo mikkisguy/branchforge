@@ -138,6 +138,41 @@ vi.mock("../../db/index.js", () => ({
 // Tests
 // ============================================================================
 
+describe("CharactersService exclusion defaults", () => {
+  beforeEach(() => {
+    resetSelectResults();
+    mockInsert.mockReset();
+    mockInsert.mockImplementation(createInsertChain);
+  });
+
+  afterEach(() => vi.clearAllMocks());
+
+  it.each([
+    { stored: null, expected: ["narrator", "extend"] },
+    { stored: [], expected: [] },
+    { stored: ["n", "u"], expected: ["n", "u"] },
+  ])(
+    "uses consistent GET/detection exclusions for $stored",
+    async ({ stored, expected }) => {
+      setSelectResults({
+        projectSettings: [{ excludedCharacterTags: stored }],
+        characters: [],
+        projectFiles: [],
+      });
+      const settings = await charactersService.getCharacterSettings(
+        "project",
+        "user"
+      );
+      const detection = await charactersService.detectCharacters(
+        "project",
+        "user"
+      );
+      expect(settings.excludedCharacterTags).toEqual(expected);
+      expect(detection.excludedTags).toEqual(expected);
+    }
+  );
+});
+
 describe("CharactersService.importCharacters", () => {
   const projectId = "project-123";
   const userId = "user-123";

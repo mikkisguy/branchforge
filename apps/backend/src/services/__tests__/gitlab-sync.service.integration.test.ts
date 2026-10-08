@@ -35,6 +35,7 @@ import {
   stats,
   projectFiles,
   projectFilePendingOperations,
+  projectSettings,
   gitlabSyncOperations,
 } from "../../db/schema/index.js";
 import { and, eq } from "drizzle-orm";
@@ -1706,6 +1707,161 @@ describe("GitLabSyncService (Integration)", () => {
           )
         );
       expect(staleRow).toBeDefined();
+    });
+
+    it("exports the default-policy unknown-speaker character without a source declaration", async () => {
+      // User fixture: a DB row `u` / `???` / `#E4E4E4` with no source
+      // declaration must render in branchforge_definitions.rpy now that
+      // the automatic exclusions are exactly `narrator` and `extend`.
+      await db.insert(characters).values({
+        projectId: testProjectId,
+        renpyTag: "u",
+        name: "???",
+        displayName: "???",
+        nameType: "unknown",
+        color: "#E4E4E4",
+      });
+      await db.insert(characters).values({
+        projectId: testProjectId,
+        renpyTag: "n",
+        name: "N",
+        displayName: "N",
+        nameType: "literal",
+        color: "#cfcfcf",
+      });
+      const commitSpy = vi
+        .spyOn(gitlabFileService, "batchCommitFiles")
+        .mockResolvedValue("commit-u");
+      mockRemoteContent(null);
+
+      const result = await exportToGitlab(
+        testProjectId,
+        testUserId,
+        testBranch
+      );
+      expect(result.status, result.errorMessage ?? undefined).toBe("COMPLETED");
+
+      const actions = commitSpy.mock.calls[0]?.[4] as Array<{
+        action: string;
+        filePath: string;
+        content?: string;
+      }>;
+      const definitions = actions.find(
+        (a) => a.filePath === "game/branchforge_definitions.rpy"
+      );
+      expect(definitions).toBeDefined();
+      expect(definitions?.content).toContain(
+        'define u = Character("???", color="#E4E4E4")'
+      );
+      expect(definitions?.content).toContain(
+        'define n = Character("N", color="#cfcfcf")'
+      );
+      for (const tag of ["u", "n"]) {
+        const declarations = actions.flatMap(
+          (action) =>
+            (action.content ?? "").match(
+              new RegExp(`^define ${tag} = Character`, "gm")
+            ) ?? []
+        );
+        expect(declarations).toHaveLength(1);
+      }
+    });
+
+    it("fails the export with an actionable conflict when an explicitly excluded character has no source declaration", async () => {
+      // Legacy project: stored explicit exclusions still contain `u`,
+      // and a DB row exists without any source declaration. The export
+      // must conflict before any remote write instead of silently
+      // dropping the row.
+      await db.insert(projectSettings).values({
+        projectId: testProjectId,
+        excludedCharacterTags: ["narrator", "u"],
+      });
+      await db.insert(characters).values({
+        projectId: testProjectId,
+        renpyTag: "u",
+        name: "???",
+        displayName: "???",
+        nameType: "unknown",
+        color: "#E4E4E4",
+        sourceDefinition: {
+          declaration: 'define u = Character("???", color="#E4E4E4")',
+          name: "???",
+          nameType: "unknown",
+          color: "#E4E4E4",
+        },
+      });
+      const commitSpy = vi
+        .spyOn(gitlabFileService, "batchCommitFiles")
+        .mockResolvedValue("commit-conflict");
+      mockRemoteContent(null);
+
+      const result = await exportToGitlab(
+        testProjectId,
+        testUserId,
+        testBranch
+      );
+      expect(result.status).toBe("FAILED");
+      expect(result.errorMessage).toContain(
+        "Some excluded characters have no source declaration"
+      );
+      expect(result.errorMessage).toContain("excluded character tags");
+      expect(commitSpy).not.toHaveBeenCalled();
+    });
+
+    it("exports an explicitly excluded character whose declaration is preserved in source", async () => {
+      const sourceWithU =
+        'define u = Character("???", color="#E4E4E4")\n' +
+        testGitlabFile.content;
+      await db
+        .update(projectFiles)
+        .set({
+          content: sourceWithU,
+          contentHash: calculateContentHash(sourceWithU),
+        })
+        .where(eq(projectFiles.id, testGitlabFileId));
+      await db.insert(projectSettings).values({
+        projectId: testProjectId,
+        excludedCharacterTags: ["narrator", "u"],
+      });
+      await db.insert(characters).values({
+        projectId: testProjectId,
+        renpyTag: "u",
+        name: "???",
+        displayName: "???",
+        nameType: "unknown",
+        color: "#E4E4E4",
+      });
+      const commitSpy = vi
+        .spyOn(gitlabFileService, "batchCommitFiles")
+        .mockResolvedValue("commit-preserved");
+      mockRemoteContent(sourceWithU);
+
+      const result = await exportToGitlab(
+        testProjectId,
+        testUserId,
+        testBranch
+      );
+      expect(result.status, result.errorMessage ?? undefined).toBe("COMPLETED");
+
+      // The excluded declaration stays source-owned: no generated
+      // definition for `u` may be pushed.
+      const actions = commitSpy.mock.calls[0]?.[4] as Array<{
+        action: string;
+        filePath: string;
+        content?: string;
+      }>;
+      for (const action of actions) {
+        if (action.filePath.endsWith("branchforge_definitions.rpy")) {
+          expect(action.content ?? "").not.toContain("define u = Character");
+        }
+      }
+      // The user file is not rewritten without its declaration.
+      const userFileAction = actions.find(
+        (a) => a.filePath === testGitlabFile.filePath
+      );
+      if (userFileAction) {
+        expect(userFileAction.content).toContain("define u = Character");
+      }
     });
   });
 

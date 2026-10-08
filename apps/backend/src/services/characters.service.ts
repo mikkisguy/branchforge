@@ -36,6 +36,7 @@ import {
 import type { Character, ProjectSettings } from "../db/schema/index.js";
 import {
   isValidCharacterNameType,
+  DEFAULT_EXCLUDED_CHARACTER_TAGS,
   type CharacterNameType,
 } from "@branchforge/shared";
 import { inferNameTypeFromStoredName } from "./character-parser/name-resolution.js";
@@ -163,7 +164,7 @@ export class CharactersService {
       .insert(projectSettings)
       .values({
         projectId,
-        excludedCharacterTags: ["n", "u", "narrator", "extend"],
+        excludedCharacterTags: [...DEFAULT_EXCLUDED_CHARACTER_TAGS],
         narratorCharacterTags: [],
         autoLinkSpeakers: true,
         updatedAt: new Date(),
@@ -216,10 +217,7 @@ export class CharactersService {
         .values({
           projectId,
           excludedCharacterTags: input.excludedCharacterTags ?? [
-            "n",
-            "u",
-            "narrator",
-            "extend",
+            ...DEFAULT_EXCLUDED_CHARACTER_TAGS,
           ],
           narratorCharacterTags: input.narratorCharacterTags ?? [],
           autoLinkSpeakers: input.autoLinkSpeakers ?? true,
@@ -245,7 +243,9 @@ export class CharactersService {
     });
 
     return {
-      excludedCharacterTags: updatedSettings.excludedCharacterTags ?? [],
+      excludedCharacterTags: updatedSettings.excludedCharacterTags ?? [
+        ...DEFAULT_EXCLUDED_CHARACTER_TAGS,
+      ],
       narratorCharacterTags: updatedSettings.narratorCharacterTags ?? [],
       autoLinkSpeakers: updatedSettings.autoLinkSpeakers,
     };
@@ -259,7 +259,9 @@ export class CharactersService {
     // getProjectSettings enforces ownership
     const settings = await this.getProjectSettings(projectId, userId);
     return {
-      excludedCharacterTags: settings.excludedCharacterTags ?? [],
+      excludedCharacterTags: settings.excludedCharacterTags ?? [
+        ...DEFAULT_EXCLUDED_CHARACTER_TAGS,
+      ],
       narratorCharacterTags: settings.narratorCharacterTags ?? [],
       autoLinkSpeakers: settings.autoLinkSpeakers,
     };
@@ -312,7 +314,9 @@ export class CharactersService {
 
     const settings = await this.getProjectSettings(projectId, userId);
     await ensureCharacterSourcePreservation(projectId);
-    const excludedTags = new Set(settings.excludedCharacterTags ?? []);
+    const excludedTags = new Set(
+      settings.excludedCharacterTags ?? DEFAULT_EXCLUDED_CHARACTER_TAGS
+    );
 
     const [existingCharacters, allProjectFiles] = await Promise.all([
       db.select().from(characters).where(eq(characters.projectId, projectId)),
@@ -416,10 +420,11 @@ export class CharactersService {
         .from(projectSettings)
         .where(eq(projectSettings.projectId, projectId))
         .limit(1);
-      const excludedTags =
-        requestedExcludedTags ??
-        previous?.excludedCharacterTags ??
-        DEFAULT_EXCLUDED_RENPY_TAGS;
+      const excludedTags = [
+        ...(requestedExcludedTags ??
+          previous?.excludedCharacterTags ??
+          DEFAULT_EXCLUDED_RENPY_TAGS),
+      ];
       const narratorTags =
         requestedNarratorTags ?? previous?.narratorCharacterTags ?? [];
       const excluded = new Set(excludedTags);
