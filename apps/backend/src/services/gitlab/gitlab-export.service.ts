@@ -39,6 +39,7 @@ import {
   stats,
   variables,
   projects,
+  projectSettings,
 } from "../../db/schema/index.js";
 import { eq, and, inArray, isNull } from "drizzle-orm";
 import {
@@ -53,9 +54,12 @@ import {
   extractAndStripRpySymbols,
   isSourceOwnedRpyFile,
   collectSourceOwnedRpySymbolKeys,
+  DEFAULT_EXCLUDED_RENPY_TAGS,
 } from "../rpy-statements.service.js";
+import { ensureCharacterSourcePreservation } from "../character-source-preservation.service.js";
 
 import type { SyncOperation } from "../gitlab.types.js";
+import type { CharacterSourceDefinition } from "@branchforge/shared";
 import {
   createSyncOperation,
   updateSyncOperation,
@@ -117,7 +121,8 @@ interface ExportPlan {
 
 function buildPlannedActions(
   files: ProjectFileRow[],
-  ops: PendingOpRow[]
+  ops: PendingOpRow[],
+  excludedTags: ReadonlySet<string>
 ): ExportPlan {
   const actions: PlannedAction[] = [];
   const operations: PlannedOperation[] = [];
@@ -177,7 +182,7 @@ function buildPlannedActions(
   for (const file of files) {
     if (file.deletedAt) continue;
     if (opsByFileId.has(file.id)) continue;
-    const baseline = localContentBaselineHash(file);
+    const baseline = localContentBaselineHash(file, excludedTags);
     if (baseline === null || baseline === file.contentHash) continue;
     actions.push({
       action: "update",
@@ -210,6 +215,7 @@ interface GeneratedExportData {
     color: string;
     isNarrator: boolean;
     displayName: string;
+    sourceDefinition: CharacterSourceDefinition | null;
   }>;
 }
 
@@ -223,7 +229,8 @@ async function buildGeneratedActions(
   branch: string,
   fileDirPrefix: string,
   generated: GeneratedExportData,
-  activeFiles: ProjectFileRow[]
+  activeFiles: ProjectFileRow[],
+  excludedTags: ReadonlySet<string>
 ): Promise<PlannedAction[]> {
   // Plain names declared in the active source-owned files own the global
   // store: generated declarations must not collide with them.
@@ -231,7 +238,8 @@ async function buildGeneratedActions(
     activeFiles.map((file) => ({
       filePath: file.filePath,
       content: file.content,
-    }))
+    })),
+    excludedTags
   );
   // Candidate selection stays based on the ORIGINAL category length: when a
   // category has DB rows whose symbols were all filtered, the generated file
@@ -245,7 +253,9 @@ async function buildGeneratedActions(
     (stat) => !sourceOwnedKeys.has(stat.key)
   );
   const filteredCharacters = generated.characters.filter(
-    (character) => !sourceOwnedKeys.has(character.renpyTag)
+    (character) =>
+      !sourceOwnedKeys.has(character.renpyTag) &&
+      !excludedTags.has(character.renpyTag)
   );
 
   const candidates: Array<{ filePath: string; content: string }> = [];
@@ -306,6 +316,32 @@ async function buildGeneratedActions(
 const MISSING_DEFAULT_BRANCH_MESSAGE =
   "Export failed. The repository default branch was not found, so a new branch cannot be created.";
 
+/**
+ * Fetch the project's excluded Ren'Py character tags. Missing settings rows
+ * or null columns fall back to the default excluded tags; explicit empty
+ * array means no exclusions.
+ */
+async function fetchProjectExcludedTags(
+  projectId: string
+): Promise<Set<string>> {
+  const db = getDb();
+  const [settings] = await db
+    .select({ excludedCharacterTags: projectSettings.excludedCharacterTags })
+    .from(projectSettings)
+    .where(eq(projectSettings.projectId, projectId))
+    .limit(1);
+
+  if (settings?.excludedCharacterTags === undefined) {
+    return new Set(DEFAULT_EXCLUDED_RENPY_TAGS);
+  }
+
+  if (settings.excludedCharacterTags === null) {
+    return new Set(DEFAULT_EXCLUDED_RENPY_TAGS);
+  }
+
+  return new Set(settings.excludedCharacterTags);
+}
+
 function toUserFacingExportError(error: unknown): string {
   if (error instanceof RepositoryNotLinkedError) {
     return "Export failed. Link a GitLab repository in project settings, then try again.";
@@ -334,7 +370,8 @@ function buildPushedContent(
     conditions: unknown;
     effects: unknown;
     projectFileId: string | null;
-  }>
+  }>,
+  excludedTags: ReadonlySet<string>
 ): string {
   // Source-owned files (screens.rpy, gui.rpy, ...) are pushed verbatim:
   // no managed-statement strip and no variable patching, independent of
@@ -347,7 +384,8 @@ function buildPushedContent(
   }
   const baseContent = extractAndStripRpySymbols(
     file.content,
-    file.filePath
+    file.filePath,
+    excludedTags
   ).cleanedContent;
   if (labelsForFile.length === 0) {
     return baseContent;
@@ -712,9 +750,17 @@ export async function exportToGitlab(
 ): Promise<SyncOperation> {
   await requireProjectOwnership(projectId, userId);
 
+  // Idempotent source-preservation maintenance must run after the ownership
+  // guard and before any file content is read or generated.
+  await ensureCharacterSourcePreservation(projectId);
+
   const db = getDb();
   const message =
     commitMessage || `Export from BranchForge - ${new Date().toISOString()}`;
+
+  // Load the project's character-tag exclusion policy once and use it for
+  // every strip/collision decision in this export.
+  const excludedTags = await fetchProjectExcludedTags(projectId);
 
   // Resolve the target branch (existing or new non-default branch)
   let targetBranch = branch;
@@ -763,7 +809,7 @@ export async function exportToGitlab(
     const unresolved = ops.filter((op) => op.attemptStartedAt !== null);
     if (unresolved.length > 0) {
       const unresolvedIds = unresolved.map((op) => op.id);
-      const plan = buildPlannedActions(files, unresolved);
+      const plan = buildPlannedActions(files, unresolved, excludedTags);
       const observed = await verifyActionSetObserved(
         projectId,
         userId,
@@ -832,19 +878,21 @@ export async function exportToGitlab(
     }
 
     // Build the plan and patch content for every affected file.
-    const plan = buildPlannedActions(files, ops);
+    const plan = buildPlannedActions(files, ops, excludedTags);
     for (const item of plan.operations) {
       if (item.file) {
         item.content = buildPushedContent(
           item.file,
-          labelsByFile.get(item.file.id) ?? []
+          labelsByFile.get(item.file.id) ?? [],
+          excludedTags
         );
       }
     }
     for (const item of plan.contentUpdatedFiles) {
       item.content = buildPushedContent(
         item.file,
-        labelsByFile.get(item.file.id) ?? []
+        labelsByFile.get(item.file.id) ?? [],
+        excludedTags
       );
       const action = plan.actions.find(
         (candidate) =>
@@ -866,7 +914,11 @@ export async function exportToGitlab(
       if (plannedFileIds.has(file.id)) {
         continue;
       }
-      const content = buildPushedContent(file, labelsByFile.get(file.id) ?? []);
+      const content = buildPushedContent(
+        file,
+        labelsByFile.get(file.id) ?? [],
+        excludedTags
+      );
       const remoteHash = remoteContentBaselineHash(file);
       if (remoteHash === null || calculateContentHash(content) === remoteHash) {
         continue;
@@ -917,6 +969,7 @@ export async function exportToGitlab(
             color: characters.color,
             isNarrator: characters.isNarrator,
             displayName: characters.displayName,
+            sourceDefinition: characters.sourceDefinition,
           })
           .from(characters)
           .where(eq(characters.projectId, projectId)),
@@ -933,7 +986,8 @@ export async function exportToGitlab(
         stats: projectStats,
         characters: projectCharacters,
       },
-      activeFiles
+      activeFiles,
+      excludedTags
     );
 
     // Preflight each affected source against the stored per-file remote

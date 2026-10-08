@@ -9,7 +9,7 @@ import { useCallback, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { projectFilesApi } from "@/lib/api/project-files";
 import type { ProjectFileNode } from "@/lib/api/project-files";
-import { projectFilesKeys } from "@/lib/query-keys";
+import { projectFilesKeys, characterKeys } from "@/lib/query-keys";
 import type { SourceOrigin } from "@branchforge/shared";
 
 // ============================================================================
@@ -102,8 +102,9 @@ export function useProjectFiles(
       });
     },
     onSuccess: () => {
-      // Invalidate files queries for this project
+      // Script saves can update authored character declarations.
       if (projectId) {
+        queryClient.invalidateQueries({ queryKey: characterKeys.all });
         queryClient.invalidateQueries({
           queryKey: options?.source
             ? projectFilesKeys.listsWithSource(projectId, options.source)

@@ -26,10 +26,8 @@ import {
 } from "../rpy-parser.service.js";
 import { updateIncomingJumpsForLabels } from "../labels.service.js";
 import { calculateLinesHash, calculateContentHash } from "../../lib/hash.js";
-import {
-  characterParserService,
-  type DetectedCharacter,
-} from "../character-parser.service.js";
+import { characterParserService } from "../character-parser.service.js";
+import type { DetectedCharacter } from "@branchforge/shared";
 import type {
   ConflictResolution,
   SyncOperation,
@@ -69,7 +67,37 @@ import {
   NotFoundError,
   ConflictError,
 } from "../../middleware/error-handler.middleware.js";
-import type { DetectCharactersResponse } from "@branchforge/shared";
+import type {
+  DetectCharactersResponse,
+  CharacterSourceDefinition,
+} from "@branchforge/shared";
+import {
+  characterDefinitionSnapshot,
+  ensureCharacterSourcePreservation,
+} from "../character-source-preservation.service.js";
+
+/** Build a per-file accepted source-definition snapshot from the symbols
+ *  extracted during stripping. Protected source files store an empty object. */
+function buildCharacterDefinitionsSnapshot(prepared: {
+  file: { path: string };
+  content: string;
+}): Record<string, CharacterSourceDefinition> {
+  if (isSourceOwnedRpyFile(prepared.file.path)) {
+    return {};
+  }
+  return characterDefinitionSnapshot(prepared.content);
+}
+
+/** Build the excluded tag set, falling back to the Ren'Py defaults only when
+ *  the row is missing or the value is null. An explicit empty array is honored. */
+function buildExcludedTags(
+  settings: { excludedCharacterTags: string[] | null } | null
+): Set<string> {
+  if (!settings || settings.excludedCharacterTags === null) {
+    return new Set(DEFAULT_EXCLUDED_RENPY_TAGS);
+  }
+  return new Set(settings.excludedCharacterTags);
+}
 
 /**
  * Helper function to fetch characters and build a Map of renpyTag -> id
@@ -238,6 +266,7 @@ export async function importFromGitlab(
   const operation = await createSyncOperation(projectId, "IMPORT", branch);
 
   try {
+    await ensureCharacterSourcePreservation(projectId);
     // Get project settings for excluded/narrator tags (used for character review)
     const [settings] = await db
       .select()
@@ -245,9 +274,7 @@ export async function importFromGitlab(
       .where(eq(projectSettings.projectId, projectId))
       .limit(1);
 
-    const excludedTags = new Set(
-      settings?.excludedCharacterTags || DEFAULT_EXCLUDED_RENPY_TAGS
-    );
+    const excludedTags = buildExcludedTags(settings ?? null);
     const narratorTags = settings?.narratorCharacterTags || [];
 
     // Get the commit SHA for this branch at import time (non-fatal — metadata only)
@@ -375,7 +402,11 @@ export async function importFromGitlab(
       }
 
       const parsed = parseRPYFileWithLabels(content, file.path);
-      const symbols = extractAndStripRpySymbols(content, file.path);
+      const symbols = extractAndStripRpySymbols(
+        content,
+        file.path,
+        excludedTags
+      );
       const contentHash = calculateContentHash(symbols.cleanedContent);
       preparedFiles.push({
         file,
@@ -454,7 +485,9 @@ export async function importFromGitlab(
 
       for (const prepared of preparedFiles) {
         const existing = existingByPath.get(prepared.file.path) ?? null;
-        const localDirty = existing ? hasUnpushedLocalContent(existing) : false;
+        const localDirty = existing
+          ? hasUnpushedLocalContent(existing, excludedTags)
+          : false;
         const remoteChanged =
           !existing ||
           existing.remoteContentHash == null ||
@@ -489,6 +522,7 @@ export async function importFromGitlab(
               content: prepared.cleanedContent,
               originalContent: prepared.content,
               contentHash: prepared.contentHash,
+              characterDefinitions: buildCharacterDefinitionsSnapshot(prepared),
               lastSyncedAt: new Date(),
               lastCommitSha: importCommitSha,
               remoteFilePath: prepared.file.path,
@@ -529,6 +563,7 @@ export async function importFromGitlab(
               originalContent: sql`COALESCE(${projectFiles.originalContent}, ${prepared.content})`,
               contentHash: prepared.contentHash,
               fileType: prepared.parsed.fileType,
+              characterDefinitions: buildCharacterDefinitionsSnapshot(prepared),
               lastSyncedAt: new Date(),
               lastCommitSha: importCommitSha,
               remoteFilePath: prepared.file.path,
@@ -602,6 +637,8 @@ export async function importFromGitlab(
           displayName: c.displayName,
           color: c.color,
           nameType: c.nameType,
+          sourceDefinition: c.sourceDefinition,
+          isNarrator: c.isNarrator,
         }))
       );
 
@@ -626,6 +663,7 @@ export async function importFromGitlab(
             name: char.name ?? char.tag,
             displayName: char.displayName || char.name || char.tag,
             nameType: char.nameType,
+            sourceDefinition: char.sourceDefinition,
             renpyTag: char.tag,
             color: char.color || "#cfcfcf",
             updatedAt: new Date(),

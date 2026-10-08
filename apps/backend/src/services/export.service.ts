@@ -16,6 +16,7 @@ import {
   stats,
   characters,
   projects,
+  projectSettings,
 } from "../db/schema/index.js";
 import { eq, and, desc, isNull, inArray } from "drizzle-orm";
 import {
@@ -36,7 +37,9 @@ import {
   extractAndStripRpySymbols,
   isSourceOwnedRpyFile,
   collectSourceOwnedRpySymbolKeys,
+  DEFAULT_EXCLUDED_RENPY_TAGS,
 } from "./rpy-statements.service.js";
+import { ensureCharacterSourcePreservation } from "./character-source-preservation.service.js";
 import { checkRateLimit } from "./rate-limiter.service.js";
 import { logInfo, logError, logWarn, LogEventType } from "../lib/logger.js";
 import {
@@ -118,6 +121,7 @@ async function fetchSupportingFileSources(projectId: string) {
           color: characters.color,
           isNarrator: characters.isNarrator,
           displayName: characters.displayName,
+          sourceDefinition: characters.sourceDefinition,
         })
         .from(characters)
         .where(eq(characters.projectId, projectId)),
@@ -135,16 +139,43 @@ async function fetchSupportingFileSources(projectId: string) {
  */
 function excludeSourceOwnedSymbols(
   sources: Awaited<ReturnType<typeof fetchSupportingFileSources>>,
-  files: ReadonlyArray<{ filePath: string; content: string }>
+  files: ReadonlyArray<{ filePath: string; content: string }>,
+  excludedTags: ReadonlySet<string>
 ) {
-  const owned = collectSourceOwnedRpySymbolKeys(files);
+  const owned = collectSourceOwnedRpySymbolKeys(files, excludedTags);
   return {
     projectVariables: sources.projectVariables.filter((v) => !owned.has(v.key)),
     projectStats: sources.projectStats.filter((s) => !owned.has(s.key)),
     projectCharacters: sources.projectCharacters.filter(
-      (c) => !owned.has(c.renpyTag)
+      (c) => !owned.has(c.renpyTag) && !excludedTags.has(c.renpyTag)
     ),
   };
+}
+
+/**
+ * Fetch the project's excluded Ren'Py character tags. Missing settings rows
+ * or null columns fall back to the default excluded tags; explicit empty
+ * array means no exclusions.
+ */
+async function fetchProjectExcludedTags(
+  projectId: string
+): Promise<Set<string>> {
+  const db = getDb();
+  const [settings] = await db
+    .select({ excludedCharacterTags: projectSettings.excludedCharacterTags })
+    .from(projectSettings)
+    .where(eq(projectSettings.projectId, projectId))
+    .limit(1);
+
+  if (settings?.excludedCharacterTags === undefined) {
+    return new Set(DEFAULT_EXCLUDED_RENPY_TAGS);
+  }
+
+  if (settings.excludedCharacterTags === null) {
+    return new Set(DEFAULT_EXCLUDED_RENPY_TAGS);
+  }
+
+  return new Set(settings.excludedCharacterTags);
 }
 
 // ============================================================================
@@ -205,7 +236,15 @@ export async function generateExport(
   // Verify project access
   await requireProjectAccess(projectId, userId);
 
+  // Idempotent source-preservation maintenance must run after the access
+  // guard and before any file content is read or generated.
+  await ensureCharacterSourcePreservation(projectId);
+
   const db = getDb();
+
+  // Load the project's character-tag exclusion policy once and use it for
+  // every strip/collision decision in this export.
+  const excludedTags = await fetchProjectExcludedTags(projectId);
 
   // Fetch project info for naming
   const [project] = await db
@@ -298,7 +337,8 @@ export async function generateExport(
     // round-tripping and reconstruction.
     const strippedContent = extractAndStripRpySymbols(
       file.content,
-      file.filePath
+      file.filePath,
+      excludedTags
     ).cleanedContent;
     if (file.fileType === "STORY" && !isSourceOwnedRpyFile(file.filePath)) {
       const fileLabels = labelsByFileId.get(file.id) ?? [];
@@ -332,7 +372,8 @@ export async function generateExport(
     Object.entries(patchedFiles).map(([filePath, content]) => ({
       filePath,
       content,
-    }))
+    })),
+    excludedTags
   );
 
   // Determine the directory prefix for generated files (e.g. "game/")
@@ -453,9 +494,14 @@ export async function getExportPreview(
   // Verify project access
   await requireProjectAccess(projectId, userId);
 
+  // Idempotent source-preservation maintenance must run after the access
+  // guard and before any file content is read or generated.
+  await ensureCharacterSourcePreservation(projectId);
+
   // Use the same ownership boundary as the ZIP export, including active
   // source files. Old managed rows may still exist after a source restore.
   const db = getDb();
+  const excludedTags = await fetchProjectExcludedTags(projectId);
   const [sources, sourceFiles] = await Promise.all([
     fetchSupportingFileSources(projectId),
     db
@@ -474,7 +520,10 @@ export async function getExportPreview(
   const { projectVariables, projectStats, projectCharacters } =
     excludeSourceOwnedSymbols(
       sources,
-      sourceFiles.filter((file) => sanitizeZipEntryPath(file.filePath) !== null)
+      sourceFiles.filter(
+        (file) => sanitizeZipEntryPath(file.filePath) !== null
+      ),
+      excludedTags
     );
 
   const variablesEmpty = projectVariables.length === 0;

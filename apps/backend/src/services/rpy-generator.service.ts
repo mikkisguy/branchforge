@@ -9,11 +9,13 @@ import {
   RENPY_LABEL_REGEX,
   isValidCharacterNameType,
   type CharacterNameType,
+  type CharacterSourceDefinition,
   type VariableCondition,
   type StatCondition,
 } from "@branchforge/shared";
 import { logWarn, LogEventType } from "../lib/logger.js";
 import { normalizeStatCondition } from "./label-line-mapper.js";
+import { renderCharacterSourceDefinition } from "./character-source-definition.js";
 
 // ============================================================================
 // Types
@@ -70,6 +72,7 @@ export function escapeRenpyString(value: string): string {
   return value
     .replace(/\\/g, "\\\\")
     .replace(/"/g, '\\"')
+    .replace(/\r/g, "\\r")
     .replace(/\n/g, "\\n");
 }
 
@@ -681,6 +684,7 @@ export function generateCharacterDefinitionsFile(
     color: string;
     isNarrator?: boolean;
     displayName?: string; // warn/logs only — NEVER the Character() arg
+    sourceDefinition?: CharacterSourceDefinition | null;
   }>
 ): string {
   const lines: string[] = [];
@@ -700,16 +704,27 @@ export function generateCharacterDefinitionsFile(
 
   for (const char of characters) {
     if (!isValidRenpyIdentifier(char.renpyTag)) {
-      console.warn(
-        `Skipping character: invalid renpyTag ${JSON.stringify(char.renpyTag)} (name: ${JSON.stringify(char.name)}${char.displayName !== undefined ? `, display name: ${JSON.stringify(char.displayName)}` : ""})`
-      );
+      logWarn(LogEventType.VALIDATION_WARNING, {
+        message: `Skipping character: invalid renpyTag ${JSON.stringify(char.renpyTag)} (name: ${JSON.stringify(char.name)}${char.displayName !== undefined ? `, display name: ${JSON.stringify(char.displayName)}` : ""})`,
+      });
       continue;
     }
     if (!RENPY_HEX_COLOR_REGEX.test(char.color)) {
-      console.warn(
-        `Skipping character: invalid color ${JSON.stringify(char.color)} (tag: ${JSON.stringify(char.renpyTag)}, name: ${JSON.stringify(char.name)}${char.displayName !== undefined ? `, display name: ${JSON.stringify(char.displayName)}` : ""})`
-      );
+      logWarn(LogEventType.VALIDATION_WARNING, {
+        message: `Skipping character: invalid color ${JSON.stringify(char.color)} (tag: ${JSON.stringify(char.renpyTag)}, name: ${JSON.stringify(char.name)}${char.displayName !== undefined ? `, display name: ${JSON.stringify(char.displayName)}` : ""})`,
+      });
       continue;
+    }
+
+    if (char.sourceDefinition) {
+      const preserved = renderCharacterSourceDefinition(
+        char.sourceDefinition,
+        char
+      );
+      if (preserved !== null) {
+        lines.push(preserved);
+        continue;
+      }
     }
 
     let nameArg: string;
@@ -717,9 +732,9 @@ export function generateCharacterDefinitionsFile(
       case "variable": {
         // Unquoted — emit raw name only if it matches a safe identifier
         if (char.name === null || !isVariableSafeIdentifier(char.name)) {
-          console.warn(
-            `Skipping character: variable name ${JSON.stringify(char.name)} is not a safe Ren'Py identifier (tag: ${JSON.stringify(char.renpyTag)})`
-          );
+          logWarn(LogEventType.VALIDATION_WARNING, {
+            message: `Skipping character: variable name ${JSON.stringify(char.name)} is not a safe Ren'Py identifier (tag: ${JSON.stringify(char.renpyTag)})`,
+          });
           continue;
         }
         nameArg = char.name;
@@ -740,9 +755,9 @@ export function generateCharacterDefinitionsFile(
       default: {
         // Exhaustive safety net — treat unrecognised values as literal
         const _exhaustive: never = char.nameType;
-        console.warn(
-          `Character ${JSON.stringify(char.renpyTag)} has unknown nameType ${JSON.stringify(char.nameType)}, treating as literal`
-        );
+        logWarn(LogEventType.VALIDATION_WARNING, {
+          message: `Character ${JSON.stringify(char.renpyTag)} has unknown nameType ${JSON.stringify(char.nameType)}, treating as literal`,
+        });
         nameArg = `"${escapeRenpyString(char.name ?? "")}"`;
         break;
       }

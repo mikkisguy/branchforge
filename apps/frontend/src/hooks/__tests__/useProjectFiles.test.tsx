@@ -9,7 +9,7 @@ import { QueryClientProvider, type QueryClient } from "@tanstack/react-query";
 import { useProjectFiles } from "../useProjectFiles";
 import { projectFilesApi } from "@/lib/api/project-files";
 import type { ProjectFileNode } from "@/lib/api/project-files";
-import { projectFilesKeys } from "@/lib/query-keys";
+import { projectFilesKeys, characterKeys } from "@/lib/query-keys";
 import { createTestQueryClient } from "@/test/query-client";
 
 vi.mock("@/lib/api/project-files", () => ({
@@ -63,6 +63,28 @@ describe("useProjectFiles", () => {
 
   afterEach(() => {
     queryClient.clear();
+  });
+
+  it("refreshes character queries after saving an authored declaration", async () => {
+    vi.mocked(projectFilesApi.updateFile).mockResolvedValue({
+      success: true,
+      contentHash: "updated",
+      updatedAt: "2026-10-06T00:00:00Z",
+    });
+    queryClient.setQueryData(characterKeys.lists("project-1"), []);
+    const { result } = renderHook(() => useProjectFiles("project-1"), {
+      wrapper,
+    });
+    await waitFor(() => expect(result.current.files).toEqual(mockFiles));
+    await act(async () => {
+      await result.current.updateFileContent(
+        "file-1",
+        'define e = Character("E", what_italic=False)'
+      );
+    });
+    expect(
+      queryClient.getQueryState(characterKeys.lists("project-1"))?.isInvalidated
+    ).toBe(true);
   });
 
   it("creates a file via the API and invalidates list queries", async () => {

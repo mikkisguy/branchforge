@@ -15,6 +15,11 @@
  */
 
 import { countCharOutsideStrings } from "./rpy-helpers.js";
+import { parseCharacterDefinitions } from "./character-source-definition.js";
+import type {
+  CharacterNameType,
+  CharacterSourceDefinition,
+} from "@branchforge/shared";
 
 /** Default Ren'Py special tags excluded from character import. */
 export const DEFAULT_EXCLUDED_RENPY_TAGS = ["n", "u", "narrator", "extend"];
@@ -43,6 +48,9 @@ export interface DetectedCharacterStatement {
   tag: string;
   name: string | null;
   color: string;
+  nameType?: CharacterNameType;
+  displayName?: string;
+  sourceDefinition?: CharacterSourceDefinition;
 }
 
 /**
@@ -113,11 +121,15 @@ export function isSourceOwnedRpyFile(filePath: string): boolean {
 export function collectSourceOwnedRpyDeclarations(
   content: string
 ): Set<string> {
-  const names = new Set<string>();
+  return new Set(collectGlobalDeclarationLines(content).values());
+}
+
+function collectGlobalDeclarationLines(content: string): Map<number, string> {
+  const names = new Map<number, string>();
   const lines = content.replace(/^\uFEFF/, "").split("\n");
   let quote: string | null = null;
   let screenIndent: number | null = null;
-  for (const line of lines) {
+  for (const [lineIndex, line] of lines.entries()) {
     // Screen defaults are local, but declarations inside init blocks are
     // global. Follow screen indentation rather than ignoring all indentation.
     const trimmed = line.trim();
@@ -132,7 +144,7 @@ export function collectSourceOwnedRpyDeclarations(
         const match = trimmed.match(
           /^(?:init(?:\s+-?\d+)?\s+)?(?:define|default)\s+(?:-?\d+\s+)?([a-zA-Z_][a-zA-Z0-9_]*)\s*=/
         );
-        if (match) names.add(match[1]);
+        if (match) names.set(lineIndex, match[1]);
       }
     }
     // Multiline text can contain declaration examples. Track strings so
@@ -160,12 +172,16 @@ export function collectSourceOwnedRpyDeclarations(
 
 /** Global store names owned by the active protected source files. */
 export function collectSourceOwnedRpySymbolKeys(
-  files: ReadonlyArray<{ filePath: string; content: string }>
+  files: ReadonlyArray<{ filePath: string; content: string }>,
+  excludedTags: ReadonlySet<string> = new Set(DEFAULT_EXCLUDED_RENPY_TAGS)
 ): Set<string> {
   const names = new Set<string>();
   for (const file of files) {
-    if (!isSourceOwnedRpyFile(file.filePath)) continue;
-    for (const name of collectSourceOwnedRpyDeclarations(file.content)) {
+    const preserved = isSourceOwnedRpyFile(file.filePath)
+      ? file.content
+      : extractAndStripRpySymbols(file.content, file.filePath, excludedTags)
+          .cleanedContent;
+    for (const name of collectSourceOwnedRpyDeclarations(preserved)) {
       names.add(name);
     }
   }
@@ -239,9 +255,9 @@ export function computeCommonDirectoryPrefix(filePaths: string[]): string {
  * - For source-owned files (`screens.rpy`, `options.rpy`, `gui.rpy`)
  *   the content is returned byte-for-byte with empty symbol arrays.
  *
- * The function is intentionally permissive: it does not filter by
- * Ren'Py special tags ("n", "u", "narrator", "extend"). Callers that
- * need that filtering can drop unwanted entries from the result.
+ * Excluded character tags and declarations that cannot be safely round-tripped
+ * remain source-owned. Character promotion and generation must use this same
+ * boundary rather than filtering only after a declaration has been removed.
  *
  * @param content - The RPY file content to process
  * @param filePath - Optional file path; when it is a source-owned
@@ -250,7 +266,21 @@ export function computeCommonDirectoryPrefix(filePaths: string[]): string {
  */
 export function extractAndStripRpySymbols(
   content: string,
-  filePath?: string
+  filePath?: string,
+  excludedTags: ReadonlySet<string> = new Set(DEFAULT_EXCLUDED_RENPY_TAGS)
+): RpySymbolExtraction {
+  return extractRpySymbols(content, filePath, excludedTags);
+}
+
+/** Reproduce historical stripping only for legacy recovery/baseline evidence. */
+export function extractLegacyRpySymbols(content: string): RpySymbolExtraction {
+  return extractRpySymbols(content, undefined, undefined);
+}
+
+function extractRpySymbols(
+  content: string,
+  filePath: string | undefined,
+  excludedTags: ReadonlySet<string> | undefined
 ): RpySymbolExtraction {
   if (filePath && isSourceOwnedRpyFile(filePath)) {
     return {
@@ -263,6 +293,18 @@ export function extractAndStripRpySymbols(
 
   const lines = content.split("\n");
   const output: string[] = [];
+  const globalLines = collectGlobalDeclarationLines(content);
+  const parsedByLine = new Map(
+    excludedTags === undefined
+      ? []
+      : parseCharacterDefinitions(content).map(
+          (definition) =>
+            [
+              content.slice(0, definition.start).split("\n").length - 1,
+              definition,
+            ] as const
+        )
+  );
 
   const charactersByTag = new Map<string, DetectedCharacterStatement>();
   const variablesByKey = new Map<string, DetectedDefaultStatement>();
@@ -297,6 +339,7 @@ export function extractAndStripRpySymbols(
     );
     if (characterStart) {
       const tag = characterStart[1];
+      const parsed = parsedByLine.get(i);
       // Capture the slice from the opening `Character\s*(` to the
       // end of the first line so the parser can find the display
       // name and options even on a single-line definition. The
@@ -318,7 +361,22 @@ export function extractAndStripRpySymbols(
           countCharOutsideStrings(nextLine, "(") -
           countCharOutsideStrings(nextLine, ")");
       }
-      const character = parseCharacterBody(tag, body);
+      if (parsed) {
+        j = content.slice(0, parsed.end).split("\n").length - 1;
+      }
+      const character =
+        excludedTags === undefined
+          ? parseCharacterBody(tag, body)
+          : parsed && !excludedTags.has(tag)
+            ? {
+                tag: parsed.tag,
+                name: parsed.name,
+                nameType: parsed.nameType,
+                displayName: parsed.displayName,
+                color: parsed.color,
+                sourceDefinition: parsed.sourceDefinition,
+              }
+            : null;
       if (character) {
         if (!charactersByTag.has(character.tag)) {
           charactersByTag.set(character.tag, character);
@@ -343,9 +401,11 @@ export function extractAndStripRpySymbols(
     // We do not try to handle multi-line `default` statements because
     // they are exceedingly rare in practice and would require
     // statement-level (not just paren) tracking.
-    const defaultMatch = trimmed.match(
-      /^default\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*(.+?)\s*(?:#.*)?$/
-    );
+    const defaultMatch =
+      (excludedTags === undefined || globalLines.has(i)) &&
+      trimmed.match(
+        /^default\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*(.+?)\s*(?:#.*)?$/
+      );
     if (defaultMatch) {
       const key = defaultMatch[1];
       const rawValue = defaultMatch[2];

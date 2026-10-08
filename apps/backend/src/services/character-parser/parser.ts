@@ -1,164 +1,97 @@
 import { DEFAULT_EXCLUDED_TAGS } from "./constants.js";
 import type { DefaultExcludedTag } from "./constants.js";
-import { normalizeColor, canonicalizeColor, extractColor } from "./color.js";
 import {
-  resolveNameFromSource,
-  buildDetectedCharacter,
+  parseCharacterDefinitions,
+  characterStylingSignature,
+} from "../character-source-definition.js";
+import {
+  classifyName,
   inferNameTypeFromStoredName,
 } from "./name-resolution.js";
-import { parseCharacterLine } from "./matchers.js";
 import type {
   NameForm,
-  CharacterPatternMatch,
   DetectedCharacter,
   CharacterConflict,
   CharacterParseResult,
 } from "./types.js";
+import { generateCharacterDefinitionsFile } from "../rpy-generator.service.js";
+import { canonicalizeColor } from "./color.js";
 import {
   isValidCharacterNameType,
   type CharacterNameType,
+  type CharacterSourceDefinition,
 } from "@branchforge/shared";
 
 /**
  * Character Parser Service
  *
- * Enhanced character definition parser with multi-pattern support.
- * Handles various Ren'Py character definition patterns including:
- * - Standard: define s = Character("Name", color="#...")
- * - Null name: define n = Character(None, ...)
- * - Unknown: define u = Character("???", ...)
- * - Multi-line: definitions spanning multiple lines
- * - Dynamic names: define ne = Character("[persistent.pl_nickname]", ...)
- * - Variable names: define ne = Character(voice_name, ...) or Character([voice_name], ...)
- * - who_color parameter: who_color="#..." instead of color="#..."
- * - Formatted names: define mystery = Character("{color=#f00}Stranger{/color}")
+ * Uses the shared, safe `parseCharacterDefinitions` lexer so that detection,
+ * stripping, and conflict detection agree on which declarations are safe to
+ * manage. Unsupported forms are left source-owned and are never promoted.
  */
 class CharacterParserService {
   /**
-   * Check if a character tag is special (narration, unknown, etc.)
+   * Check if a character tag is one of the default special/system tags.
    */
   private isSpecialTag(tag: string): boolean {
     return DEFAULT_EXCLUDED_TAGS.includes(tag as DefaultExcludedTag);
   }
 
   /**
-   * Parse character definitions from a single file
+   * Map a parsed name back to the internal `NameForm` so the existing
+   * `classifyName` helper can derive confidence and displayName.
+   */
+  private formForNameType(nameType: CharacterNameType): NameForm | null {
+    switch (nameType) {
+      case "variable":
+        return "identifier";
+      case "interpolated":
+        return "bracketed";
+      case "none":
+        return null;
+      case "literal":
+      case "tagged":
+      case "unknown":
+      case "empty":
+        return "quoted";
+      default: {
+        const _exhaustive: never = nameType;
+        return _exhaustive;
+      }
+    }
+  }
+
+  /**
+   * Parse character definitions from a single file using the safe source
+   * parser. Unsupported declarations are skipped; only forms that the
+   * round-trip renderer can safely edit are returned.
    */
   parseFile(content: string, filename: string): DetectedCharacter[] {
+    const definitions = parseCharacterDefinitions(content);
     const characters: DetectedCharacter[] = [];
-    const lines = content.split("\n");
 
-    // Track multi-line definitions
-    let pendingCharacter: {
-      tag: string;
-      name: string | null;
-      rawName: string | null;
-      nameForm: NameForm | null;
-      color: string | undefined;
-      options: string[];
-      startLine: number;
-      /**
-       * True once the name has been resolved (or explicitly set to
-       * null for `None`). Prevents subsequent option lines like
-       * `color="#cfcfcf"` from re-matching as the character name.
-       */
-      nameResolved: boolean;
-    } | null = null;
-    let parenDepth = 0;
+    for (const definition of definitions) {
+      const form = this.formForNameType(definition.nameType);
+      const { confidence } = classifyName(definition.name, form);
 
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      const trimmed = line.trim();
-
-      // Skip empty lines and comments
-      if (!trimmed || trimmed.startsWith("#")) {
-        continue;
-      }
-
-      // Check if we're in a multi-line definition
-      if (pendingCharacter) {
-        // Track parentheses
-        parenDepth += (line.match(/\(/g) || []).length;
-        parenDepth -= (line.match(/\)/g) || []).length;
-
-        // Capture options
-        if (trimmed && !trimmed.startsWith("#")) {
-          // Check if this line contains the name (if not already found)
-          if (!pendingCharacter.nameResolved) {
-            const resolution = resolveNameFromSource(trimmed);
-            if (resolution) {
-              pendingCharacter.name = resolution.name;
-              pendingCharacter.rawName = resolution.rawName;
-              pendingCharacter.nameForm = resolution.nameForm;
-              pendingCharacter.nameResolved = resolution.nameResolved;
-            }
-          }
-          pendingCharacter.options.push(trimmed);
-        }
-
-        // Check if definition is complete
-        if (parenDepth <= 0) {
-          // Extract color from options (who_color first, then color)
-          let color = pendingCharacter.color;
-          if (!color) {
-            const optionsText = pendingCharacter.options.join(" ");
-            color = extractColor(optionsText);
-          }
-
-          const isSpecial = this.isSpecialTag(pendingCharacter.tag);
-          const match: CharacterPatternMatch = {
-            tag: pendingCharacter.tag,
-            name: pendingCharacter.name,
-            rawName: pendingCharacter.rawName,
-            nameForm: pendingCharacter.nameForm,
-            // The continuation loop only runs while the name is
-            // unresolved, so by the time we get here the name has
-            // been resolved one way or another.
-            nameResolved: true,
-            color: normalizeColor(color),
-            isMultiLine: true,
-          };
-          characters.push(buildDetectedCharacter(match, filename, isSpecial));
-
-          pendingCharacter = null;
-          parenDepth = 0;
-        }
-        continue;
-      }
-
-      // Try to parse as a character definition
-      const match = parseCharacterLine(line);
-      if (match) {
-        if (match.isMultiLine) {
-          // Start tracking multi-line definition
-          parenDepth =
-            (line.match(/\(/g) || []).length - (line.match(/\)/g) || []).length;
-          pendingCharacter = {
-            tag: match.tag,
-            name: match.name,
-            rawName: match.rawName,
-            nameForm: match.nameForm,
-            color: match.color,
-            options: [],
-            startLine: i,
-            // Pass through the parser's name-resolved signal. When
-            // false, the continuation loop will look for the name
-            // on subsequent lines.
-            nameResolved: match.nameResolved,
-          };
-        } else {
-          // Single-line definition
-          const isSpecial = this.isSpecialTag(match.tag);
-          characters.push(buildDetectedCharacter(match, filename, isSpecial));
-        }
-      }
+      characters.push({
+        tag: definition.tag,
+        name: definition.name,
+        displayName: definition.displayName,
+        nameType: definition.nameType,
+        color: definition.color,
+        isSpecial: this.isSpecialTag(definition.tag),
+        sourceFile: filename,
+        confidence,
+        sourceDefinition: definition.sourceDefinition,
+      });
     }
 
     return characters;
   }
 
   /**
-   * Parse with exclusions applied
+   * Parse with exclusions applied.
    */
   parseWithExclusions(
     content: string,
@@ -172,9 +105,10 @@ class CharacterParserService {
   /**
    * Detect conflicts between detected and existing characters.
    *
-   * Compares the semantic source name, nameType, and color. UI-only
-   * displayName differences are ignored. Colors are compared after
-   * normalizing case and short hex expansion.
+   * Compares the semantic source name, nameType, and color. When those are
+   * unchanged but the accepted source declaration differs in styling or
+   * options, a "definition" conflict is reported using the declaration
+   * text and a styling signature comparison.
    */
   detectConflicts(
     detected: DetectedCharacter[],
@@ -184,6 +118,8 @@ class CharacterParserService {
       displayName: string;
       color: string;
       nameType?: CharacterNameType | string | null;
+      sourceDefinition?: CharacterSourceDefinition | null;
+      isNarrator?: boolean;
     }>
   ): CharacterConflict[] {
     const conflicts: CharacterConflict[] = [];
@@ -198,7 +134,9 @@ class CharacterParserService {
           existingChar.nameType
         );
 
-        const changedFields: Array<"name" | "nameType" | "color"> = [];
+        const changedFields: Array<
+          "name" | "nameType" | "color" | "definition"
+        > = [];
 
         const existingSourceName =
           existingNameType === "none"
@@ -216,7 +154,43 @@ class CharacterParserService {
         if (nameTypeMismatch) changedFields.push("nameType");
         if (colorMismatch) changedFields.push("color");
 
-        if (nameMismatch || nameTypeMismatch || colorMismatch) {
+        // A legacy row without a recoverable template exports the fallback
+        // declaration. Compare against that actual behavior so new retained
+        // options can still be accepted through the review wizard.
+        const existingDefinition =
+          existingChar.sourceDefinition ??
+          parseCharacterDefinitions(
+            generateCharacterDefinitionsFile([
+              {
+                ...existingChar,
+                nameType: existingNameType,
+                color: canonicalizeColor(existingChar.color),
+              },
+            ])
+          )[0]?.sourceDefinition;
+        let definitionMismatch = false;
+        {
+          const detectedSignature = characterStylingSignature(
+            detectedChar.sourceDefinition
+          );
+          const existingSignature =
+            characterStylingSignature(existingDefinition);
+          if (
+            detectedSignature !== null &&
+            existingSignature !== null &&
+            detectedSignature !== existingSignature
+          ) {
+            definitionMismatch = true;
+            changedFields.push("definition");
+          }
+        }
+
+        if (
+          nameMismatch ||
+          nameTypeMismatch ||
+          colorMismatch ||
+          definitionMismatch
+        ) {
           conflicts.push({
             tag: detectedChar.tag,
             detectedName: detectedChar.name,
@@ -226,6 +200,8 @@ class CharacterParserService {
             detectedNameType: detectedChar.nameType,
             existingNameType: existingNameType,
             existingDisplayName: existingChar.displayName,
+            detectedDefinition: detectedChar.sourceDefinition?.declaration,
+            existingDefinition: existingDefinition?.declaration,
             changedFields,
           });
         }

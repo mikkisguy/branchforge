@@ -120,8 +120,9 @@ export const importCharactersSchema = z
         })
       )
       .min(1, "At least one character is required"),
-    excludedTags: z.array(renpyTagSchema).default([]),
-    narratorTags: z.array(renpyTagSchema).default([]),
+    // Omitted ownership settings preserve the existing values; [] clears.
+    excludedTags: z.array(renpyTagSchema).optional(),
+    narratorTags: z.array(renpyTagSchema).optional(),
     linkToLines: z.boolean().default(true),
   })
   .strict();
@@ -133,9 +134,10 @@ export type ImportCharactersInput = z.infer<typeof importCharactersSchema>;
  */
 export const projectSettingsSchema = z
   .object({
-    excludedCharacterTags: z.array(renpyTagSchema).default([]),
-    narratorCharacterTags: z.array(renpyTagSchema).default([]),
-    autoLinkSpeakers: z.boolean().default(true),
+    // Defaults inside a partial schema would reset omitted settings.
+    excludedCharacterTags: z.array(renpyTagSchema),
+    narratorCharacterTags: z.array(renpyTagSchema),
+    autoLinkSpeakers: z.boolean(),
   })
   .strict()
   .partial();

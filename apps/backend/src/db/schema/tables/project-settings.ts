@@ -11,6 +11,7 @@ import {
   boolean,
   timestamp,
   index,
+  integer,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { projects } from "./projects.js";
@@ -28,6 +29,12 @@ export const projectSettings = pgTable(
       .$type<string[]>()
       .default(sql`'[]'::jsonb`),
     autoLinkSpeakers: boolean("auto_link_speakers").default(true).notNull(),
+    /** One-time legacy recovery must never resurrect later source deletions. */
+    characterSourcePreservationVersion: integer(
+      "character_source_preservation_version"
+    )
+      .default(0)
+      .notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
   (table) => [index("project_settings_updated_at_idx").on(table.updatedAt)]

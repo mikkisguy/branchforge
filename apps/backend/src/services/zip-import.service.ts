@@ -15,15 +15,23 @@ import {
   variables,
   stats,
   labels,
+  projectSettings,
 } from "../db/schema/index.js";
 import { eq, and, isNull, sql } from "drizzle-orm";
 import { calculateContentHash } from "../lib/hash.js";
+import type { CharacterSourceDefinition } from "@branchforge/shared";
 import { parseRPYFileWithLabels } from "./rpy-parser.service.js";
 import {
   extractAndStripRpySymbols,
   type DetectedCharacterStatement,
   type DetectedDefaultStatement,
+  isSourceOwnedRpyFile,
 } from "./rpy-statements.service.js";
+import { DEFAULT_EXCLUDED_RENPY_TAGS } from "./rpy-statements.service.js";
+import {
+  characterDefinitionSnapshot,
+  ensureCharacterSourcePreservation,
+} from "./character-source-preservation.service.js";
 import { logError, LogEventType } from "../lib/logger.js";
 import {
   syncLabelsFromFile,
@@ -85,6 +93,7 @@ interface PreProcessedFile {
     variables: DetectedDefaultStatement[];
     stats: DetectedDefaultStatement[];
   };
+  characterDefinitions: Record<string, CharacterSourceDefinition>;
   contentHash: string;
 }
 
@@ -93,6 +102,16 @@ type ProcessFileAction = "imported" | "updated" | "skipped";
 interface ProcessFileInTxResult {
   action: ProcessFileAction;
   labelsCreated: number;
+}
+
+/** Build the set of excluded character tags for a ZIP import. */
+function buildExcludedTags(
+  settings: { excludedCharacterTags: string[] | null } | null
+): Set<string> {
+  if (!settings || settings.excludedCharacterTags === null) {
+    return new Set(DEFAULT_EXCLUDED_RENPY_TAGS);
+  }
+  return new Set(settings.excludedCharacterTags);
 }
 
 // ============================================================================
@@ -253,10 +272,20 @@ export { calculateContentHash };
  * and compute content hashes. Runs outside any database transaction
  * since it does not touch the database.
  */
-function preProcessFiles(extractedFiles: ExtractedFile[]): PreProcessedFile[] {
+function preProcessFiles(
+  extractedFiles: ExtractedFile[],
+  excludedTags: Set<string>
+): PreProcessedFile[] {
   return extractedFiles.map((file) => {
     const parsed = parseRPYFileWithLabels(file.content, file.filePath);
-    const stripped = extractAndStripRpySymbols(file.content, file.filePath);
+    const stripped = extractAndStripRpySymbols(
+      file.content,
+      file.filePath,
+      excludedTags
+    );
+    const characterDefinitions = isSourceOwnedRpyFile(file.filePath)
+      ? {}
+      : characterDefinitionSnapshot(file.content);
     return {
       filePath: file.filePath,
       fileType: parsed.fileType,
@@ -267,6 +296,7 @@ function preProcessFiles(extractedFiles: ExtractedFile[]): PreProcessedFile[] {
         variables: stripped.variables,
         stats: stripped.stats,
       },
+      characterDefinitions,
       contentHash: calculateContentHash(stripped.cleanedContent),
     };
   });
@@ -330,8 +360,18 @@ export async function importZipFile(
       };
     }
 
+    await ensureCharacterSourcePreservation(projectId);
+    // Load project character settings so the same exclusion set is used
+    // for stripping, collision suppression, and promotion.
+    const [settings] = await db
+      .select({ excludedCharacterTags: projectSettings.excludedCharacterTags })
+      .from(projectSettings)
+      .where(eq(projectSettings.projectId, projectId))
+      .limit(1);
+    const excludedTags = buildExcludedTags(settings ?? null);
+
     // Step 3: Pre-process all files (parse, hash, strip symbols)
-    const preProcessedFiles = preProcessFiles(extractedFiles);
+    const preProcessedFiles = preProcessFiles(extractedFiles, excludedTags);
 
     // Accumulators
     let filesImported = 0;
@@ -476,9 +516,29 @@ async function processFileInTransaction(
       .limit(1);
 
     if (existing) {
+      const snapshotChanged =
+        JSON.stringify(existing.characterDefinitions ?? {}) !==
+        JSON.stringify(entry.characterDefinitions);
+
       if (existing.contentHash === entry.contentHash) {
+        if (!snapshotChanged) {
+          await tx.execute(sql.raw(`RELEASE SAVEPOINT ${savepointName}`));
+          return { action: "skipped", labelsCreated: 0 };
+        }
+
+        // Style-only reimport: cleaned content is identical but the
+        // accepted declaration snapshot changed. Refresh the snapshot
+        // without touching the immutable originalContent.
+        await tx
+          .update(projectFiles)
+          .set({
+            characterDefinitions: entry.characterDefinitions,
+            updatedAt: new Date(),
+          })
+          .where(eq(projectFiles.id, existing.id));
+
         await tx.execute(sql.raw(`RELEASE SAVEPOINT ${savepointName}`));
-        return { action: "skipped", labelsCreated: 0 };
+        return { action: "updated", labelsCreated: 0 };
       }
 
       // Update existing file with cleaned content
@@ -489,6 +549,7 @@ async function processFileInTransaction(
           originalContent: sql`COALESCE(${projectFiles.originalContent}, ${entry.originalContent})`,
           contentHash: entry.contentHash,
           fileType: entry.fileType,
+          characterDefinitions: entry.characterDefinitions,
           updatedAt: new Date(),
         })
         .where(eq(projectFiles.id, existing.id));
@@ -519,6 +580,7 @@ async function processFileInTransaction(
           content: entry.cleanedContent,
           originalContent: entry.originalContent,
           contentHash: entry.contentHash,
+          characterDefinitions: entry.characterDefinitions,
         })
         .returning();
 
@@ -597,10 +659,12 @@ async function promoteSymbols(
         allCharacters.map((c) => ({
           projectId,
           name: c.name ?? c.tag,
-          displayName: c.name ?? c.tag,
-          nameType: inferNameTypeFromStoredName(c.name) ?? "literal",
+          displayName: c.displayName ?? c.name ?? c.tag,
+          nameType:
+            c.nameType ?? inferNameTypeFromStoredName(c.name) ?? "literal",
           renpyTag: c.tag,
           color: c.color || "#cfcfcf",
+          sourceDefinition: c.sourceDefinition,
           updatedAt: new Date(),
         }))
       )

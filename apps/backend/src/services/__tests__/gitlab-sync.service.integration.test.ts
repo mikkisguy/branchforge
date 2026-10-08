@@ -2260,6 +2260,62 @@ describe("GitLabSyncService (Integration)", () => {
       });
     }
 
+    it("preserves narrator styling and reviews styling-only accepted GitLab pulls", async () => {
+      const narrator =
+        'define narrator = Character(None, what_color="#cfcfcf", what_italic=True)';
+      const raw =
+        narrator +
+        '\ndefine hero = Character("Hero", who_color="#ABC", what_italic=False, what_font="old.ttf")\n';
+      mockCharacterPull(raw);
+      const first = await importFromGitlab(
+        testProjectId,
+        testUserId,
+        testBranch,
+        "gitlab_wins"
+      );
+      expect(first.status, first.errorMessage ?? undefined).toBe("COMPLETED");
+      const [file] = await db
+        .select()
+        .from(projectFiles)
+        .where(eq(projectFiles.id, testGitlabFileId));
+      expect(file.content).toContain(narrator);
+      const [character] = await db
+        .select()
+        .from(characters)
+        .where(eq(characters.projectId, testProjectId));
+      expect(character.renpyTag).toBe("hero");
+      expect(character.sourceDefinition?.declaration).toContain(
+        'what_font="old.ttf"'
+      );
+      mockCharacterPull(raw.replace("old.ttf", "new.ttf"));
+      const second = await importFromGitlab(
+        testProjectId,
+        testUserId,
+        testBranch,
+        "gitlab_wins"
+      );
+      expect(second.status, second.errorMessage ?? undefined).toBe("COMPLETED");
+      expect(
+        second.characterReview?.conflicts.find((entry) => entry.tag === "hero")
+          ?.changedFields
+      ).toContain("definition");
+      const [unchanged] = await db
+        .select()
+        .from(characters)
+        .where(eq(characters.id, character.id));
+      expect(unchanged.sourceDefinition?.declaration).toContain(
+        'what_font="old.ttf"'
+      );
+      const detection = await charactersService.detectCharacters(
+        testProjectId,
+        testUserId
+      );
+      expect(
+        detection.conflicts.find((entry) => entry.tag === "hero")
+          ?.detectedDefinition
+      ).toContain('what_font="new.ttf"');
+    });
+
     it("reviews auto-promoted discoveries against pre-pull rows and keeps repeated pulls unchanged", async () => {
       const content = 'define boss = Character(boss_name, color="#ABC")\n';
       mockCharacterPull(content);

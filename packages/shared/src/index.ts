@@ -1016,6 +1016,12 @@ export interface DetectedCharacter {
   isSpecial: boolean;
   sourceFile: string;
   confidence: number;
+  /**
+   * Optional accepted source declaration metadata. Present when the
+   * declaration was safely parsed and can be used for round-trip
+   * generation.
+   */
+  sourceDefinition?: CharacterSourceDefinition;
 }
 
 /**
@@ -1030,7 +1036,9 @@ export interface CharacterConflict {
   detectedNameType?: CharacterNameType;
   existingNameType?: CharacterNameType;
   existingDisplayName?: string;
-  changedFields?: Array<"name" | "nameType" | "color">;
+  changedFields?: Array<"name" | "nameType" | "color" | "definition">;
+  detectedDefinition?: string;
+  existingDefinition?: string;
 }
 
 /**
@@ -1044,6 +1052,43 @@ export interface DetectCharactersResponse {
   /** All existing tags; a sync review uses the snapshot before the pull. */
   existingTags: string[];
 }
+
+// ============================================================================
+// Character Source Definition Metadata
+// ============================================================================
+
+import { z } from "zod";
+
+/**
+ * Zod schema for the original semantic baseline of a parsed Ren'Py
+ * Character() declaration. This metadata is used during round-trip
+ * rendering so only the fields that actually changed are edited.
+ */
+export const characterSourceDefinitionSchema = z.object({
+  /** Verbatim declaration text that produced this baseline. */
+  declaration: z.string(),
+  /** The semantic name (first positional argument). */
+  name: z.string().nullable(),
+  /** How the name was specified in the source. */
+  nameType: z.enum([
+    "literal",
+    "variable",
+    "interpolated",
+    "tagged",
+    "none",
+    "empty",
+    "unknown",
+  ]),
+  /** The semantic display color (normalized hex or fallback). */
+  color: z.string(),
+});
+
+/**
+ * Original semantic baseline of a parsed Ren'Py Character() declaration.
+ */
+export type CharacterSourceDefinition = z.infer<
+  typeof characterSourceDefinitionSchema
+>;
 
 // ============================================================================
 // File Upload Configuration

@@ -393,6 +393,30 @@ describe("character source differences", () => {
     ).toEqual([]);
   });
 
+  it("reviews retained options when a legacy row has no recoverable source template", () => {
+    const detected = characterParserService.parseFile(
+      'define e = Character("E", color="#abcdef", what_font="font.ttf")',
+      "script.rpy"
+    );
+    expect(
+      characterParserService.detectConflicts(detected, [
+        {
+          renpyTag: "e",
+          name: "E",
+          nameType: "literal",
+          displayName: "E",
+          color: "#abcdef",
+          sourceDefinition: null,
+        },
+      ])
+    ).toEqual([
+      expect.objectContaining({
+        changedFields: ["definition"],
+        existingDefinition: 'define e = Character("E", color="#abcdef")',
+      }),
+    ]);
+  });
+
   it("reports the precise changed fields while retaining the UI alias", () => {
     const detected = characterParserService.parseFile(
       'define e = Character(e_name, color="#ffffff")',

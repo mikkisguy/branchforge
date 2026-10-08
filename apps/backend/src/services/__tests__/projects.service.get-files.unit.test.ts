@@ -4,6 +4,10 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+vi.mock("../character-source-preservation.service.js", () => ({
+  ensureCharacterSourcePreservation: vi.fn(async () => {}),
+}));
+
 vi.mock("../../db/index.js", () => ({
   getDb: vi.fn(),
 }));

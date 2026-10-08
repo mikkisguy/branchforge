@@ -20,6 +20,7 @@ import {
   projectFilePendingOperations,
   projects,
   userSettings,
+  projectSettings,
 } from "../db/schema/index.js";
 import type { ProjectFile } from "../db/schema/tables/project-files.js";
 import type { ProjectFilePendingOperation } from "../db/schema/tables/project-file-operations.js";
@@ -33,7 +34,10 @@ import {
 } from "../middleware/error-handler.middleware.js";
 import { requireProjectOwnership } from "./authz.service.js";
 import { canonicalizeRpyFilePath } from "@branchforge/shared";
-import { computeCommonDirectoryPrefix } from "./rpy-statements.service.js";
+import {
+  DEFAULT_EXCLUDED_RENPY_TAGS,
+  computeCommonDirectoryPrefix,
+} from "./rpy-statements.service.js";
 import { hasUnpushedLocalContent } from "./project-file-baseline.js";
 import { parseRPYFileWithLabels } from "./rpy-parser.service.js";
 import { logWarn } from "../lib/logger.js";
@@ -1006,7 +1010,7 @@ export async function getPendingStructuralSummary(
   await requireProjectOwnership(projectId, userId);
   const db = getDb();
 
-  const [pendingOps, activeFiles] = await Promise.all([
+  const [pendingOps, activeFiles, settingsRows] = await Promise.all([
     db
       .select()
       .from(projectFilePendingOperations)
@@ -1027,6 +1031,11 @@ export async function getPendingStructuralSummary(
           isNull(projectFiles.deletedAt)
         )
       ),
+    db
+      .select({ excluded: projectSettings.excludedCharacterTags })
+      .from(projectSettings)
+      .where(eq(projectSettings.projectId, projectId))
+      .limit(1),
   ]);
 
   const createPendingFileIds = new Set(
@@ -1040,9 +1049,12 @@ export async function getPendingStructuralSummary(
   // legacy rows without a local baseline, fall back to the imported original
   // content. This deliberately matches the export planner's fallback, so
   // pre-migration GitLab projects expose the same edits that will be pushed.
+  const excludedTags = new Set(
+    settingsRows[0]?.excluded ?? DEFAULT_EXCLUDED_RENPY_TAGS
+  );
   const contentChanges = activeFiles.filter((f) => {
     if (createPendingFileIds.has(f.id)) return false;
-    return hasUnpushedLocalContent(f);
+    return hasUnpushedLocalContent(f, excludedTags);
   });
 
   return {
