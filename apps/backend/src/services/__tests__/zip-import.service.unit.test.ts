@@ -29,6 +29,22 @@ vi.mock("../../db/index.js", () => ({
   getDb: vi.fn(),
 }));
 
+// Keep the pure source-preservation helpers (e.g. characterDefinitionSnapshot)
+// real; only the DB-touching maintenance entry point is stubbed out.
+vi.mock(
+  "../character-source-preservation.service.js",
+  async (importOriginal) => {
+    const actual =
+      await importOriginal<
+        typeof import("../character-source-preservation.service.js")
+      >();
+    return {
+      ...actual,
+      ensureCharacterSourcePreservation: vi.fn(async () => {}),
+    };
+  }
+);
+
 // Mock rpy-parser.service
 vi.mock("../rpy-parser.service.js", () => ({
   parseRPYFileWithLabels: vi.fn((content: string, filename: string) => ({

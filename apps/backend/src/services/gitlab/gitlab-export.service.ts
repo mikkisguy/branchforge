@@ -39,6 +39,7 @@ import {
   stats,
   variables,
   projects,
+  projectSettings,
 } from "../../db/schema/index.js";
 import { eq, and, inArray, isNull } from "drizzle-orm";
 import {
@@ -53,9 +54,12 @@ import {
   extractAndStripRpySymbols,
   isSourceOwnedRpyFile,
   collectSourceOwnedRpySymbolKeys,
+  DEFAULT_EXCLUDED_RENPY_TAGS,
 } from "../rpy-statements.service.js";
+import { ensureCharacterSourcePreservation } from "../character-source-preservation.service.js";
 
 import type { SyncOperation } from "../gitlab.types.js";
+import type { CharacterSourceDefinition } from "@branchforge/shared";
 import {
   createSyncOperation,
   updateSyncOperation,
@@ -117,7 +121,8 @@ interface ExportPlan {
 
 function buildPlannedActions(
   files: ProjectFileRow[],
-  ops: PendingOpRow[]
+  ops: PendingOpRow[],
+  excludedTags: ReadonlySet<string>
 ): ExportPlan {
   const actions: PlannedAction[] = [];
   const operations: PlannedOperation[] = [];
@@ -177,7 +182,7 @@ function buildPlannedActions(
   for (const file of files) {
     if (file.deletedAt) continue;
     if (opsByFileId.has(file.id)) continue;
-    const baseline = localContentBaselineHash(file);
+    const baseline = localContentBaselineHash(file, excludedTags);
     if (baseline === null || baseline === file.contentHash) continue;
     actions.push({
       action: "update",
@@ -210,6 +215,7 @@ interface GeneratedExportData {
     color: string;
     isNarrator: boolean;
     displayName: string;
+    sourceDefinition: CharacterSourceDefinition | null;
   }>;
 }
 
@@ -223,7 +229,8 @@ async function buildGeneratedActions(
   branch: string,
   fileDirPrefix: string,
   generated: GeneratedExportData,
-  activeFiles: ProjectFileRow[]
+  activeFiles: ProjectFileRow[],
+  excludedTags: ReadonlySet<string>
 ): Promise<PlannedAction[]> {
   // Plain names declared in the active source-owned files own the global
   // store: generated declarations must not collide with them.
@@ -231,7 +238,8 @@ async function buildGeneratedActions(
     activeFiles.map((file) => ({
       filePath: file.filePath,
       content: file.content,
-    }))
+    })),
+    excludedTags
   );
   // Candidate selection stays based on the ORIGINAL category length: when a
   // category has DB rows whose symbols were all filtered, the generated file
@@ -245,7 +253,9 @@ async function buildGeneratedActions(
     (stat) => !sourceOwnedKeys.has(stat.key)
   );
   const filteredCharacters = generated.characters.filter(
-    (character) => !sourceOwnedKeys.has(character.renpyTag)
+    (character) =>
+      !sourceOwnedKeys.has(character.renpyTag) &&
+      !excludedTags.has(character.renpyTag)
   );
 
   const candidates: Array<{ filePath: string; content: string }> = [];
@@ -274,26 +284,63 @@ async function buildGeneratedActions(
     });
   }
 
-  return Promise.all(
-    candidates.map(async ({ filePath, content }) => {
-      // A 404 (including for a new branch) is represented as content: null.
-      const remoteFile = await getFileContentWithMetadata(
-        projectId,
-        userId,
-        filePath,
-        branch
-      );
-      return {
-        action: remoteFile.content === null ? "create" : "update",
-        filePath,
-        content,
-      };
-    })
+  const generatedActions = await Promise.all(
+    candidates.map(
+      async ({ filePath, content }): Promise<PlannedAction | null> => {
+        // A 404 (including for a new branch) is represented as content: null.
+        const remoteFile = await getFileContentWithMetadata(
+          projectId,
+          userId,
+          filePath,
+          branch
+        );
+        if (remoteFile.content === null) {
+          return { action: "create", filePath, content };
+        }
+        if (remoteFile.content === content) {
+          // Generated content already matches the remote exactly: avoid a
+          // no-op update. Symbol ownership/filtering and empty-generated
+          // cleanup are handled before this point.
+          return null;
+        }
+        return { action: "update", filePath, content };
+      }
+    )
+  );
+
+  return generatedActions.filter(
+    (action): action is PlannedAction => action !== null
   );
 }
 
 const MISSING_DEFAULT_BRANCH_MESSAGE =
   "Export failed. The repository default branch was not found, so a new branch cannot be created.";
+
+/**
+ * Fetch the project's excluded Ren'Py character tags. Missing settings rows
+ * or null columns fall back to the default excluded tags; explicit empty
+ * array means no exclusions.
+ */
+async function fetchProjectExcludedTags(
+  projectId: string
+): Promise<Set<string>> {
+  const db = getDb();
+  const [settings] = await db
+    .select({ excludedCharacterTags: projectSettings.excludedCharacterTags })
+    .from(projectSettings)
+    .where(eq(projectSettings.projectId, projectId))
+    .limit(1);
+
+  if (settings?.excludedCharacterTags === undefined) {
+    return new Set(DEFAULT_EXCLUDED_RENPY_TAGS);
+  }
+
+  if (settings.excludedCharacterTags === null) {
+    return new Set(DEFAULT_EXCLUDED_RENPY_TAGS);
+  }
+
+  return new Set(settings.excludedCharacterTags);
+}
 
 function toUserFacingExportError(error: unknown): string {
   if (error instanceof RepositoryNotLinkedError) {
@@ -323,7 +370,8 @@ function buildPushedContent(
     conditions: unknown;
     effects: unknown;
     projectFileId: string | null;
-  }>
+  }>,
+  excludedTags: ReadonlySet<string>
 ): string {
   // Source-owned files (screens.rpy, gui.rpy, ...) are pushed verbatim:
   // no managed-statement strip and no variable patching, independent of
@@ -336,7 +384,8 @@ function buildPushedContent(
   }
   const baseContent = extractAndStripRpySymbols(
     file.content,
-    file.filePath
+    file.filePath,
+    excludedTags
   ).cleanedContent;
   if (labelsForFile.length === 0) {
     return baseContent;
@@ -419,7 +468,7 @@ async function preflightConflicts(
   branch: string,
   files: ProjectFileRow[],
   plan: ExportPlan
-): Promise<void> {
+): Promise<Map<string, string | null>> {
   const filesByRemoteBasePath = new Map<string, ProjectFileRow>();
   for (const f of files) {
     filesByRemoteBasePath.set(f.remoteFilePath ?? f.filePath, f);
@@ -457,6 +506,8 @@ async function preflightConflicts(
   }
   // Generated files are managed content and are overwritten unconditionally.
 
+  const remoteContents = new Map<string, string | null>();
+
   for (const remotePath of mustExist) {
     const meta = await getFileContentWithMetadata(
       projectId,
@@ -469,6 +520,7 @@ async function preflightConflicts(
         `Conflict: expected source file not found on the remote: ${remotePath}`
       );
     }
+    remoteContents.set(remotePath, meta.content);
     const storedFile = filesByRemoteBasePath.get(remotePath);
     const expectedHash = storedFile
       ? remoteContentBaselineHash(storedFile)
@@ -495,6 +547,35 @@ async function preflightConflicts(
         `Conflict: file already exists on the remote: ${remotePath}`
       );
     }
+  }
+
+  return remoteContents;
+}
+
+/**
+ * Advance local baselines for content-only files whose update was omitted
+ * because the remote already matches the desired content. Preserves the
+ * existing remoteRevision rather than overwriting it with null, since no new
+ * commit was created.
+ */
+async function advanceContentUpdatedBaselines(
+  tx: ExportTx,
+  contentUpdatedFiles: Array<{ file: ProjectFileRow; content: string }>,
+  branch: string
+): Promise<void> {
+  for (const { file, content } of contentUpdatedFiles) {
+    await tx
+      .update(projectFiles)
+      .set({
+        remoteFilePath: file.filePath,
+        remoteBranch: branch,
+        remoteContent: content,
+        remoteContentHash: calculateContentHash(content),
+        lastPushedContentHash: file.contentHash,
+        hasRemoteConflict: false,
+        updatedAt: new Date(),
+      })
+      .where(eq(projectFiles.id, file.id));
   }
 }
 
@@ -533,13 +614,20 @@ async function finalizeSuccessfulPush(
   }
 
   // Content-only updated files advance their local baseline too.
+  const updatedPaths = new Set(
+    plan.actions
+      .filter((action) => action.action === "update")
+      .map((action) => action.filePath)
+  );
   for (const { file, content } of plan.contentUpdatedFiles) {
     await tx
       .update(projectFiles)
       .set({
         remoteFilePath: file.filePath,
         remoteBranch: branch,
-        remoteRevision: commitId,
+        remoteRevision: updatedPaths.has(file.filePath)
+          ? commitId
+          : file.remoteRevision,
         remoteContent: content,
         remoteContentHash: calculateContentHash(content),
         lastPushedContentHash: file.contentHash,
@@ -662,9 +750,17 @@ export async function exportToGitlab(
 ): Promise<SyncOperation> {
   await requireProjectOwnership(projectId, userId);
 
+  // Idempotent source-preservation maintenance must run after the ownership
+  // guard and before any file content is read or generated.
+  await ensureCharacterSourcePreservation(projectId);
+
   const db = getDb();
   const message =
     commitMessage || `Export from BranchForge - ${new Date().toISOString()}`;
+
+  // Load the project's character-tag exclusion policy once and use it for
+  // every strip/collision decision in this export.
+  const excludedTags = await fetchProjectExcludedTags(projectId);
 
   // Resolve the target branch (existing or new non-default branch)
   let targetBranch = branch;
@@ -713,7 +809,7 @@ export async function exportToGitlab(
     const unresolved = ops.filter((op) => op.attemptStartedAt !== null);
     if (unresolved.length > 0) {
       const unresolvedIds = unresolved.map((op) => op.id);
-      const plan = buildPlannedActions(files, unresolved);
+      const plan = buildPlannedActions(files, unresolved, excludedTags);
       const observed = await verifyActionSetObserved(
         projectId,
         userId,
@@ -782,19 +878,21 @@ export async function exportToGitlab(
     }
 
     // Build the plan and patch content for every affected file.
-    const plan = buildPlannedActions(files, ops);
+    const plan = buildPlannedActions(files, ops, excludedTags);
     for (const item of plan.operations) {
       if (item.file) {
         item.content = buildPushedContent(
           item.file,
-          labelsByFile.get(item.file.id) ?? []
+          labelsByFile.get(item.file.id) ?? [],
+          excludedTags
         );
       }
     }
     for (const item of plan.contentUpdatedFiles) {
       item.content = buildPushedContent(
         item.file,
-        labelsByFile.get(item.file.id) ?? []
+        labelsByFile.get(item.file.id) ?? [],
+        excludedTags
       );
       const action = plan.actions.find(
         (candidate) =>
@@ -816,7 +914,11 @@ export async function exportToGitlab(
       if (plannedFileIds.has(file.id)) {
         continue;
       }
-      const content = buildPushedContent(file, labelsByFile.get(file.id) ?? []);
+      const content = buildPushedContent(
+        file,
+        labelsByFile.get(file.id) ?? [],
+        excludedTags
+      );
       const remoteHash = remoteContentBaselineHash(file);
       if (remoteHash === null || calculateContentHash(content) === remoteHash) {
         continue;
@@ -867,6 +969,7 @@ export async function exportToGitlab(
             color: characters.color,
             isNarrator: characters.isNarrator,
             displayName: characters.displayName,
+            sourceDefinition: characters.sourceDefinition,
           })
           .from(characters)
           .where(eq(characters.projectId, projectId)),
@@ -883,16 +986,35 @@ export async function exportToGitlab(
         stats: projectStats,
         characters: projectCharacters,
       },
-      activeFiles
+      activeFiles,
+      excludedTags
     );
+
+    // Preflight each affected source against the stored per-file remote
+    // content baseline. The preflight also returns the actual remote content
+    // for update paths so identical plain updates can be dropped after
+    // conflict checks succeed.
+    if (plan.actions.length > 0) {
+      const remoteContents = await preflightConflicts(
+        projectId,
+        userId,
+        contentBranch,
+        files,
+        plan
+      );
+
+      // Keep contentUpdatedFiles so omitted updates still advance baselines.
+      // Structural actions always remain in the atomic commit.
+      plan.actions = plan.actions.filter(
+        (action) =>
+          action.action !== "update" ||
+          remoteContents.get(action.filePath) !== action.content
+      );
+    }
 
     const allActions = [...plan.actions, ...generatedActions];
 
     if (allActions.length > 0) {
-      // Preflight each affected source against the stored per-file remote
-      // content baseline.
-      await preflightConflicts(projectId, userId, contentBranch, files, plan);
-
       // Durably mark the exact planned attempt BEFORE the remote call.
       const plannedIds = plan.operations.map((item) => item.op.id);
       if (plannedIds.length > 0) {
@@ -954,7 +1076,24 @@ export async function exportToGitlab(
       };
     }
 
-    // Nothing to push
+    // Nothing to push: advance baselines for content-only files whose update
+    // was omitted because the remote is already up to date.
+    if (plan.contentUpdatedFiles.length > 0) {
+      await db.transaction(async (tx) => {
+        await lockProject(tx, projectId);
+        await advanceContentUpdatedBaselines(
+          tx,
+          plan.contentUpdatedFiles,
+          contentBranch
+        );
+      });
+
+      const contentUpdatedFileIds = plan.contentUpdatedFiles.map(
+        (item) => item.file.id
+      );
+      await advanceLabelBaselines(db, projectId, contentUpdatedFileIds);
+    }
+
     await updateSyncOperation(operation.id, {
       status: "COMPLETED",
       conflictCount: 0,
@@ -963,6 +1102,7 @@ export async function exportToGitlab(
       ...operation,
       status: "COMPLETED",
       conflictCount: 0,
+      noChanges: true,
     };
   } catch (error) {
     const errorMessage = toUserFacingExportError(error);

@@ -1,5 +1,8 @@
 import type { DetectedCharacter } from "./character-parser.service.js";
-import type { DetectCharactersResponse } from "@branchforge/shared";
+import type {
+  DetectCharactersResponse,
+  GitLabExportOutcome,
+} from "@branchforge/shared";
 
 // GitLab API response types
 
@@ -53,7 +56,7 @@ export interface GitlabTreeItem {
 export type ConflictResolution =
   "branchforge_wins" | "gitlab_wins" | "manual_review";
 
-export interface SyncOperation {
+export interface SyncOperation extends GitLabExportOutcome {
   id: string;
   projectId: string;
   operation: "EXPORT" | "IMPORT";

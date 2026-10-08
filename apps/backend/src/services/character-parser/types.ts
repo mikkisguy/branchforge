@@ -1,4 +1,5 @@
 import type { CharacterNameType } from "@branchforge/shared";
+import type { CharacterSourceDefinition } from "@branchforge/shared";
 import type { CharacterConflict } from "@branchforge/shared";
 export type { CharacterConflict } from "@branchforge/shared";
 
@@ -64,6 +65,7 @@ export interface DetectedCharacter {
   isSpecial: boolean; // narration, unknown, etc.
   sourceFile: string;
   confidence: number; // 0-1 for fuzzy matches
+  sourceDefinition?: CharacterSourceDefinition;
 }
 
 /**

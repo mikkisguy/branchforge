@@ -159,6 +159,15 @@ their symbols or UI labels. Use the shared ownership helpers consistently
 in ZIP, GitLab, character detection, export previews, and sync baselines.
 Generated declarations must not duplicate global names in those active files.
 The `SETTINGS` file type alone does not determine symbol ownership.
+Excluded character tags (including `narrator` by default) and character
+declarations that cannot be safely parsed also remain source-owned. Managed
+characters retain server-owned source definitions; edit only changed name,
+tag, or speaker-color arguments and preserve other options. `what_color` is
+dialogue styling, distinct from `who_color`/`color`. Accepted per-file
+declaration snapshots must follow import conflict decisions. Legacy recovery
+is performed once, only with evidence of an untouched source baseline, and
+must never resurrect later source deletions. Omitted import/settings ownership
+fields preserve current settings; explicit empty arrays clear them.
 
 **Rate Limiting:** Required for auth endpoints, recommended for all public endpoints. Use `checkRateLimit()` from `src/services/rate-limiter.service.ts`.
 

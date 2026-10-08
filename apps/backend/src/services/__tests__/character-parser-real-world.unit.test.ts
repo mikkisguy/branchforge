@@ -5,7 +5,7 @@ describe("real-world Ren'Py file (from db)", () => {
   it("parses characters from a real GitLab-imported project's variables.rpy", () => {
     // This is the actual content from project_files.original_content
     // for project 3c3f11c1 (game/variables.rpy), with psql's
-    // trailing whitespace stripped.
+    // table output indentation removed before parsing.
     const content = ` ## Persistent settings
  default persistent.age_verified = False
  default persistent.pl_nickname = ""
@@ -28,8 +28,13 @@ describe("real-world Ren'Py file (from db)", () => {
  define re = Character("[re_first]", who_color="#CDCDCD")
 `;
 
+    // psql table output prefixes each displayed line with one space.
+    const source = content
+      .split("\n")
+      .map((line) => (line.startsWith(" ") ? line.slice(1) : line))
+      .join("\n");
     const detected = characterParserService.parseFile(
-      content,
+      source,
       "game/variables.rpy"
     );
 

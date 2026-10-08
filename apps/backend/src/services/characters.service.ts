@@ -40,11 +40,16 @@ import {
 } from "@branchforge/shared";
 import { inferNameTypeFromStoredName } from "./character-parser/name-resolution.js";
 import { isVariableSafeIdentifier } from "./rpy-generator.service.js";
-import { calculateContentHash } from "../lib/hash.js";
 import {
-  extractAndStripRpySymbols,
   isSourceOwnedRpyFile,
+  DEFAULT_EXCLUDED_RENPY_TAGS,
 } from "./rpy-statements.service.js";
+import {
+  acceptedCharacterDefinitionContent,
+  ensureCharacterSourcePreservation,
+  reconcileCharacterOwnership,
+} from "./character-source-preservation.service.js";
+import { lockProject } from "./project-files-operations.service.js";
 import type {
   CreateCharacterInput,
   UpdateCharacterInput,
@@ -186,36 +191,58 @@ export class CharactersService {
 
     const db = getDb();
 
-    const [updatedSettings] = await db
-      .insert(projectSettings)
-      .values({
-        projectId,
-        excludedCharacterTags: input.excludedCharacterTags ?? [
-          "n",
-          "u",
-          "narrator",
-          "extend",
-        ],
-        narratorCharacterTags: input.narratorCharacterTags ?? [],
-        autoLinkSpeakers: input.autoLinkSpeakers ?? true,
-        updatedAt: new Date(),
-      })
-      .onConflictDoUpdate({
-        target: [projectSettings.projectId],
-        set: {
-          ...(input.excludedCharacterTags && {
-            excludedCharacterTags: input.excludedCharacterTags,
-          }),
-          ...(input.narratorCharacterTags && {
-            narratorCharacterTags: input.narratorCharacterTags,
-          }),
-          ...(input.autoLinkSpeakers !== undefined && {
-            autoLinkSpeakers: input.autoLinkSpeakers,
-          }),
+    await ensureCharacterSourcePreservation(projectId);
+    const updatedSettings = await db.transaction(async (tx) => {
+      await lockProject(tx, projectId);
+      const [previous] = await tx
+        .select()
+        .from(projectSettings)
+        .where(eq(projectSettings.projectId, projectId))
+        .limit(1);
+      if (input.excludedCharacterTags !== undefined) {
+        const before = new Set(
+          previous?.excludedCharacterTags ?? DEFAULT_EXCLUDED_RENPY_TAGS
+        );
+        const after = new Set(input.excludedCharacterTags);
+        if (
+          before.size !== after.size ||
+          [...before].some((tag) => !after.has(tag))
+        ) {
+          await reconcileCharacterOwnership(tx, projectId, after, before);
+        }
+      }
+      const [updated] = await tx
+        .insert(projectSettings)
+        .values({
+          projectId,
+          excludedCharacterTags: input.excludedCharacterTags ?? [
+            "n",
+            "u",
+            "narrator",
+            "extend",
+          ],
+          narratorCharacterTags: input.narratorCharacterTags ?? [],
+          autoLinkSpeakers: input.autoLinkSpeakers ?? true,
           updatedAt: new Date(),
-        },
-      })
-      .returning();
+        })
+        .onConflictDoUpdate({
+          target: [projectSettings.projectId],
+          set: {
+            ...(input.excludedCharacterTags && {
+              excludedCharacterTags: input.excludedCharacterTags,
+            }),
+            ...(input.narratorCharacterTags && {
+              narratorCharacterTags: input.narratorCharacterTags,
+            }),
+            ...(input.autoLinkSpeakers !== undefined && {
+              autoLinkSpeakers: input.autoLinkSpeakers,
+            }),
+            updatedAt: new Date(),
+          },
+        })
+        .returning();
+      return updated;
+    });
 
     return {
       excludedCharacterTags: updatedSettings.excludedCharacterTags ?? [],
@@ -284,6 +311,7 @@ export class CharactersService {
     const db = getDb();
 
     const settings = await this.getProjectSettings(projectId, userId);
+    await ensureCharacterSourcePreservation(projectId);
     const excludedTags = new Set(settings.excludedCharacterTags ?? []);
 
     const [existingCharacters, allProjectFiles] = await Promise.all([
@@ -306,32 +334,10 @@ export class CharactersService {
       // managed by BranchForge.
       if (isSourceOwnedRpyFile(file.filePath)) continue;
 
-      let sourceContent: string | null = null;
-
-      if (file.source === "GITLAB") {
-        // For GitLab files, avoid historical originalContent that may
-        // contain definitions since removed by BranchForge. Use the raw
-        // remote content only when its stripped form matches the accepted
-        // content; otherwise use the accepted cleaned content.
-        if (!file.hasRemoteConflict && file.remoteContent) {
-          const stripped = extractAndStripRpySymbols(
-            file.remoteContent,
-            file.filePath
-          ).cleanedContent;
-          if (
-            file.content !== null &&
-            calculateContentHash(stripped) ===
-              calculateContentHash(file.content)
-          ) {
-            sourceContent = file.remoteContent;
-          }
-        }
-        sourceContent = sourceContent ?? file.content;
-      } else {
-        // Non-GitLab sources keep the historical behavior of reading the
-        // original imported content when available.
-        sourceContent = file.originalContent ?? file.content;
-      }
+      const sourceContent = acceptedCharacterDefinitionContent(
+        file,
+        excludedTags
+      );
 
       if (sourceContent) {
         const fileCharacters = characterParserService.parseWithExclusions(
@@ -361,6 +367,8 @@ export class CharactersService {
         displayName: c.displayName,
         color: c.color,
         nameType: c.nameType,
+        sourceDefinition: c.sourceDefinition,
+        isNarrator: c.isNarrator,
       }))
     );
 
@@ -389,11 +397,12 @@ export class CharactersService {
     input: ImportCharactersInput
   ): Promise<ImportCharactersResult> {
     await requireProjectOwnership(projectId, userId);
+    await ensureCharacterSourcePreservation(projectId);
 
     const {
       characters: charactersToImport,
-      excludedTags,
-      narratorTags,
+      excludedTags: requestedExcludedTags,
+      narratorTags: requestedNarratorTags,
       linkToLines,
     } = input;
 
@@ -401,6 +410,51 @@ export class CharactersService {
     // speaker linking) in a transaction so a failure at any stage rolls
     // back to the pre-import state.
     return getDb().transaction(async (tx) => {
+      await lockProject(tx, projectId);
+      const [previous] = await tx
+        .select()
+        .from(projectSettings)
+        .where(eq(projectSettings.projectId, projectId))
+        .limit(1);
+      const excludedTags =
+        requestedExcludedTags ??
+        previous?.excludedCharacterTags ??
+        DEFAULT_EXCLUDED_RENPY_TAGS;
+      const narratorTags =
+        requestedNarratorTags ?? previous?.narratorCharacterTags ?? [];
+      const excluded = new Set(excludedTags);
+      const before = new Set(
+        previous?.excludedCharacterTags ?? DEFAULT_EXCLUDED_RENPY_TAGS
+      );
+      if (
+        before.size !== excluded.size ||
+        [...before].some((tag) => !excluded.has(tag))
+      ) {
+        await reconcileCharacterOwnership(tx, projectId, excluded, before);
+      }
+      const sourceFiles = await tx
+        .select()
+        .from(projectFiles)
+        .where(
+          and(
+            eq(projectFiles.projectId, projectId),
+            isNull(projectFiles.deletedAt)
+          )
+        );
+      const sourceByTag = new Map<
+        string,
+        NonNullable<DetectedCharacter["sourceDefinition"]>
+      >();
+      for (const file of sourceFiles) {
+        for (const detected of characterParserService.parseFile(
+          acceptedCharacterDefinitionContent(file, excluded),
+          file.filePath
+        )) {
+          if (detected.sourceDefinition && !sourceByTag.has(detected.tag)) {
+            sourceByTag.set(detected.tag, detected.sourceDefinition);
+          }
+        }
+      }
       // Update project settings
       await tx
         .insert(projectSettings)
@@ -438,6 +492,8 @@ export class CharactersService {
       }> = [];
 
       for (const charData of charactersToImport) {
+        if (excluded.has(charData.tag)) continue;
+        const sourceDefinition = sourceByTag.get(charData.tag);
         const existing = existingByTag.get(charData.tag);
 
         if (existing) {
@@ -470,6 +526,7 @@ export class CharactersService {
           }
 
           const updates: Record<string, unknown> = {
+            ...(sourceDefinition ? { sourceDefinition } : {}),
             name: importedName,
             displayName: charData.displayName,
             nameType: resolvedNameType,
@@ -509,6 +566,7 @@ export class CharactersService {
             displayName: charData.displayName,
             renpyTag: charData.tag,
             color: charData.color,
+            sourceDefinition,
             isLoveInterest: charData.isLoveInterest ?? false,
             isNarrator: charData.isNarrator ?? false,
           })

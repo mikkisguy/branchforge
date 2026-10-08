@@ -1,25 +1,39 @@
 import { QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { DetectCharactersResponse } from "@branchforge/shared";
 import { charactersApi } from "@/lib/api/characters";
+import type { SyncOperation } from "@/lib/api/gitlab";
 import { gitlabApi } from "@/lib/api/gitlab";
 import { createTestQueryClient } from "@/test/query-client";
 import { GitLabSyncDialog } from "../GitLabSyncDialog";
 
-const { mockImport, mockPending, mockSyncState, errorToast } = vi.hoisted(
-  () => ({
-    mockImport: vi.fn(),
-    mockPending: vi.fn(),
-    mockSyncState: {
-      operation: null,
-      isProcessing: false,
-      progress: 0,
-      error: null as string | null,
-    },
-    errorToast: vi.fn(),
-  })
-);
+const {
+  mockImport,
+  mockExport,
+  mockPending,
+  mockSyncState,
+  errorToast,
+  successToast,
+} = vi.hoisted(() => ({
+  mockImport: vi.fn(),
+  mockExport: vi.fn(),
+  successToast: vi.fn(),
+  mockPending: vi.fn(),
+  mockSyncState: {
+    operation: null as SyncOperation | null,
+    isProcessing: false,
+    progress: 0,
+    error: null as string | null,
+  },
+  errorToast: vi.fn(),
+}));
 
 vi.mock("@/lib/api/characters", () => ({
   charactersApi: { detectCharacters: vi.fn(), importCharacters: vi.fn() },
@@ -28,7 +42,7 @@ vi.mock("@/lib/api/characters", () => ({
 vi.mock("@/hooks/useGitLabSync", () => ({
   useGitLabSync: () => ({
     state: mockSyncState,
-    exportToGitlab: vi.fn(),
+    exportToGitlab: mockExport,
     importFromGitlab: mockImport,
     reset: vi.fn(),
   }),
@@ -53,7 +67,10 @@ function pendingState() {
 
 beforeEach(() => {
   mockPending.mockReturnValue(pendingState());
+  mockSyncState.operation = null;
   mockSyncState.error = null;
+  mockExport.mockReset();
+  successToast.mockClear();
   errorToast.mockClear();
 });
 
@@ -66,10 +83,99 @@ vi.mock("@/hooks/useLabels", () => ({
 }));
 
 vi.mock("@/contexts/ToastContext", () => ({
-  useToast: () => ({ success: vi.fn(), error: errorToast }),
+  useToast: () => ({ success: successToast, error: errorToast }),
 }));
 
 describe("GitLabSyncDialog", () => {
+  it.each([true, false])(
+    "handles a completed export with noChanges=%s",
+    async (noChanges) => {
+      const branchesSpy = vi
+        .spyOn(gitlabApi, "getBranches")
+        .mockResolvedValue(["main"]);
+      const result: SyncOperation = {
+        id: "operation-1",
+        projectId: "project-1",
+        operation: "EXPORT",
+        status: "COMPLETED",
+        branch: "main",
+        conflictCount: 0,
+        errorMessage: null,
+        startedAt: "2026-10-04T00:00:00Z",
+        completedAt: null,
+        ...(noChanges ? { noChanges: true } : {}),
+      };
+      mockExport.mockResolvedValue(result);
+      const onOpenChange = vi.fn();
+      const queryClient = createTestQueryClient();
+      const dialog = (
+        <QueryClientProvider client={queryClient}>
+          <GitLabSyncDialog
+            open
+            onOpenChange={onOpenChange}
+            operationType="export"
+            projectId="project-1"
+          />
+        </QueryClientProvider>
+      );
+      try {
+        const view = render(dialog);
+        const button = await screen.findByRole("button", {
+          name: "Export to main",
+        });
+        await waitFor(() => expect(button).toBeEnabled());
+        vi.useFakeTimers();
+        try {
+          await act(async () => {
+            fireEvent.click(button);
+            await vi.advanceTimersByTimeAsync(0);
+          });
+          expect(mockExport).toHaveBeenCalledOnce();
+          mockSyncState.operation = result;
+          view.rerender(
+            <QueryClientProvider client={queryClient}>
+              <GitLabSyncDialog
+                open
+                onOpenChange={onOpenChange}
+                operationType="export"
+                projectId="project-1"
+              />
+            </QueryClientProvider>
+          );
+          if (noChanges) {
+            expect(screen.getByRole("status")).toHaveTextContent(
+              "No changes to push."
+            );
+            expect(
+              screen.queryByText("Export completed")
+            ).not.toBeInTheDocument();
+            expect(successToast).not.toHaveBeenCalled();
+            await act(async () => {
+              await vi.advanceTimersByTimeAsync(1100);
+            });
+            expect(onOpenChange).not.toHaveBeenCalled();
+            fireEvent.click(screen.getByRole("button", { name: "Close" }));
+            expect(onOpenChange).toHaveBeenCalledWith(false);
+          } else {
+            expect(screen.getByText("Export completed")).toBeInTheDocument();
+            expect(successToast).toHaveBeenCalledWith(
+              "Export completed successfully"
+            );
+            await act(async () => {
+              await vi.advanceTimersByTimeAsync(2000);
+            });
+            expect(onOpenChange).toHaveBeenCalledWith(false);
+          }
+        } finally {
+          vi.useRealTimers();
+        }
+      } finally {
+        branchesSpy.mockRestore();
+        queryClient.clear();
+      }
+    }
+  );
+
   it("selects the linked default branch after fetching branches", async () => {
     let resolveBranches!: (branches: string[]) => void;
     const branches = new Promise<string[]>((resolve) => {

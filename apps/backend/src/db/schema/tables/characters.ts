@@ -13,7 +13,9 @@ import {
   index,
   unique,
   check,
+  jsonb,
 } from "drizzle-orm/pg-core";
+import type { CharacterSourceDefinition } from "@branchforge/shared";
 import { sql } from "drizzle-orm";
 import { projects } from "./projects.js";
 
@@ -32,6 +34,9 @@ export const characters = pgTable(
      * backfill of existing rows; import/create should set the real type.
      */
     nameType: text("name_type").notNull().default("literal"),
+    /** Original source syntax and baseline, maintained by import/review only. */
+    sourceDefinition:
+      jsonb("source_definition").$type<CharacterSourceDefinition>(),
     renpyTag: text("renpy_tag").notNull(),
     isLoveInterest: boolean("is_love_interest").default(false).notNull(),
     isNarrator: boolean("is_narrator").default(false).notNull(),

@@ -46,6 +46,11 @@ import { isUniqueConstraintViolation } from "../lib/db.js";
 import { parseRPYFileWithLabels } from "./rpy-parser.service.js";
 import { assertCaseInsensitiveUnique } from "./project-files-operations.service.js";
 import { validateGitLabUrl } from "./encryption.service.js";
+import {
+  ensureCharacterSourcePreservation,
+  updateCharacterDefinitionSnapshot,
+  syncAuthoredCharacterDefinitions,
+} from "./character-source-preservation.service.js";
 
 /**
  * Project row type from database queries (with optional role for shared projects)
@@ -502,6 +507,7 @@ export async function getProjectFiles(
 ): Promise<GetProjectFilesResult> {
   // Verify user has access to the project (throws NotFoundError / ForbiddenError)
   await requireProjectAccess(projectId, userId);
+  await ensureCharacterSourcePreservation(projectId);
 
   const db = getDb();
 
@@ -618,6 +624,7 @@ export async function createProjectFile(
           fileType: "STORY",
           content,
           originalContent: null,
+          characterDefinitions: {},
           contentHash,
         })
         .returning();
@@ -739,6 +746,8 @@ async function applyFileUpdate(
       .select({
         contentHash: projectFiles.contentHash,
         updatedAt: projectFiles.updatedAt,
+        content: projectFiles.content,
+        characterDefinitions: projectFiles.characterDefinitions,
       })
       .from(projectFiles)
       .innerJoin(projects, eq(projectFiles.projectId, projects.id))
@@ -787,10 +796,22 @@ async function applyFileUpdate(
         content,
         fileType,
         contentHash: newContentHash,
+        characterDefinitions: updateCharacterDefinitionSnapshot(
+          lockedFile.content,
+          content,
+          lockedFile.characterDefinitions
+        ),
         updatedAt: fileUpdatedAt,
       })
       .where(eq(projectFiles.id, fileId));
 
+    await syncAuthoredCharacterDefinitions(
+      tx,
+      file.projectId,
+      file.filePath,
+      content,
+      lockedFile.content
+    );
     // Sync labels from updated content (only for STORY files)
     const syncResultForFile =
       fileType === "STORY"
@@ -876,7 +897,9 @@ export async function updateFileContent(
   expectedContentHash?: string
 ): Promise<UpdateFileContentResult> {
   // Phase 1: Validate file access and project ownership
-  const file = await validateFileAccess(fileId, userId);
+  let file = await validateFileAccess(fileId, userId);
+  await ensureCharacterSourcePreservation(file.projectId);
+  file = await validateFileAccess(fileId, userId);
 
   // Phase 2: Determine file type from content
   let nextFileType: typeof file.fileType;

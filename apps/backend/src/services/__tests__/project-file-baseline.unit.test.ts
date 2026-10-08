@@ -4,9 +4,49 @@ import {
   localContentBaselineHash,
 } from "../project-file-baseline.js";
 import { calculateContentHash } from "../../lib/hash.js";
-import { BRANCHFORGE_MANAGED_NOTICE } from "../rpy-statements.service.js";
+import {
+  BRANCHFORGE_MANAGED_NOTICE,
+  extractAndStripRpySymbols,
+  extractLegacyRpySymbols,
+} from "../rpy-statements.service.js";
 
 describe("project-file-baseline", () => {
+  it("recognizes category-specific historical notices after ownership changes", () => {
+    const originalContent =
+      "define narrator = Character(None, what_italic=True)\nlabel start:\n    return";
+    const contentHash = calculateContentHash(
+      extractLegacyRpySymbols(originalContent).cleanedContent
+    );
+    expect(
+      hasUnpushedLocalContent({
+        filePath: "game/script.rpy",
+        originalContent,
+        contentHash,
+        lastPushedContentHash: null,
+      })
+    ).toBe(false);
+  });
+
+  it("uses custom exclusion ownership when reconstructing a baseline", () => {
+    const originalContent =
+      "define thought = Character(None, what_italic=False)\nlabel start:\n    return";
+    const excluded = new Set(["thought"]);
+    const contentHash = calculateContentHash(
+      extractAndStripRpySymbols(originalContent, "game/script.rpy", excluded)
+        .cleanedContent
+    );
+    expect(
+      hasUnpushedLocalContent(
+        {
+          filePath: "game/script.rpy",
+          originalContent,
+          contentHash,
+          lastPushedContentHash: null,
+        },
+        excluded
+      )
+    ).toBe(false);
+  });
   it.each(["game/script.rpy", "game/screens.rpy"])(
     "recognizes an untouched legacy stripped baseline for %s",
     (filePath) => {

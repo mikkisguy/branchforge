@@ -12,35 +12,85 @@ vi.mock("../authz.service.js", () => ({
   requireProjectOwnership: vi.fn(() => Promise.resolve()),
 }));
 
+// Mock project locking — the import transaction locks the project row
+vi.mock("../project-files-operations.service.js", () => ({
+  lockProject: vi.fn(() => Promise.resolve()),
+}));
+
+// Keep the pure source-preservation helpers real; only the DB-touching
+// maintenance entry point is stubbed out.
+vi.mock(
+  "../character-source-preservation.service.js",
+  async (importOriginal) => {
+    const actual =
+      await importOriginal<
+        typeof import("../character-source-preservation.service.js")
+      >();
+    return {
+      ...actual,
+      ensureCharacterSourcePreservation: vi.fn(() => Promise.resolve()),
+    };
+  }
+);
+
 // Hoist all mock variables so vi.mock factories can access them
 const {
-  createSelectChain,
-  mockSelect,
   mockInsert,
   mockUpdate,
   mockGetDb,
   mockTransactionFn,
   mockLinkSpeakersToLines,
+  setSelectResults,
+  resetSelectResults,
+  createInsertChain,
 } = vi.hoisted(() => {
-  const createSelectChain = (resolveValue: unknown[]) => {
-    const whereResult = Object.assign(Promise.resolve(resolveValue), {
-      limit: vi.fn(() => Promise.resolve(resolveValue)),
-    });
-    return {
-      from: vi.fn(() => ({
-        where: vi.fn(() => whereResult),
-      })),
-    };
+  /** Identify a drizzle table object by one of its unique column names. */
+  const tableKey = (table: unknown): string => {
+    const t = table as Record<string, unknown> | null;
+    if (!t || typeof t !== "object") {
+      throw new Error("Expected a Drizzle table in select mock");
+    }
+    if ("excludedCharacterTags" in t) return "projectSettings";
+    if ("filePath" in t) return "projectFiles";
+    if ("renpyTag" in t) return "characters";
+    if ("labelName" in t) return "labels";
+    throw new Error("Unmapped Drizzle table in select mock");
+  };
+
+  const selectResults: Record<string, unknown[]> = {};
+
+  const setSelectResults = (results: Record<string, unknown[]>) => {
+    for (const [key, value] of Object.entries(results)) {
+      selectResults[key] = value;
+    }
+  };
+
+  const resetSelectResults = () => {
+    for (const key of Object.keys(selectResults)) {
+      delete selectResults[key];
+    }
   };
 
   const createInsertChain = () => ({
     values: vi.fn(() => ({
+      onConflictDoNothing: vi.fn(() => Promise.resolve()),
       onConflictDoUpdate: vi.fn(() => Promise.resolve()),
       returning: vi.fn(() => Promise.resolve([] as unknown[])),
     })),
   });
 
-  const mockSelect = vi.fn(() => createSelectChain([]));
+  const mockSelect = vi.fn(() => ({
+    from: vi.fn((table?: unknown) => {
+      const resolveValue = selectResults[tableKey(table)] ?? [];
+      const whereResult = Object.assign(Promise.resolve(resolveValue), {
+        limit: vi.fn(() => Promise.resolve(resolveValue)),
+      });
+      return {
+        where: vi.fn(() => whereResult),
+      };
+    }),
+  }));
+
   const mockInsert = vi.fn(createInsertChain);
   const mockUpdate = vi.fn();
   const mockTransactionFn = vi.fn((cb: (tx: unknown) => unknown) =>
@@ -61,13 +111,15 @@ const {
   );
 
   return {
-    createSelectChain,
     mockSelect,
     mockInsert,
     mockUpdate,
     mockGetDb,
     mockTransactionFn,
     mockLinkSpeakersToLines,
+    setSelectResults,
+    resetSelectResults,
+    createInsertChain,
   };
 });
 
@@ -125,6 +177,9 @@ describe("CharactersService.importCharacters", () => {
   let updateSetFn: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
+    resetSelectResults();
+    mockInsert.mockReset();
+    mockInsert.mockImplementation(createInsertChain);
     updateSetFn = vi.fn(() => ({
       where: vi.fn(() => Promise.resolve()),
     }));
@@ -139,15 +194,23 @@ describe("CharactersService.importCharacters", () => {
   // Shared test helpers for the import path
   // --------------------------------------------------------------------------
 
-  /** Stub the DB select so the existing-character lookup returns a match. */
+  /** Stub the DB selects so the existing-character lookup returns a match. */
   function stubExistingCharacter() {
-    mockSelect.mockImplementation(() => createSelectChain([existingCharacter]));
+    setSelectResults({
+      // Must match buildInput's excludedTags so no ownership reconcile runs
+      projectSettings: [{ excludedCharacterTags: [] }],
+      projectFiles: [],
+      characters: [existingCharacter],
+    });
   }
 
   /** Stub the DB insert to return a new character (creating path). */
   function stubNewCharacter() {
-    // select returns empty → no existing match, so create path is taken
-    mockSelect.mockImplementation(() => createSelectChain([]));
+    setSelectResults({
+      projectSettings: [{ excludedCharacterTags: [] }],
+      projectFiles: [],
+      characters: [],
+    });
     // insert.returning returns the new character
     mockInsert.mockReturnValue({
       values: vi.fn(() => ({
@@ -349,12 +412,7 @@ describe("CharactersService.importCharacters", () => {
   describe("linker integration", () => {
     it("should pass transaction to linker when linkToLines is true", async () => {
       stubExistingCharacter();
-      // Labels select must return at least one label for the linker path
-      mockSelect.mockImplementation((_table?: unknown) => {
-        // The second select call in the import flow is for labels
-        // Return one label to trigger the linker call
-        return createSelectChain([{ id: "label-1" }]);
-      });
+      setSelectResults({ labels: [{ id: "label-1" }] });
 
       await charactersService.importCharacters(
         projectId,
@@ -374,9 +432,7 @@ describe("CharactersService.importCharacters", () => {
 
     it("should propagate linker errors when linkToLines is true", async () => {
       stubExistingCharacter();
-      mockSelect.mockImplementation((_table?: unknown) => {
-        return createSelectChain([{ id: "label-1" }]);
-      });
+      setSelectResults({ labels: [{ id: "label-1" }] });
       mockLinkSpeakersToLines.mockRejectedValueOnce(
         new Error("Speaker linking failed")
       );
@@ -397,15 +453,13 @@ describe("CharactersService.detectCharacters", () => {
   const userId = "user-123";
 
   beforeEach(() => {
-    // getProjectSettings inserts default settings when none exist
-    mockInsert.mockImplementation(() => ({
-      values: vi.fn(() => ({
-        onConflictDoNothing: vi.fn(() => Promise.resolve()),
-        onConflictDoUpdate: vi.fn(() => Promise.resolve()),
-        returning: vi.fn(() => Promise.resolve([] as unknown[])),
-      })),
-    }));
-    // Select order: projectSettings, characters, projectFiles
+    resetSelectResults();
+    // Restore the default insert chain — the new-character creation tests
+    // override it via mockReturnValue, which survives clearAllMocks.
+    mockInsert.mockReset();
+    mockInsert.mockImplementation(createInsertChain);
+    // Select results by table: projectSettings (via getProjectSettings),
+    // characters, projectFiles
     const settingsRow = {
       projectId,
       excludedCharacterTags: ["n", "u", "narrator", "extend"],
@@ -431,11 +485,10 @@ describe("CharactersService.detectCharacters", () => {
         hasRemoteConflict: false,
       },
     ];
-    const selectResults = [[settingsRow], [], projectFilesRows];
-    let selectIndex = 0;
-    mockSelect.mockImplementation(() => {
-      const resolveValue = selectResults[selectIndex++] ?? [];
-      return createSelectChain(resolveValue);
+    setSelectResults({
+      projectSettings: [settingsRow],
+      characters: [],
+      projectFiles: projectFilesRows,
     });
   });
 
@@ -475,7 +528,8 @@ describe("CharactersService.updateCharacter", () => {
   let updateSetFn: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
-    mockSelect.mockImplementation(() => createSelectChain([variableCharacter]));
+    resetSelectResults();
+    setSelectResults({ characters: [variableCharacter] });
 
     updateSetFn = vi.fn(() => ({
       where: vi.fn(() => ({

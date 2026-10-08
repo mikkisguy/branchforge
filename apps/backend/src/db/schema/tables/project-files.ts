@@ -14,7 +14,9 @@ import {
   index,
   uniqueIndex,
   boolean,
+  jsonb,
 } from "drizzle-orm/pg-core";
+import type { CharacterSourceDefinition } from "@branchforge/shared";
 import { sql } from "drizzle-orm";
 import { projectFileTypeEnum, fileSourceEnum } from "../enums.js";
 import { projects } from "./projects.js";
@@ -38,6 +40,10 @@ export const projectFiles = pgTable(
     fileType: projectFileTypeEnum("file_type").notNull(),
     content: text("content").notNull(), // Full RPY file content for Script Mode (reconstructed from label_lines)
     originalContent: text("original_content"), // Original imported content (used as base for reconstruction)
+    /** Accepted import declarations, including changes invisible after stripping. */
+    characterDefinitions: jsonb("character_definitions").$type<
+      Record<string, CharacterSourceDefinition>
+    >(),
     contentHash: text("content_hash").notNull(), // SHA-256 hash for idempotency
 
     // GitLab-specific (nullable for non-GitLab sources)

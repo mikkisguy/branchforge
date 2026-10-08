@@ -82,6 +82,11 @@ export function WizardConflicts({
                 current: conflict.existingColor,
                 imported: conflict.detectedColor,
               },
+              definition: {
+                label: "Styling / options",
+                current: conflict.existingDefinition ?? "",
+                imported: conflict.detectedDefinition ?? "",
+              },
             };
             const id = `${choiceId}-${index}`;
             return (

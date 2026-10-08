@@ -31,6 +31,10 @@ vi.mock("../rpy-generator.service.js", () => ({
   normalizeCharacterNameType: vi.fn((nameType: string) => nameType),
 }));
 
+vi.mock("../character-source-preservation.service.js", () => ({
+  ensureCharacterSourcePreservation: vi.fn(async () => {}),
+}));
+
 vi.mock("../../lib/logger.js", () => ({
   logInfo: vi.fn(),
   logWarn: vi.fn(),
@@ -170,6 +174,8 @@ describe("ExportService", () => {
       );
       const content =
         "default quick_menu = True\r\nlabel ui_label:\r\n    return\r\n";
+      resolveQueue.push([]); // project settings
+      resolveQueue.push([{ name: "Protected UI" }]); // project
       resolveQueue.push([
         {
           id: "ui-file",
@@ -191,7 +197,6 @@ describe("ExportService", () => {
       resolveQueue.push([]);
       resolveQueue.push([]);
       resolveQueue.push([]);
-      mockDb.limit.mockResolvedValueOnce([{ name: "Protected UI" }]);
       mockDb.returning.mockResolvedValueOnce([
         {
           id: EXPORT_ID,
@@ -252,7 +257,9 @@ describe("ExportService", () => {
         createdAt: new Date("2024-01-01T00:00:00Z"),
       };
 
-      // Queue: files, labels, variables, stats, characters, cleanup
+      // Queue: settings, files, labels, variables, stats, characters, cleanup
+      resolveQueue.push([]); // project settings
+      resolveQueue.push([mockProject]); // project
       resolveQueue.push(mockFiles);
       resolveQueue.push(mockLabels);
       resolveQueue.push([]);
@@ -260,8 +267,6 @@ describe("ExportService", () => {
       resolveQueue.push([]);
       resolveQueue.push([]);
 
-      // Project query: limit(1) returns the project
-      mockDb.limit.mockResolvedValueOnce([mockProject]);
       // Insert: returning returns export record
       mockDb.returning.mockResolvedValueOnce([mockExportRecord]);
 
@@ -327,6 +332,8 @@ describe("ExportService", () => {
         createdAt: new Date("2024-01-01T00:00:00Z"),
       };
 
+      resolveQueue.push([]); // project settings
+      resolveQueue.push([mockProject]); // project
       resolveQueue.push(mockFiles);
       resolveQueue.push([]); // labels
       resolveQueue.push([]); // variables
@@ -334,7 +341,6 @@ describe("ExportService", () => {
       resolveQueue.push([]); // characters
       resolveQueue.push([]); // cleanup
 
-      mockDb.limit.mockResolvedValueOnce([mockProject]);
       mockDb.returning.mockResolvedValueOnce([mockExportRecord]);
 
       const result = await generateExport(PROJECT_ID, USER_ID);
@@ -387,6 +393,8 @@ describe("ExportService", () => {
         createdAt: new Date("2024-01-01T00:00:00Z"),
       };
 
+      resolveQueue.push([]); // project settings
+      resolveQueue.push([mockProject]); // project
       resolveQueue.push(mockFiles);
       resolveQueue.push([]); // labels
       resolveQueue.push([]); // variables
@@ -394,7 +402,6 @@ describe("ExportService", () => {
       resolveQueue.push([]); // characters
       resolveQueue.push([]); // cleanup
 
-      mockDb.limit.mockResolvedValueOnce([mockProject]);
       mockDb.returning.mockResolvedValueOnce([mockExportRecord]);
 
       await generateExport(PROJECT_ID, USER_ID);
@@ -466,7 +473,9 @@ describe("ExportService", () => {
         createdAt: new Date("2024-01-01T00:00:00Z"),
       };
 
-      // Queue: files, labels, variables, stats, characters, cleanup
+      // Queue: settings, files, labels, variables, stats, characters, cleanup
+      resolveQueue.push([]); // project settings
+      resolveQueue.push([mockProject]); // project
       resolveQueue.push(mockFiles);
       resolveQueue.push(mockLabels);
       resolveQueue.push(mockVars);
@@ -474,7 +483,6 @@ describe("ExportService", () => {
       resolveQueue.push(mockChars);
       resolveQueue.push([]);
 
-      mockDb.limit.mockResolvedValueOnce([mockProject]);
       mockDb.returning.mockResolvedValueOnce([mockExportRecord]);
 
       const result = await generateExport(PROJECT_ID, USER_ID);
@@ -524,6 +532,8 @@ describe("ExportService", () => {
         createdAt: new Date("2024-01-01T00:00:00Z"),
       };
 
+      resolveQueue.push([]); // project settings
+      resolveQueue.push([mockProject]); // project
       resolveQueue.push(mockFiles); // files
       resolveQueue.push([]); // labels
       resolveQueue.push([{ key: "v", description: null, category: null }]);
@@ -541,7 +551,6 @@ describe("ExportService", () => {
       ]);
       resolveQueue.push([]); // cleanup
 
-      mockDb.limit.mockResolvedValueOnce([mockProject]);
       mockDb.returning.mockResolvedValueOnce([mockExportRecord]);
 
       // Capture the JSON content the service hands to the DB.
@@ -617,6 +626,8 @@ describe("ExportService", () => {
         createdAt: new Date("2024-01-01T00:00:00Z"),
       };
 
+      resolveQueue.push([]); // project settings
+      resolveQueue.push([mockProject]); // project
       resolveQueue.push(mockFiles); // files
       resolveQueue.push([]); // labels
       resolveQueue.push([]); // variables
@@ -624,7 +635,6 @@ describe("ExportService", () => {
       resolveQueue.push([]); // characters (DB-side, not in the file)
       resolveQueue.push([]); // cleanup
 
-      mockDb.limit.mockResolvedValueOnce([mockProject]);
       mockDb.returning.mockResolvedValueOnce([mockExportRecord]);
 
       mockDb.values.mockImplementationOnce(
@@ -701,6 +711,8 @@ describe("ExportService", () => {
         createdAt: new Date("2024-01-01T00:00:00Z"),
       };
 
+      resolveQueue.push([]); // project settings
+      resolveQueue.push([mockProject]); // project
       resolveQueue.push(mockFiles); // files
       resolveQueue.push([]); // labels
       resolveQueue.push([{ key: "v", description: null, category: null }]);
@@ -708,7 +720,6 @@ describe("ExportService", () => {
       resolveQueue.push([]); // characters
       resolveQueue.push([]); // cleanup
 
-      mockDb.limit.mockResolvedValueOnce([mockProject]);
       mockDb.returning.mockResolvedValueOnce([mockExportRecord]);
 
       mockDb.values.mockImplementationOnce(
@@ -779,6 +790,8 @@ describe("ExportService", () => {
         createdAt: new Date("2024-01-01T00:00:00Z"),
       };
 
+      resolveQueue.push([]); // project settings
+      resolveQueue.push([mockProject]); // project
       resolveQueue.push(mockFiles); // files
       resolveQueue.push([]); // labels
       resolveQueue.push([{ key: "v", description: null, category: null }]);
@@ -786,7 +799,6 @@ describe("ExportService", () => {
       resolveQueue.push([]); // characters
       resolveQueue.push([]); // cleanup
 
-      mockDb.limit.mockResolvedValueOnce([mockProject]);
       mockDb.returning.mockResolvedValueOnce([mockExportRecord]);
 
       mockDb.values.mockImplementationOnce(
@@ -840,8 +852,9 @@ describe("ExportService", () => {
     });
 
     it("should throw NotFoundError when project has no files", async () => {
+      resolveQueue.push([]); // project settings
       // Project found
-      mockDb.limit.mockResolvedValueOnce([{ name: "Empty Project" }]);
+      resolveQueue.push([{ name: "Empty Project" }]);
       // Files query returns [] — nothing in queue, falls back to []
       resolveQueue.push([]);
 
@@ -869,14 +882,14 @@ describe("ExportService", () => {
         },
       ];
 
+      resolveQueue.push([]); // project settings
+      resolveQueue.push([mockProject]); // project
       resolveQueue.push(mockFiles); // files
       resolveQueue.push([]); // labels
       resolveQueue.push([]); // variables
       resolveQueue.push([]); // stats
       resolveQueue.push([]); // characters
       resolveQueue.push([]); // cleanup
-
-      mockDb.limit.mockResolvedValueOnce([mockProject]);
 
       // Intercept .values() to capture the fileName the service computed
       // so we can seed the returning() mock with it
@@ -985,6 +998,7 @@ describe("ExportService", () => {
 
   describe("getExportPreview", () => {
     it("previews only managed symbols not declared in protected source", async () => {
+      resolveQueue.push([]); // project settings
       resolveQueue.push([{ key: "quick_menu" }, { key: "met_nelson" }]);
       resolveQueue.push([{ key: "text_scale" }, { key: "trust" }]);
       resolveQueue.push([
@@ -1029,10 +1043,12 @@ describe("ExportService", () => {
     });
 
     it("should call requireProjectAccess", async () => {
-      // All empty — 3 dequeue calls: variables, stats, characters
-      resolveQueue.push([]);
-      resolveQueue.push([]);
-      resolveQueue.push([]);
+      // Five queries: settings, variables, stats, characters, source files
+      resolveQueue.push([]); // project settings
+      resolveQueue.push([]); // variables
+      resolveQueue.push([]); // stats
+      resolveQueue.push([]); // characters
+      resolveQueue.push([]); // source files
 
       await getExportPreview(PROJECT_ID, USER_ID);
 
@@ -1044,9 +1060,11 @@ describe("ExportService", () => {
     });
 
     it("should return isEmpty true with emptyReason when all sources are empty", async () => {
+      resolveQueue.push([]); // project settings
       resolveQueue.push([]); // variables
       resolveQueue.push([]); // stats
       resolveQueue.push([]); // characters
+      resolveQueue.push([]); // source files
 
       const result: ExportPreviewResponse = await getExportPreview(
         PROJECT_ID,
@@ -1099,9 +1117,11 @@ describe("ExportService", () => {
         },
       ];
 
+      resolveQueue.push([]); // project settings
       resolveQueue.push(mockVars);
       resolveQueue.push(mockStats);
       resolveQueue.push(mockChars);
+      resolveQueue.push([]); // source files
 
       const result: ExportPreviewResponse = await getExportPreview(
         PROJECT_ID,
@@ -1118,9 +1138,11 @@ describe("ExportService", () => {
     });
 
     it("should return files in order: variables, stats, definitions", async () => {
-      resolveQueue.push([]);
-      resolveQueue.push([]);
-      resolveQueue.push([]);
+      resolveQueue.push([]); // project settings
+      resolveQueue.push([]); // variables
+      resolveQueue.push([]); // stats
+      resolveQueue.push([]); // characters
+      resolveQueue.push([]); // source files
 
       const result: ExportPreviewResponse = await getExportPreview(
         PROJECT_ID,
@@ -1163,9 +1185,11 @@ describe("ExportService", () => {
         },
       ];
 
+      resolveQueue.push([]); // project settings
       resolveQueue.push(mockVars);
       resolveQueue.push(mockStats);
       resolveQueue.push(mockChars);
+      resolveQueue.push([]); // source files
 
       await getExportPreview(PROJECT_ID, USER_ID);
 
@@ -1175,9 +1199,11 @@ describe("ExportService", () => {
     });
 
     it("should include generated content even when source is empty", async () => {
-      resolveQueue.push([]);
-      resolveQueue.push([]);
-      resolveQueue.push([]);
+      resolveQueue.push([]); // project settings
+      resolveQueue.push([]); // variables
+      resolveQueue.push([]); // stats
+      resolveQueue.push([]); // characters
+      resolveQueue.push([]); // source files
 
       const result: ExportPreviewResponse = await getExportPreview(
         PROJECT_ID,
@@ -1219,14 +1245,16 @@ describe("ExportService", () => {
         createdAt: new Date("2024-01-01T00:00:00Z"),
       };
 
+      resolveQueue.push([]); // project settings
+      resolveQueue.push([mockProject]); // project
       resolveQueue.push(mockFiles); // files
       resolveQueue.push([]); // labels
       resolveQueue.push([]); // variables
       resolveQueue.push([]); // stats
       resolveQueue.push([]); // characters
+      resolveQueue.push([]); // source files
       resolveQueue.push([]); // cleanup — no old exports
 
-      mockDb.limit.mockResolvedValueOnce([mockProject]);
       mockDb.returning.mockResolvedValueOnce([mockExportRecord]);
 
       await generateExport(PROJECT_ID, USER_ID);

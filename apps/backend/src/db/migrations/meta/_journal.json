@@ -421,6 +421,13 @@
       "when": 1789891965003,
       "tag": "0059_fine_saracen",
       "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1791306293585,
+      "tag": "0060_fluffy_colossus",
+      "breakpoints": true
     }
   ]
 }

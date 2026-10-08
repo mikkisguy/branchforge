@@ -1,0 +1,3 @@
+/** Keep actions discoverable on mobile and touch; reveal on hover on desktop. */
+export const ROW_MENU_TRIGGER_CLASSNAME =
+  "size-11 min-w-11 shrink-0 rounded-md text-muted-foreground/70 opacity-100 transition-[opacity,color,background-color] hover:bg-muted hover:text-foreground focus-visible:bg-muted group-hover/row:opacity-100 [&[aria-expanded=true]]:bg-muted [&[aria-expanded=true]]:text-foreground [&[aria-expanded=true]]:opacity-100 [@media(min-width:768px)_and_(hover:hover)_and_(pointer:fine)]:size-6 [@media(min-width:768px)_and_(hover:hover)_and_(pointer:fine)]:min-w-6 [@media(min-width:768px)_and_(hover:hover)_and_(pointer:fine)]:opacity-0 [@media(min-width:768px)_and_(hover:hover)_and_(pointer:fine)]:focus-visible:opacity-100";

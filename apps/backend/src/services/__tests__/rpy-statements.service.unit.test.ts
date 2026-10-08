@@ -21,8 +21,6 @@ const VARIABLE_NOTICE =
   "# [BranchForge] Managed boolean variable defaults were moved out of this file (exported as branchforge_variables.rpy).";
 const STAT_NOTICE =
   "# [BranchForge] Managed numeric stat defaults were moved out of this file (exported as branchforge_stats.rpy).";
-const CHARACTER_STAT_NOTICE =
-  "# [BranchForge] Managed character definitions and numeric stat defaults were moved out of this file (exported as branchforge_definitions.rpy, branchforge_stats.rpy).";
 
 describe("rpy-statements.service", () => {
   // ---------------------------------------------------------------------
@@ -103,7 +101,7 @@ describe("rpy-statements.service", () => {
     it("returns empty arrays and unchanged content for empty input", () => {
       const result = extractAndStripRpySymbols("");
       expect(result.cleanedContent).toBe("");
-      expect(result.characters).toEqual([]);
+      expect(result.characters).toMatchObject([]);
       expect(result.variables).toEqual([]);
       expect(result.stats).toEqual([]);
     });
@@ -122,7 +120,7 @@ describe("rpy-statements.service", () => {
 
       const result = extractAndStripRpySymbols(content);
       expect(result.cleanedContent).toBe(content);
-      expect(result.characters).toEqual([]);
+      expect(result.characters).toMatchObject([]);
       expect(result.variables).toEqual([]);
       expect(result.stats).toEqual([]);
     });
@@ -137,7 +135,7 @@ describe("rpy-statements.service", () => {
       ].join("\n");
 
       const result = extractAndStripRpySymbols(content);
-      expect(result.characters).toEqual([
+      expect(result.characters).toMatchObject([
         { tag: "e", name: "Eileen", color: "#c8ffc8" },
       ]);
       expect(result.cleanedContent).not.toContain("define e = Character");
@@ -161,7 +159,7 @@ describe("rpy-statements.service", () => {
       ].join("\n");
 
       const result = extractAndStripRpySymbols(content);
-      expect(result.characters).toEqual([
+      expect(result.characters).toMatchObject([
         // who_color wins over color when both are present
         { tag: "e", name: "Eileen", color: "#c8c8c8" },
       ]);
@@ -185,7 +183,7 @@ describe("rpy-statements.service", () => {
       ].join("\n");
 
       const result = extractAndStripRpySymbols(content);
-      expect(result.characters).toEqual([
+      expect(result.characters).toMatchObject([
         { tag: "e", name: "Eileen", color: "#c8ffc8" },
         { tag: "s", name: "Sylvie", color: "#ff0000" },
         { tag: "l", name: "Lucy", color: "#0000ff" },
@@ -208,7 +206,7 @@ describe("rpy-statements.service", () => {
       ].join("\n");
 
       const result = extractAndStripRpySymbols(content);
-      expect(result.characters).toEqual([
+      expect(result.characters).toMatchObject([
         { tag: "e", name: "Eileen", color: "#c8ffc8" },
       ]);
       expect(result.cleanedContent).not.toContain("define e = Character");
@@ -227,7 +225,7 @@ describe("rpy-statements.service", () => {
       ].join("\n");
 
       const multi = extractAndStripRpySymbols(multiLine);
-      expect(multi.characters).toEqual([
+      expect(multi.characters).toMatchObject([
         { tag: "s", name: "Sylvie", color: "#ff0000" },
       ]);
       expect(multi.cleanedContent).not.toContain("define s = Character");
@@ -313,7 +311,7 @@ describe("rpy-statements.service", () => {
       ].join("\n");
 
       const result = extractAndStripRpySymbols(content);
-      expect(result.characters).toEqual([
+      expect(result.characters).toMatchObject([
         { tag: "e", name: "Eileen", color: "#c8ffc8" },
       ]);
       expect(result.cleanedContent).not.toContain("default e = Character");
@@ -361,7 +359,7 @@ describe("rpy-statements.service", () => {
       );
     });
 
-    it("removes indented managed lines while keeping surrounding indented content", () => {
+    it("preserves indented characters while retaining default handling", () => {
       const content = [
         '  define e = Character("Eileen", color="#c8ffc8")',
         "  default affection = 0",
@@ -371,15 +369,15 @@ describe("rpy-statements.service", () => {
       ].join("\n");
 
       const result = extractAndStripRpySymbols(content);
-      expect(result.characters).toEqual([
-        { tag: "e", name: "Eileen", color: "#c8ffc8" },
-      ]);
+      expect(result.characters).toEqual([]);
       expect(result.stats).toEqual([
         { key: "affection", value: "0", kind: "stat" },
       ]);
-      expect(result.cleanedContent).not.toContain("define e = Character");
+      expect(result.cleanedContent).toContain("define e = Character");
       expect(result.cleanedContent).not.toContain("default affection");
-      expect(result.cleanedContent.split("\n")[0]).toBe(CHARACTER_STAT_NOTICE);
+      expect(result.cleanedContent.split("\n")[0]).toBe(
+        "# [BranchForge] Managed numeric stat defaults were moved out of this file (exported as branchforge_stats.rpy)."
+      );
       expect(result.cleanedContent.split("\n")[1]).toBe("");
       expect(result.cleanedContent).toContain("label start:");
       expect(result.cleanedContent).toContain("    return");
@@ -409,25 +407,23 @@ describe("rpy-statements.service", () => {
 
       const result = extractAndStripRpySymbols(content);
       expect(result.cleanedContent).toBe(content);
-      expect(result.characters).toEqual([]);
+      expect(result.characters).toMatchObject([]);
       expect(result.variables).toEqual([]);
       expect(result.stats).toEqual([]);
     });
 
     it("preserves unparseable Character() definitions instead of stripping them", () => {
-      // Bare identifiers (and other non-quoted / non-None forms) are
-      // not safely promotable today — deleting them would lose
-      // author content. Also guards against mistaking color="#..."
-      // for the display name.
+      // Complex name expressions remain source-owned rather than risking
+      // changes to their Python semantics.
       const content = [
-        'define boss = Character(boss_name, color="#ff0000")',
+        'define boss = Character(get_boss_name(), color="#ff0000")',
         "",
         "label start:",
         "    return",
       ].join("\n");
 
       const result = extractAndStripRpySymbols(content);
-      expect(result.characters).toEqual([]);
+      expect(result.characters).toMatchObject([]);
       expect(result.cleanedContent).toBe(content);
       expect(result.cleanedContent).not.toContain("# [BranchForge]");
     });
@@ -462,7 +458,7 @@ describe("rpy-statements.service", () => {
       ].join("\n");
 
       const result = extractAndStripRpySymbols(content);
-      expect(result.characters).toEqual([
+      expect(result.characters).toMatchObject([
         { tag: "e", name: "Eileen", color: "#c8ffc8" },
       ]);
     });
@@ -475,8 +471,8 @@ describe("rpy-statements.service", () => {
         "    return",
       ].join("\n");
 
-      const result = extractAndStripRpySymbols(content);
-      expect(result.characters).toEqual([
+      const result = extractAndStripRpySymbols(content, undefined, new Set());
+      expect(result.characters).toMatchObject([
         { tag: "n", name: null, color: "#c8c8c8" },
       ]);
     });
@@ -490,7 +486,7 @@ describe("rpy-statements.service", () => {
       ].join("\n");
 
       const result = extractAndStripRpySymbols(content);
-      expect(result.characters).toEqual([
+      expect(result.characters).toMatchObject([
         { tag: "s", name: "Sylvie", color: "#cfcfcf" },
       ]);
     });
