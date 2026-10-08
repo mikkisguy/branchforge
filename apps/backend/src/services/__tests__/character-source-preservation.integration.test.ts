@@ -1,3 +1,4 @@
+import JSZip from "jszip";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { getDb } from "../../db/index.js";
@@ -21,6 +22,7 @@ import {
   collectSourceOwnedRpySymbolKeys,
 } from "../rpy-statements.service.js";
 import { generateCharacterDefinitionsFile } from "../rpy-generator.service.js";
+import { importZipFile } from "../zip-import.service.js";
 
 const userId = testUuid("09000000", 71);
 const projectId = testUuid("19000000", 71);
@@ -100,7 +102,7 @@ describe("character preservation maintenance", () => {
     expect(after.content).toBe(removed);
   });
 
-  it("transfers a styled managed character into source ownership without changing unrelated defaults", async () => {
+  it("retains excluded declaration edits when returning to managed ownership without changing unrelated defaults", async () => {
     await ensureCharacterSourcePreservation(projectId);
     await db.transaction(async (tx) => {
       await reconcileCharacterOwnership(
@@ -122,9 +124,17 @@ describe("character preservation maintenance", () => {
         "e"
       )
     ).toBe(true);
+    const editedContent =
+      file.content.replace(
+        'Character("Locally edited", color="#112233", what_italic=False, what_font="font.ttf")',
+        'Character(hero_name, color="#445566", what_italic=False, what_font="edited.ttf")'
+      ) + "\ndefault future_flag = True";
     await db
       .update(projectFiles)
-      .set({ content: file.content + "\ndefault future_flag = True" })
+      .set({
+        content: editedContent,
+        contentHash: calculateContentHash(editedContent),
+      })
       .where(eq(projectFiles.id, file.id));
     await db.transaction(async (tx) => {
       await reconcileCharacterOwnership(
@@ -140,6 +150,37 @@ describe("character preservation maintenance", () => {
       .where(eq(projectFiles.id, file.id));
     expect(after.content).not.toContain("define e =");
     expect(after.content).toContain("default future_flag = True");
+    const [character] = await db
+      .select()
+      .from(characters)
+      .where(eq(characters.projectId, projectId));
+    expect(character.name).toBe("hero_name");
+    expect(character.color).toBe("#445566");
+    expect(character.nameType).toBe("variable");
+    expect(character.sourceDefinition?.declaration).toContain(
+      'what_font="edited.ttf"'
+    );
+    expect(
+      generateCharacterDefinitionsFile([{ ...character, nameType: "variable" }])
+    ).toContain(
+      'Character(hero_name, color="#445566", what_italic=False, what_font="edited.ttf")'
+    );
+  });
+
+  it("skips an unchanged one-file ZIP re-import when declaration snapshots match semantically", async () => {
+    await db.delete(projectFiles).where(eq(projectFiles.projectId, projectId));
+    await db.delete(characters).where(eq(characters.projectId, projectId));
+    const zip = new JSZip();
+    zip.file("game/only.rpy", original);
+    const buffer = await zip.generateAsync({ type: "nodebuffer" });
+    const first = await importZipFile(projectId, buffer);
+    expect(first.success).toBe(true);
+    if (!first.success) return;
+    expect(first.filesImported + first.filesUpdated).toBeGreaterThan(0);
+    const second = await importZipFile(projectId, buffer);
+    expect(second.success).toBe(true);
+    if (!second.success) return;
+    expect(second.filesSkipped).toBe(1);
   });
 
   it("uses custom source ownership in legacy pending-change summaries", async () => {

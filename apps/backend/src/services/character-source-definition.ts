@@ -430,3 +430,28 @@ export function renderCharacterSourceDefinition(
   }
   return result;
 }
+
+/** Compare declaration snapshots without relying on JSON key order. */
+export function sameCharacterDefinitions(
+  left: Record<string, CharacterSourceDefinition> | null | undefined,
+  right: Record<string, CharacterSourceDefinition> | null | undefined
+): boolean {
+  const a = left ?? {};
+  const b = right ?? {};
+  const tagsA = Object.keys(a);
+  if (tagsA.length !== Object.keys(b).length) return false;
+  for (const tag of tagsA) {
+    if (!Object.hasOwn(b, tag)) return false;
+    const la = a[tag];
+    const rb = b[tag];
+    if (
+      la.declaration !== rb.declaration ||
+      la.name !== rb.name ||
+      la.nameType !== rb.nameType ||
+      la.color !== rb.color
+    ) {
+      return false;
+    }
+  }
+  return true;
+}

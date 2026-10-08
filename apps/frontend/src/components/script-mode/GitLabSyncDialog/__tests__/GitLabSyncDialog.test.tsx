@@ -124,45 +124,50 @@ describe("GitLabSyncDialog", () => {
           name: "Export to main",
         });
         await waitFor(() => expect(button).toBeEnabled());
-        fireEvent.click(button);
-        await waitFor(() => expect(mockExport).toHaveBeenCalledOnce());
-        await act(async () => {
-          await Promise.resolve();
-        });
-        mockSyncState.operation = result;
-        view.rerender(
-          <QueryClientProvider client={queryClient}>
-            <GitLabSyncDialog
-              open
-              onOpenChange={onOpenChange}
-              operationType="export"
-              projectId="project-1"
-            />
-          </QueryClientProvider>
-        );
-        if (noChanges) {
-          expect(screen.getByRole("status")).toHaveTextContent(
-            "No changes to push."
-          );
-          expect(
-            screen.queryByText("Export completed")
-          ).not.toBeInTheDocument();
-          expect(successToast).not.toHaveBeenCalled();
+        vi.useFakeTimers();
+        try {
           await act(async () => {
-            await new Promise((resolve) => setTimeout(resolve, 1100));
+            fireEvent.click(button);
+            await vi.advanceTimersByTimeAsync(0);
           });
-          expect(onOpenChange).not.toHaveBeenCalled();
-          fireEvent.click(screen.getByRole("button", { name: "Close" }));
-          expect(onOpenChange).toHaveBeenCalledWith(false);
-        } else {
-          expect(screen.getByText("Export completed")).toBeInTheDocument();
-          expect(successToast).toHaveBeenCalledWith(
-            "Export completed successfully"
+          expect(mockExport).toHaveBeenCalledOnce();
+          mockSyncState.operation = result;
+          view.rerender(
+            <QueryClientProvider client={queryClient}>
+              <GitLabSyncDialog
+                open
+                onOpenChange={onOpenChange}
+                operationType="export"
+                projectId="project-1"
+              />
+            </QueryClientProvider>
           );
-          await waitFor(
-            () => expect(onOpenChange).toHaveBeenCalledWith(false),
-            { timeout: 2000 }
-          );
+          if (noChanges) {
+            expect(screen.getByRole("status")).toHaveTextContent(
+              "No changes to push."
+            );
+            expect(
+              screen.queryByText("Export completed")
+            ).not.toBeInTheDocument();
+            expect(successToast).not.toHaveBeenCalled();
+            await act(async () => {
+              await vi.advanceTimersByTimeAsync(1100);
+            });
+            expect(onOpenChange).not.toHaveBeenCalled();
+            fireEvent.click(screen.getByRole("button", { name: "Close" }));
+            expect(onOpenChange).toHaveBeenCalledWith(false);
+          } else {
+            expect(screen.getByText("Export completed")).toBeInTheDocument();
+            expect(successToast).toHaveBeenCalledWith(
+              "Export completed successfully"
+            );
+            await act(async () => {
+              await vi.advanceTimersByTimeAsync(2000);
+            });
+            expect(onOpenChange).toHaveBeenCalledWith(false);
+          }
+        } finally {
+          vi.useRealTimers();
         }
       } finally {
         branchesSpy.mockRestore();

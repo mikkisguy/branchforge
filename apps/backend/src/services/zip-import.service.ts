@@ -28,6 +28,7 @@ import {
   isSourceOwnedRpyFile,
 } from "./rpy-statements.service.js";
 import { DEFAULT_EXCLUDED_RENPY_TAGS } from "./rpy-statements.service.js";
+import { sameCharacterDefinitions } from "./character-source-definition.js";
 import {
   characterDefinitionSnapshot,
   ensureCharacterSourcePreservation,
@@ -516,9 +517,10 @@ async function processFileInTransaction(
       .limit(1);
 
     if (existing) {
-      const snapshotChanged =
-        JSON.stringify(existing.characterDefinitions ?? {}) !==
-        JSON.stringify(entry.characterDefinitions);
+      const snapshotChanged = !sameCharacterDefinitions(
+        existing.characterDefinitions,
+        entry.characterDefinitions
+      );
 
       if (existing.contentHash === entry.contentHash) {
         if (!snapshotChanged) {

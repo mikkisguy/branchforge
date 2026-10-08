@@ -11,6 +11,7 @@ import { calculateContentHash } from "../lib/hash.js";
 import {
   parseCharacterDefinitions,
   renderCharacterSourceDefinition,
+  sameCharacterDefinitions,
 } from "./character-source-definition.js";
 import {
   BRANCHFORGE_MANAGED_NOTICE,
@@ -354,7 +355,14 @@ export async function reconcileCharacterOwnership(
       if (existing) {
         await tx
           .update(characters)
-          .set({ sourceDefinition: definition.sourceDefinition })
+          .set({
+            name: definition.name ?? definition.tag,
+            ...(definition.nameType !== undefined
+              ? { nameType: definition.nameType }
+              : {}),
+            color: definition.color,
+            sourceDefinition: definition.sourceDefinition,
+          })
           .where(eq(characters.id, existing.id));
       } else {
         await tx
@@ -374,7 +382,7 @@ export async function reconcileCharacterOwnership(
     if (
       content === initialContents.get(file.id) &&
       file.characterDefinitions !== null &&
-      JSON.stringify(definitions) === JSON.stringify(file.characterDefinitions)
+      sameCharacterDefinitions(definitions, file.characterDefinitions)
     )
       continue;
     await tx

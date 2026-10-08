@@ -3,6 +3,7 @@ import {
   characterStylingSignature,
   parseCharacterDefinitions,
   renderCharacterSourceDefinition,
+  sameCharacterDefinitions,
 } from "../character-source-definition.js";
 import { generateCharacterDefinitionsFile } from "../rpy-generator.service.js";
 import { extractAndStripRpySymbols } from "../rpy-statements.service.js";
@@ -27,6 +28,24 @@ function render(
     ...edits,
   });
 }
+
+describe("sameCharacterDefinitions", () => {
+  const e = parseCharacterDefinitions(
+    'define e = Character("E", color="#abcdef", what_font="font.ttf")'
+  )[0]!.sourceDefinition;
+
+  it("matches snapshots with different key order", () => {
+    expect(
+      sameCharacterDefinitions({ e, narrator: e }, { narrator: e, e })
+    ).toBe(true);
+  });
+
+  it("detects semantic field changes", () => {
+    expect(
+      sameCharacterDefinitions({ e }, { e: { ...e, color: "#000000" } })
+    ).toBe(false);
+  });
+});
 
 describe("character source preservation", () => {
   it("preserves the exact narrator definition as source-owned", () => {
