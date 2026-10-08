@@ -1,5 +1,6 @@
 ---
+"@branchforge/backend": patch
 "@branchforge/frontend": patch
 ---
 
-Improved secondary menus for mobile use.
+Improved mobile/touch label and file menus, and preserved character styling/ownership across updates.

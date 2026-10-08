@@ -4,4 +4,4 @@
 "@branchforge/shared": patch
 ---
 
-Fixed label action menus for mobile
+Fixed character list refreshes on script edits, import style conflicts, and no-op GitLab sync reporting.
