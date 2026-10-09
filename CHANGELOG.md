@@ -4,6 +4,10 @@ All notable changes to BranchForge will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v1.0.0-beta.18 - 2026-10-09
+
+- Fixed missing character definitions in exports and automatic returns breaking label flow.
+
 ## v1.0.0-beta.17 - 2026-10-08
 
 - Improved mobile/touch label and file menus, and preserved character styling/ownership across updates.
