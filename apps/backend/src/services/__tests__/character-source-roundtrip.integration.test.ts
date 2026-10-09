@@ -1,6 +1,6 @@
 import JSZip from "jszip";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { getDb } from "../../db/index.js";
 import {
   users,
@@ -8,6 +8,8 @@ import {
   projectFiles,
   projectSettings,
   characters,
+  labels,
+  labelLines,
 } from "../../db/schema/index.js";
 import { testEmail, testUuid } from "../../utils/test-ids.js";
 import {
@@ -17,6 +19,7 @@ import {
 import { importZipFile } from "../zip-import.service.js";
 import { updateFileContent } from "../projects.service.js";
 import { charactersService } from "../characters.service.js";
+import { characterLinkerService } from "../character-linker.service.js";
 import {
   generateExport,
   getExportForDownload,
@@ -60,6 +63,65 @@ describe("character source round trips", () => {
   afterEach(async () => {
     await db.delete(projects).where(eq(projects.id, projectId));
     await db.delete(users).where(eq(users.id, userId));
+  });
+
+  it("imports, links, previews, and exports n and u as ordinary characters", async () => {
+    const declarations = [
+      'define u = Character("???", color="#E4E4E4")',
+      'define n = Character("N", color="#123456", what_italic=True)',
+    ];
+    const source = `${declarations.join("\n")}
+label start:
+    u "Who are you?"
+    n "I am N."
+    return`;
+    const imported = await importZipFile(projectId, await archive(source));
+    expect(imported.success).toBe(true);
+    const rows = await db
+      .select()
+      .from(characters)
+      .where(eq(characters.projectId, projectId));
+    expect(rows.map((row) => row.renpyTag).sort()).toEqual(["n", "u"]);
+    const scenes = await db
+      .select()
+      .from(labels)
+      .where(eq(labels.projectId, projectId));
+    const labelIds = scenes.map((scene) => scene.id);
+    await db
+      .update(labelLines)
+      .set({ speakerId: null })
+      .where(inArray(labelLines.labelId, labelIds));
+    const linked = await characterLinkerService.linkSpeakersToLines(
+      projectId,
+      labelIds
+    );
+    expect(linked.linked).toBe(2);
+    const lines = await db
+      .select()
+      .from(labelLines)
+      .where(inArray(labelLines.labelId, labelIds))
+      .orderBy(labelLines.sequence);
+    expect(lines.map((line) => line.speakerId)).toEqual([
+      rows.find((row) => row.renpyTag === "u")!.id,
+      rows.find((row) => row.renpyTag === "n")!.id,
+    ]);
+    const preview = await getExportPreview(projectId, userId);
+    const definitions = preview.files.find(
+      (file) => file.kind === "definitions"
+    )!.content;
+    for (const declaration of declarations) {
+      expect(definitions).toContain(declaration);
+    }
+    const exported = await generateExport(projectId, userId);
+    const download = await getExportForDownload(exported.id, projectId, userId);
+    const files = JSON.parse(download.content) as Record<string, string>;
+    expect(files["game/branchforge_definitions.rpy"]).toBe(definitions);
+    const combined = Object.values(files).join("\n");
+    for (const tag of ["u", "n"]) {
+      expect(
+        combined.match(new RegExp(`^define ${tag} = Character`, "gm"))
+      ).toHaveLength(1);
+    }
   });
 
   it("preserves narrator source and managed styling through real ZIP import, edits, preview, and export", async () => {

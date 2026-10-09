@@ -18,6 +18,7 @@ import {
   projectFiles,
 } from "../db/schema/index.js";
 import { eq, and, inArray, isNull, sql } from "drizzle-orm";
+import { DEFAULT_EXCLUDED_CHARACTER_TAGS } from "@branchforge/shared";
 import {
   parseRPYFileWithLabels,
   convertToBranchForgeFormatFromLabels,
@@ -45,9 +46,10 @@ export interface SpeakerLinkResult {
 }
 
 /**
- * Default excluded character tags (special Ren'Py characters)
+ * Default excluded character tags (special Ren'Py system speakers),
+ * shared with the rest of the codebase via the shared policy constant.
  */
-const DEFAULT_EXCLUDED_TAGS = new Set(["n", "u", "narrator", "extend"]);
+const DEFAULT_EXCLUDED_TAGS = new Set<string>(DEFAULT_EXCLUDED_CHARACTER_TAGS);
 
 /**
  * Character Linker Service

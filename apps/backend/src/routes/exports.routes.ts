@@ -25,6 +25,7 @@ import {
   NotFoundError,
   ForbiddenError,
   RateLimitError,
+  ConflictError,
 } from "../middleware/error-handler.middleware.js";
 
 // ============================================================================
@@ -92,6 +93,10 @@ async function generateExportHandler(
         error: error.userMessage,
         retryAfter: error.retryAfter,
       });
+      return;
+    }
+    if (error instanceof ConflictError) {
+      reply.status(409).send({ error: error.userMessage });
       return;
     }
     reply.status(500).send({ error: "Internal server error" });
@@ -173,6 +178,10 @@ async function exportPreviewHandler(
         error: error.userMessage,
         retryAfter: error.retryAfter,
       });
+      return;
+    }
+    if (error instanceof ConflictError) {
+      reply.status(409).send({ error: error.userMessage });
       return;
     }
     reply.status(500).send({ error: "Internal server error" });

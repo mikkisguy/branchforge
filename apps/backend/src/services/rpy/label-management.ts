@@ -188,7 +188,7 @@ export function addLabelToRPYContent(
       separator = "\n\n";
     }
 
-    return `${content}${separator}label ${labelName}:\n${indent}return\n`;
+    return `${content}${separator}label ${labelName}:\n${indent}pass\n`;
   }
 
   // Find the label to insert after
@@ -240,7 +240,7 @@ export function addLabelToRPYContent(
 
   // Insert the new label
   const indent = " ".repeat(labelIndent + 4);
-  const labelBlock = `label ${labelName}:\n${indent}return`;
+  const labelBlock = `label ${labelName}:\n${indent}pass`;
 
   const result = [
     ...lines.slice(0, insertAfterLine + 1),

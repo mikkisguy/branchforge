@@ -39,7 +39,9 @@ import {
   ForbiddenError,
   NotFoundError,
   RateLimitError,
+  ConflictError,
 } from "../../middleware/error-handler.middleware.js";
+import { assertExcludedCharactersHaveSourceOwnership } from "../../services/export-consistency.service.js";
 
 // Mock the services
 vi.mock("../../services/export.service.js", () => ({
@@ -123,6 +125,45 @@ describe("Export Routes (Integration)", () => {
     await fastify.close();
     vi.clearAllMocks();
   });
+
+  it.each([
+    {
+      method: "POST" as const,
+      path: "export",
+      service: "generateExport" as const,
+    },
+    {
+      method: "GET" as const,
+      path: "export-preview",
+      service: "getExportPreview" as const,
+    },
+  ])(
+    "returns actionable 409 errors from $path",
+    async ({ method, path, service }) => {
+      let conflict: unknown;
+      try {
+        assertExcludedCharactersHaveSourceOwnership(
+          [{ renpyTag: "u" }],
+          new Set(["u"]),
+          []
+        );
+      } catch (error) {
+        conflict = error;
+      }
+      if (!(conflict instanceof ConflictError)) {
+        throw new Error("Expected an export ownership conflict");
+      }
+      vi.spyOn(exportService, service).mockRejectedValue(conflict);
+      const response = await fastify.inject({
+        method,
+        url: `/projects/${testProjectId}/${path}`,
+      });
+      expect(response.statusCode).toBe(409);
+      expect(response.json()).toEqual({ error: conflict.userMessage });
+      expect(response.json().error).toContain("excluded character tags");
+      expect(response.body).not.toContain(conflict.message);
+    }
+  );
 
   // ===========================================================================
   // POST /projects/:projectId/export

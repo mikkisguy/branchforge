@@ -16,13 +16,14 @@
 
 import { countCharOutsideStrings } from "./rpy-helpers.js";
 import { parseCharacterDefinitions } from "./character-source-definition.js";
-import type {
-  CharacterNameType,
-  CharacterSourceDefinition,
+import {
+  DEFAULT_EXCLUDED_CHARACTER_TAGS,
+  type CharacterNameType,
+  type CharacterSourceDefinition,
 } from "@branchforge/shared";
 
-/** Default Ren'Py special tags excluded from character import. */
-export const DEFAULT_EXCLUDED_RENPY_TAGS = ["n", "u", "narrator", "extend"];
+/** Compatibility alias for the shared default character exclusions. */
+export const DEFAULT_EXCLUDED_RENPY_TAGS = DEFAULT_EXCLUDED_CHARACTER_TAGS;
 
 /**
  * Ren'Py source files whose declarations are owned by the user's project

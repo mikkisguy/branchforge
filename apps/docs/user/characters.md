@@ -27,6 +27,16 @@ Upload an image for each character. The avatar appears in the flow graph and cha
 
 When importing RPY files, BranchForge scans for character definitions and creates character records automatically.
 
+Only Ren'Py's built-in `narrator` and `extend` speakers are excluded by default.
+Tags such as `n` and `u` are ordinary characters, including characters named
+`"???"`. Explicitly excluded characters keep their definitions in source files
+instead of `branchforge_definitions.rpy`.
+
+Older projects may still exclude `n` and `u`. Remove those tags from the excluded
+character tags in project settings to manage them in BranchForge. If an excluded
+project character has no source declaration, export reports a conflict so it
+cannot disappear silently.
+
 ### Dialogue Linking
 
 <!-- screenshot: dialogue-linking.png — Elena dialogue line list, dark theme -->

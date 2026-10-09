@@ -57,6 +57,7 @@ import {
   DEFAULT_EXCLUDED_RENPY_TAGS,
 } from "../rpy-statements.service.js";
 import { ensureCharacterSourcePreservation } from "../character-source-preservation.service.js";
+import { assertExcludedCharactersHaveSourceOwnership } from "../export-consistency.service.js";
 
 import type { SyncOperation } from "../gitlab.types.js";
 import type { CharacterSourceDefinition } from "@branchforge/shared";
@@ -81,6 +82,7 @@ import { logWarn } from "../../lib/logger.js";
 import {
   NotFoundError,
   RepositoryNotLinkedError,
+  ConflictError,
 } from "../../middleware/error-handler.middleware.js";
 import type { Transaction } from "../../db/types.js";
 
@@ -345,6 +347,11 @@ async function fetchProjectExcludedTags(
 function toUserFacingExportError(error: unknown): string {
   if (error instanceof RepositoryNotLinkedError) {
     return "Export failed. Link a GitLab repository in project settings, then try again.";
+  }
+
+  // Export-consistency conflicts are already actionable; pass them through.
+  if (error instanceof ConflictError) {
+    return error.userMessage;
   }
 
   if (
@@ -974,6 +981,19 @@ export async function exportToGitlab(
           .from(characters)
           .where(eq(characters.projectId, projectId)),
       ]);
+
+    // Export consistency: an excluded DB character without any current
+    // active source-owned global declaration would silently disappear
+    // from the remote tree. Fail with an actionable conflict before any
+    // remote write.
+    assertExcludedCharactersHaveSourceOwnership(
+      projectCharacters,
+      excludedTags,
+      activeFiles.map((file) => ({
+        filePath: file.filePath,
+        content: file.content,
+      }))
+    );
 
     // Generated files share the single atomic commit.
     const generatedActions = await buildGeneratedActions(

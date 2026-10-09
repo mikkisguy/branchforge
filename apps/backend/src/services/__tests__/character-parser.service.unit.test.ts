@@ -256,8 +256,28 @@ describe("characterParserService", () => {
   });
 
   describe("isSpecial flag (regression)", () => {
-    it("marks narrator (n) as special", () => {
-      const content = `define n = Character(None, what_color="#cfcfcf")`;
+    it("marks the narrator tag as special", () => {
+      const content = `define narrator = Character(None, what_color="#cfcfcf")`;
+      const chars = characterParserService.parseFile(content, "test.rpy");
+      expect(chars[0].isSpecial).toBe(true);
+    });
+
+    it("treats n and u as ordinary tags, never implicitly special", () => {
+      // Policy: the automatic exclusions are exactly `narrator` and
+      // `extend`. `n` and `u` are ordinary tags a project may define
+      // (e.g. `define u = Character("???", color="#E4E4E4")`), so they
+      // must not be flagged special nor implicitly excluded.
+      const content = [
+        'define n = Character(None, what_color="#cfcfcf")',
+        'define u = Character("???", color="#E4E4E4")',
+      ].join("\n");
+      const chars = characterParserService.parseFile(content, "test.rpy");
+      expect(chars.find((c) => c.tag === "n")?.isSpecial).toBe(false);
+      expect(chars.find((c) => c.tag === "u")?.isSpecial).toBe(false);
+    });
+
+    it("marks extend as special", () => {
+      const content = `define extend = Character(None, what_color="#cfcfcf")`;
       const chars = characterParserService.parseFile(content, "test.rpy");
       expect(chars[0].isSpecial).toBe(true);
     });
@@ -282,10 +302,10 @@ describe("characterParserService", () => {
       expect(chars[0].color).toBe("#cfcfcf");
     });
 
-    it("marks unknown speaker (u) as special", () => {
+    it("does not mark the unknown-speaker tag u as special", () => {
       const content = `define u = Character("???", color="#cfcfcf")`;
       const chars = characterParserService.parseFile(content, "test.rpy");
-      expect(chars[0].isSpecial).toBe(true);
+      expect(chars[0].isSpecial).toBe(false);
     });
 
     it("does not mark normal characters as special", () => {
@@ -346,6 +366,13 @@ describe("characterParserService", () => {
 
       expect(result.characters).toHaveLength(1);
       expect(result.characters[0].displayName).toBe("Sarah");
+    });
+
+    it("reports default exclusions of exactly narrator and extend", () => {
+      const result = characterParserService.parseFiles([
+        { content: "", filename: "a.rpy" },
+      ]);
+      expect([...result.excludedTags].sort()).toEqual(["extend", "narrator"]);
     });
   });
 });

@@ -883,8 +883,8 @@ export interface LabelDetail extends PublicLabel {
  * - `tagged` — A quoted string containing Ren'Py inline tags (e.g.,
  *   `"{color=#f00}Stranger{/color}"`). The raw form is preserved; the
  *   display name strips tags for readability.
- * - `none` — `Character(None, ...)`; the narrator. Already excluded from
- *   import by default but the wizard may surface it for confirmation.
+ * - `none` — `Character(None, ...)`; no displayed name. Ownership follows
+ *   the declaration's tag and project exclusions, not the name type.
  * - `empty` — `Character("", ...)`; the wizard should show "(unnamed)".
  * - `unknown` — A non-standard value such as `"???"`; usually intentional
  *   by the author, so the wizard keeps it as-is.
@@ -982,6 +982,18 @@ export function stripRenpyTextTags(input: string): string {
 // ============================================================================
 // Character Detection Types
 // ============================================================================
+
+/**
+ * Character tags that BranchForge excludes from management by default.
+ *
+ * Policy: exactly `narrator` (Ren'Py's built-in narrator) and
+ * `extend` (Ren'Py's dialogue-extension speaker). These are Ren'Py
+ * system speakers, not project characters. Everything else — including
+ * `n` and `u` — is an ordinary tag owned by the user's project and is
+ * never implicitly special or excluded; projects exclude tags only
+ * through their explicit settings.
+ */
+export const DEFAULT_EXCLUDED_CHARACTER_TAGS = ["narrator", "extend"] as const;
 
 /**
  * Character detected from RPY files

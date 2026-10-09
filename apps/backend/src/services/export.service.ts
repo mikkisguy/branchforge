@@ -40,6 +40,7 @@ import {
   DEFAULT_EXCLUDED_RENPY_TAGS,
 } from "./rpy-statements.service.js";
 import { ensureCharacterSourcePreservation } from "./character-source-preservation.service.js";
+import { assertExcludedCharactersHaveSourceOwnership } from "./export-consistency.service.js";
 import { checkRateLimit } from "./rate-limiter.service.js";
 import { logInfo, logError, logWarn, LogEventType } from "../lib/logger.js";
 import {
@@ -376,6 +377,18 @@ export async function generateExport(
     excludedTags
   );
 
+  // Export consistency: an excluded DB character without any current
+  // active exported source-owned global declaration would silently
+  // disappear from the export. Fail with an actionable conflict instead.
+  assertExcludedCharactersHaveSourceOwnership(
+    projectCharacters,
+    excludedTags,
+    Object.entries(patchedFiles).map(([filePath, content]) => ({
+      filePath,
+      content,
+    }))
+  );
+
   // Determine the directory prefix for generated files (e.g. "game/")
   // by computing a shared top-level directory segment from the
   // sanitized project file paths (not the raw `file.filePath`
@@ -525,6 +538,15 @@ export async function getExportPreview(
       ),
       excludedTags
     );
+
+  // Export consistency: an excluded DB character without any current
+  // active source-owned global declaration would silently disappear
+  // from the generated preview. Fail with an actionable conflict instead.
+  assertExcludedCharactersHaveSourceOwnership(
+    sources.projectCharacters,
+    excludedTags,
+    sourceFiles.filter((file) => sanitizeZipEntryPath(file.filePath) !== null)
+  );
 
   const variablesEmpty = projectVariables.length === 0;
   const statsEmpty = projectStats.length === 0;
