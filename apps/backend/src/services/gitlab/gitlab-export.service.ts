@@ -78,13 +78,18 @@ import { getDecryptedToken } from "./gitlab-integration.service.js";
 import { requireProjectOwnership } from "../authz.service.js";
 import { lockProject } from "../project-files-operations.service.js";
 import { localContentBaselineHash } from "../project-file-baseline.js";
-import { logWarn } from "../../lib/logger.js";
+import { logWarn, logError } from "../../lib/logger.js";
 import {
   NotFoundError,
   RepositoryNotLinkedError,
-  ConflictError,
 } from "../../middleware/error-handler.middleware.js";
 import type { Transaction } from "../../db/types.js";
+import {
+  createPreflightSourceMissingError,
+  createPreflightRemoteChangedError,
+  createPreflightFileExistsError,
+  toUserFacingExportError,
+} from "./gitlab-error.helpers.js";
 
 type PendingOpRow = typeof projectFilePendingOperations.$inferSelect;
 type ProjectFileRow = typeof projectFiles.$inferSelect;
@@ -344,27 +349,6 @@ async function fetchProjectExcludedTags(
   return new Set(settings.excludedCharacterTags);
 }
 
-function toUserFacingExportError(error: unknown): string {
-  if (error instanceof RepositoryNotLinkedError) {
-    return "Export failed. Link a GitLab repository in project settings, then try again.";
-  }
-
-  // Export-consistency conflicts are already actionable; pass them through.
-  if (error instanceof ConflictError) {
-    return error.userMessage;
-  }
-
-  if (
-    error instanceof Error &&
-    (error.message.startsWith("Conflict:") ||
-      error.message === MISSING_DEFAULT_BRANCH_MESSAGE)
-  ) {
-    return error.message;
-  }
-
-  return "Export failed. Check your GitLab connection, branch name, and permissions, then try again.";
-}
-
 /**
  * Build the patched content pushed for a file (defensive symbol strip +
  * variable patching for labels with conditions).
@@ -523,9 +507,7 @@ async function preflightConflicts(
       branch
     );
     if (meta.content === null) {
-      throw new Error(
-        `Conflict: expected source file not found on the remote: ${remotePath}`
-      );
+      throw createPreflightSourceMissingError(remotePath);
     }
     remoteContents.set(remotePath, meta.content);
     const storedFile = filesByRemoteBasePath.get(remotePath);
@@ -535,9 +517,7 @@ async function preflightConflicts(
     if (expectedHash) {
       const remoteHash = calculateContentHash(meta.content);
       if (remoteHash !== expectedHash) {
-        throw new Error(
-          `Conflict: remote file changed since the last sync: ${remotePath}`
-        );
+        throw createPreflightRemoteChangedError(remotePath);
       }
     }
   }
@@ -550,9 +530,7 @@ async function preflightConflicts(
       branch
     );
     if (meta.content !== null) {
-      throw new Error(
-        `Conflict: file already exists on the remote: ${remotePath}`
-      );
+      throw createPreflightFileExistsError(remotePath);
     }
   }
 
@@ -1125,6 +1103,7 @@ export async function exportToGitlab(
       noChanges: true,
     };
   } catch (error) {
+    logError("gitlab_export.failed", { projectId, branch }, error);
     const errorMessage = toUserFacingExportError(error);
     await updateSyncOperation(operation.id, {
       status: "FAILED",

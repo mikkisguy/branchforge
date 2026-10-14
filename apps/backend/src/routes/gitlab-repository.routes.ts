@@ -72,7 +72,7 @@ async function linkRepositoryHandler(
     reply.status(201).send();
   } catch (err) {
     if (err instanceof ConflictError) {
-      reply.status(409).send({ error: "Conflict", message: err.message });
+      reply.status(409).send({ error: "Conflict", message: err.userMessage });
       return;
     }
     if (handleKnownRouteErrors(err, reply)) return;

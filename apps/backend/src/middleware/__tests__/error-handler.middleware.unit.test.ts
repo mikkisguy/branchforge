@@ -213,7 +213,11 @@ describe("Global Error Handler", () => {
   });
 
   afterEach(() => {
-    process.env.NODE_ENV = originalEnv;
+    if (originalEnv === undefined) {
+      delete process.env.NODE_ENV;
+    } else {
+      process.env.NODE_ENV = originalEnv;
+    }
   });
 
   it("should handle HttpError and send appropriate response", () => {
@@ -340,23 +344,31 @@ describe("Global Error Handler", () => {
     expect(reply.status).toHaveBeenCalledWith(500);
     expect(reply.send).toHaveBeenCalledWith({
       error: "InternalServerError",
-      message: "Unknown error",
-    });
-  });
-
-  it("should use generic error message in production", () => {
-    process.env.NODE_ENV = "production";
-
-    const request = createMockRequest();
-    const reply = createMockReply();
-    const error = new Error("Detailed error message");
-
-    globalErrorHandler(error as any, request, reply);
-
-    expect(reply.status).toHaveBeenCalledWith(500);
-    expect(reply.send).toHaveBeenCalledWith({
-      error: "InternalServerError",
       message: "An unexpected error occurred",
     });
   });
+
+  it.each(["production", "development", "test", undefined])(
+    "should hide internal details when NODE_ENV is %s",
+    (environment) => {
+      if (environment === undefined) {
+        delete process.env.NODE_ENV;
+      } else {
+        process.env.NODE_ENV = environment;
+      }
+      const request = createMockRequest();
+      const reply = createMockReply();
+      const error = new Error(
+        "Failed query: select * from users params: [secret-token]\n at db.ts:42"
+      );
+
+      globalErrorHandler(error as any, request, reply);
+
+      expect(reply.status).toHaveBeenCalledWith(500);
+      expect(reply.send).toHaveBeenCalledWith({
+        error: "InternalServerError",
+        message: "An unexpected error occurred",
+      });
+    }
+  );
 });

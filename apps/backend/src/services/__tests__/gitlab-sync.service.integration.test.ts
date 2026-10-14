@@ -39,7 +39,10 @@ import {
   gitlabSyncOperations,
 } from "../../db/schema/index.js";
 import { and, eq } from "drizzle-orm";
-import { NotFoundError } from "../../middleware/error-handler.middleware.js";
+import {
+  NotFoundError,
+  ConflictError,
+} from "../../middleware/error-handler.middleware.js";
 import {
   detectConflicts,
   exportToGitlab,
@@ -606,7 +609,8 @@ describe("GitLabSyncService (Integration)", () => {
       expect(result).toMatchObject({
         hasConflicts: false,
         conflicts: [],
-        error: "API Error",
+        error:
+          "Conflict detection failed. Check your GitLab connection, branch name, and permissions, then try again.",
       });
     });
 
@@ -2396,6 +2400,88 @@ describe("GitLabSyncService (Integration)", () => {
   });
 
   describe("importFromGitlab", () => {
+    it("preserves known character-source recovery guidance", async () => {
+      const preservation =
+        await import("../character-source-preservation.service.js");
+      const message =
+        "A character cannot be excluded until its source can be preserved.";
+      const conflict = new ConflictError(message);
+      conflict.userMessage = message;
+      vi.spyOn(
+        preservation,
+        "ensureCharacterSourcePreservation"
+      ).mockRejectedValueOnce(conflict);
+      const result = await importFromGitlab(
+        testProjectId,
+        testUserId,
+        testBranch,
+        "gitlab_wins"
+      );
+      expect(result.errorMessage).toBe(message);
+      expect(result.status).toBe("FAILED");
+      const [stored] = await db
+        .select()
+        .from(gitlabSyncOperations)
+        .where(eq(gitlabSyncOperations.id, result.id));
+      expect(stored.errorMessage).toBe(message);
+    });
+
+    it("preserves recovery guidance when structural edits arrive during fetch", async () => {
+      const [before] = await db
+        .select()
+        .from(projectFiles)
+        .where(eq(projectFiles.id, testGitlabFileId));
+      vi.spyOn(gitlabRepoService, "getBranchCommitSha").mockResolvedValue(
+        "remote-rev"
+      );
+      vi.spyOn(gitlabRepoService, "listRpyFiles").mockResolvedValue([
+        { name: "script.rpy", path: "game/script.rpy" },
+      ]);
+      vi.spyOn(
+        gitlabRepoService,
+        "getFileContentWithMetadata"
+      ).mockImplementation(async () => {
+        await db.insert(projectFilePendingOperations).values({
+          projectId: testProjectId,
+          projectFileId: testGitlabFileId,
+          operation: "CREATE",
+          remoteBasePath: "game/script.rpy",
+          localPath: "game/script.rpy",
+        });
+        return {
+          content: 'label start:\n    "Remote content"\n    return',
+          lastCommitId: "remote-rev",
+          contentSha256: null,
+          blobId: null,
+        };
+      });
+      const result = await importFromGitlab(
+        testProjectId,
+        testUserId,
+        testBranch,
+        "gitlab_wins"
+      );
+      const message =
+        "Push or discard your structural file changes before pulling from GitLab";
+      expect(result.status).toBe("FAILED");
+      expect(result.errorMessage).toBe(message);
+      const [stored] = await db
+        .select()
+        .from(gitlabSyncOperations)
+        .where(eq(gitlabSyncOperations.id, result.id));
+      expect(stored.errorMessage).toBe(message);
+      const [after] = await db
+        .select()
+        .from(projectFiles)
+        .where(eq(projectFiles.id, testGitlabFileId));
+      expect(after.content).toBe(before.content);
+      const pending = await db
+        .select()
+        .from(projectFilePendingOperations)
+        .where(eq(projectFilePendingOperations.projectId, testProjectId));
+      expect(pending).toHaveLength(1);
+    });
+
     function mockCharacterPull(content: string) {
       vi.spyOn(gitlabRepoService, "listRpyFiles").mockResolvedValue([
         { name: "script.rpy", path: "game/script.rpy" },
@@ -3119,7 +3205,9 @@ describe("GitLabSyncService (Integration)", () => {
         "getFileContentWithMetadata"
       ).mockImplementation(async (_projectId, _userId, path) => {
         if (path === "game/other.rpy") {
-          throw new Error("fetch failed for other.rpy");
+          throw new Error(
+            "Failed query: select secret from private_table\nparams: sensitive-value"
+          );
         }
         return {
           content: 'label start:\n    "Remote"\n    return',
@@ -3137,7 +3225,16 @@ describe("GitLabSyncService (Integration)", () => {
       );
 
       expect(result.status).toBe("FAILED");
-      expect(result.errorMessage).toContain("fetch failed");
+      expect(result.errorMessage).toBe(
+        "Import failed. Check your GitLab connection, branch name, and permissions, then try again."
+      );
+      const [savedFailure] = await db
+        .select()
+        .from(gitlabSyncOperations)
+        .where(eq(gitlabSyncOperations.id, result.id));
+      expect(savedFailure.errorMessage).toBe(
+        "Import failed. Check your GitLab connection, branch name, and permissions, then try again."
+      );
 
       const [file] = await db
         .select()
@@ -3191,7 +3288,11 @@ describe("GitLabSyncService (Integration)", () => {
       vi.spyOn(
         labelsService,
         "updateIncomingJumpsForLabels"
-      ).mockRejectedValueOnce(new Error("incoming jumps failed"));
+      ).mockRejectedValueOnce(
+        new Error(
+          "Failed query: update private_table set secret = $1\nparams: sensitive-value"
+        )
+      );
 
       const result = await importFromGitlab(
         testProjectId,
@@ -3201,7 +3302,16 @@ describe("GitLabSyncService (Integration)", () => {
       );
 
       expect(result.status).toBe("FAILED");
-      expect(result.errorMessage).toContain("incoming jumps failed");
+      expect(result.errorMessage).toBe(
+        "Import failed. Check your GitLab connection, branch name, and permissions, then try again."
+      );
+      const [savedFailure] = await db
+        .select()
+        .from(gitlabSyncOperations)
+        .where(eq(gitlabSyncOperations.id, result.id));
+      expect(savedFailure.errorMessage).toBe(
+        "Import failed. Check your GitLab connection, branch name, and permissions, then try again."
+      );
 
       const [file] = await db
         .select()
@@ -3228,7 +3338,8 @@ describe("GitLabSyncService (Integration)", () => {
 
       expect(result).toMatchObject({
         status: "FAILED",
-        errorMessage: "API Error",
+        errorMessage:
+          "Import failed. Check your GitLab connection, branch name, and permissions, then try again.",
       });
     });
 

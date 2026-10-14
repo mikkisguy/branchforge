@@ -176,9 +176,12 @@ export async function linkRepository(
         .limit(1);
 
       if (existingLink && existingLink.projectId !== projectId) {
-        throw new ConflictError(
+        const error = new ConflictError(
           "GitLab repository is already linked to another project"
         );
+        error.userMessage =
+          "GitLab repository is already linked to another project";
+        throw error;
       }
 
       // Ensure project source is set to GITLAB and validate project exists
@@ -215,9 +218,12 @@ export async function linkRepository(
   } catch (err) {
     // Handle unique constraint violation on gitlabProjectId (race condition)
     if (isPostgresError(err) && err.code === "23505") {
-      throw new ConflictError(
+      const error = new ConflictError(
         "GitLab repository is already linked to another project"
       );
+      error.userMessage =
+        "GitLab repository is already linked to another project";
+      throw error;
     }
     throw err;
   }

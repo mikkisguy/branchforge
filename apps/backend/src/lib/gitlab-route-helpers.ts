@@ -37,15 +37,15 @@ export function handleKnownRouteErrors(
   reply: FastifyReply
 ): boolean {
   if (err instanceof NotFoundError) {
-    reply.status(404).send({ error: "Not Found", message: err.message });
+    reply.status(404).send({ error: "Not Found", message: err.userMessage });
     return true;
   }
   if (err instanceof ForbiddenError) {
-    reply.status(403).send({ error: "Forbidden", message: err.message });
+    reply.status(403).send({ error: "Forbidden", message: err.userMessage });
     return true;
   }
   if (err instanceof ConflictError) {
-    reply.status(409).send({ error: "Conflict", message: err.message });
+    reply.status(409).send({ error: "Conflict", message: err.userMessage });
     return true;
   }
   return false;

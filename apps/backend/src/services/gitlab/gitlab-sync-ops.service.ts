@@ -11,11 +11,27 @@ import { eq, and, desc, lt } from "drizzle-orm";
 import { requireProjectOwnership } from "../authz.service.js";
 import { logWarn } from "../../lib/logger.js";
 import type { SyncOperation } from "../gitlab.types.js";
+import { safeGitLabSyncErrorMessage } from "./gitlab-error.helpers.js";
 
 // Staleness threshold for sync operations: if a sync operation has been
 // IN_PROGRESS for longer than this without completing, it is considered
 // stale. Same value as SYNC_LEASE_TIMEOUT_MS in labels/sync-state.ts.
 const SYNC_OPERATION_STALE_MS = 5 * 60 * 1000; // 5 minutes
+
+/**
+ * Sanitize the user-facing error message on a sync operation without mutating
+ * the database. Unknown persisted messages are replaced with operation-specific
+ * generic guidance.
+ */
+function sanitizeSyncOperation(operation: SyncOperation): SyncOperation {
+  return {
+    ...operation,
+    errorMessage: safeGitLabSyncErrorMessage(
+      operation.operation,
+      operation.errorMessage ?? null
+    ),
+  };
+}
 
 /**
  * Create a sync operation record in the database
@@ -83,7 +99,7 @@ export async function getSyncOperation(
 
   await requireProjectOwnership(operation.projectId, userId);
 
-  return operation as SyncOperation;
+  return sanitizeSyncOperation(operation as SyncOperation);
 }
 
 /**
@@ -105,7 +121,8 @@ export async function listSyncOperations(
     .orderBy(desc(gitlabSyncOperations.startedAt))
     .limit(limit || 100);
 
-  return (await query) as SyncOperation[];
+  const operations = (await query) as SyncOperation[];
+  return operations.map(sanitizeSyncOperation);
 }
 
 /**
