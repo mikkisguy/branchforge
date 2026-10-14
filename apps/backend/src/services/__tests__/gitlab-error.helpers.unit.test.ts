@@ -3,11 +3,46 @@ import {
   createPreflightFileExistsError,
   createPreflightRemoteChangedError,
   createPreflightSourceMissingError,
+  isSafeGitLabSyncErrorMessage,
   safeGitLabSyncErrorMessage,
   toUserFacingExportError,
 } from "../gitlab/gitlab-error.helpers.js";
 
 describe("GitLab public errors", () => {
+  it.each([
+    "",
+    "   ",
+    "game/file.rpy; diagnostics",
+    "game/<script>.rpy",
+    "game/file.rpy\tparams",
+    'game/"file".rpy',
+    "game/file.rpy\nparams",
+    "game/file.rpy\rparams",
+    "game//file.rpy",
+  ])("rejects unsafe preflight path suffixes: %j", (path) => {
+    for (const createError of [
+      createPreflightFileExistsError,
+      createPreflightRemoteChangedError,
+      createPreflightSourceMissingError,
+    ]) {
+      expect(
+        isSafeGitLabSyncErrorMessage(createError(path).message, "EXPORT")
+      ).toBe(false);
+    }
+  });
+
+  it.each([
+    "script.rpy",
+    "game/chapter_1-2.rpy",
+    "game/My Story.rpy",
+    "game/物語.rpy",
+  ])("preserves safe preflight paths: %s", (path) => {
+    const message = createPreflightRemoteChangedError(path).message;
+    expect(isSafeGitLabSyncErrorMessage(message, "EXPORT")).toBe(true);
+    expect(isSafeGitLabSyncErrorMessage(message, null)).toBe(true);
+    expect(isSafeGitLabSyncErrorMessage(message, "IMPORT")).toBe(false);
+  });
+
   it.each([
     "Failed query: select secret from private_table\nparams: sensitive-value",
     "Error: failure\n    at internalFunction (/server/private.ts:10)",

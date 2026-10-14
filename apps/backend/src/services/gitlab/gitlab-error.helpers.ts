@@ -112,9 +112,14 @@ export function isSafeGitLabSyncErrorMessage(
   if (
     operation !== "IMPORT" &&
     !/[\r\n]/.test(message) &&
-    PREFLIGHT_CONFLICT_PREFIXES.some(
-      (prefix) => message.startsWith(prefix) && message.length > prefix.length
-    )
+    PREFLIGHT_CONFLICT_PREFIXES.some((prefix) => {
+      if (!message.startsWith(prefix)) return false;
+      const path = message.slice(prefix.length);
+      return (
+        path.trim().length > 0 &&
+        /^[\p{L}\p{N}_ .-]+(?:\/[\p{L}\p{N}_ .-]+)*$/u.test(path)
+      );
+    })
   ) {
     return true;
   }
