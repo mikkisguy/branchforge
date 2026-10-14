@@ -222,7 +222,7 @@ describe("ProjectImagesRoutes", () => {
     expect(response.statusCode).toBe(500);
     expect(response.json()).toMatchObject({
       error: "InternalServerError",
-      message: "premature close",
+      message: "An unexpected error occurred",
     });
     expect(projectImagesService.uploadProjectImage).not.toHaveBeenCalled();
 
