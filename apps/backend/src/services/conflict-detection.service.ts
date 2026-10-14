@@ -18,6 +18,7 @@ import { getFileContent } from "./gitlab/gitlab-repository.service.js";
 import { parseRPYFileWithLabels } from "./rpy-parser.service.js";
 import { ConcurrencyLimiter } from "./concurrency-limiter.js";
 import { HttpError } from "../middleware/error-handler.middleware.js";
+import { logError as logErrorShared, LogEventType } from "../lib/logger.js";
 
 // ============================================================================
 // Types
@@ -261,12 +262,21 @@ export async function detectConflicts(
       }
     }
 
-    // If all file fetches failed, return an error
+    // If all file fetches failed, return a safe public error message and log
+    // the original failure server-side.
     if (!anySuccess && firstError) {
+      logErrorShared(LogEventType.SERVICE_ERROR, {
+        context: "conflictDetection.file_fetch_failed",
+        projectId,
+        branch,
+        error:
+          firstError instanceof Error ? firstError.message : String(firstError),
+      });
       return {
         hasConflicts: false,
         conflicts: [],
-        error: firstError.message,
+        error:
+          "Conflict detection failed. Check your GitLab connection, branch name, and permissions, then try again.",
       };
     }
 
@@ -285,11 +295,19 @@ export async function detectConflicts(
     ) {
       throw error;
     }
-    // Catch only true operational errors (DB failures, API errors, etc.)
+    // Catch only true operational errors (DB failures, API errors, etc.).
+    // Log the original failure server-side and return a safe public message.
+    logErrorShared(LogEventType.SERVICE_ERROR, {
+      context: "conflictDetection.unexpected_error",
+      projectId,
+      branch,
+      error: error instanceof Error ? error.message : String(error),
+    });
     return {
       hasConflicts: false,
       conflicts: [],
-      error: error instanceof Error ? error.message : "Unknown error",
+      error:
+        "Conflict detection failed. Check your GitLab connection, branch name, and permissions, then try again.",
     };
   }
 }

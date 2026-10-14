@@ -67,6 +67,10 @@ import {
   NotFoundError,
   ConflictError,
 } from "../../middleware/error-handler.middleware.js";
+import {
+  GENERIC_IMPORT_MESSAGE,
+  safeGitLabSyncErrorMessage,
+} from "./gitlab-error.helpers.js";
 import type {
   DetectCharactersResponse,
   CharacterSourceDefinition,
@@ -256,9 +260,12 @@ export async function importFromGitlab(
       .where(eq(projectFilePendingOperations.projectId, projectId))
       .limit(1);
     if (pendingRow) {
-      throw new ConflictError(
+      const structuralConflictError = new ConflictError(
         "Push or discard your structural file changes before pulling from GitLab"
       );
+      structuralConflictError.userMessage =
+        "Push or discard your structural file changes before pulling from GitLab";
+      throw structuralConflictError;
     }
   }
 
@@ -356,7 +363,7 @@ export async function importFromGitlab(
     );
     if (fetchFailures.length > 0) {
       const firstFailure = fetchFailures[0] as PromiseRejectedResult;
-      const errorMessage =
+      const rawErrorMessage =
         firstFailure.reason instanceof Error
           ? firstFailure.reason.message
           : String(firstFailure.reason);
@@ -364,8 +371,9 @@ export async function importFromGitlab(
         projectId,
         failedCount: fetchFailures.length,
         totalFiles: rpyFiles.length,
-        error: errorMessage,
+        error: rawErrorMessage,
       });
+      const errorMessage = GENERIC_IMPORT_MESSAGE;
       await updateSyncOperation(operation.id, {
         status: "FAILED",
         errorMessage,
@@ -849,9 +857,21 @@ export async function importFromGitlab(
       characterReview,
     };
   } catch (error) {
-    // Mark operation as failed
+    // Mark operation as failed. Log the original failure server-side but only
+    // persist a safe public message in the operation record.
+    logErrorShared(
+      "gitlab_sync.import_failed",
+      {
+        projectId,
+        branch,
+      },
+      error
+    );
     const errorMessage =
-      error instanceof Error ? error.message : "Unknown error";
+      error instanceof ConflictError
+        ? (safeGitLabSyncErrorMessage("IMPORT", error.message) ??
+          GENERIC_IMPORT_MESSAGE)
+        : GENERIC_IMPORT_MESSAGE;
     await updateSyncOperation(operation.id, {
       status: "FAILED",
       errorMessage,

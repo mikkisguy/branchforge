@@ -308,9 +308,12 @@ export async function reconcileCharacterOwnership(
               !/\/branchforge_[^/]*\.rpy$/i.test(`/${file.filePath}`)
           );
     if (!target) {
-      throw new ConflictError(
+      const error = new ConflictError(
         "A character cannot be excluded until its source can be preserved."
       );
+      error.userMessage =
+        "A character cannot be excluded until its source can be preserved.";
+      throw error;
     }
     const character = {
       ...row,

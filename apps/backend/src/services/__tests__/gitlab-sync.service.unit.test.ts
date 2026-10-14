@@ -61,6 +61,7 @@ describe("GitLabSyncService", () => {
         status: "COMPLETED" as const,
         branch: testBranch,
         conflictCount: 0,
+        errorMessage: null,
         startedAt: new Date(),
         completedAt: new Date(),
       };
@@ -78,6 +79,37 @@ describe("GitLabSyncService", () => {
       const result = await getSyncOperation(testOperationId, testUserId);
 
       expect(result).toEqual(mockOperation);
+    });
+
+    it("sanitizes legacy query errors without mutating the stored operation", async () => {
+      const mockOperation = {
+        id: testOperationId,
+        projectId: testProjectId,
+        operation: "EXPORT" as const,
+        status: "FAILED" as const,
+        branch: testBranch,
+        conflictCount: 0,
+        errorMessage: "Failed query: select * from secrets params: [token]",
+        startedAt: new Date(),
+        completedAt: new Date(),
+      };
+      const originalErrorMessage = mockOperation.errorMessage;
+
+      const mockDb = vi.mocked(getDb)();
+      mockDb.select = vi.fn(() => ({
+        from: vi.fn(() => ({
+          where: vi.fn(() => ({
+            limit: vi.fn(() => Promise.resolve([mockOperation])),
+          })),
+        })),
+      })) as any;
+
+      const result = await getSyncOperation(testOperationId, testUserId);
+
+      expect(result?.errorMessage).toBe(
+        "Export failed. Check your GitLab connection, branch name, and permissions, then try again."
+      );
+      expect(mockOperation.errorMessage).toBe(originalErrorMessage);
     });
 
     it("should return null for non-existent operation", async () => {
@@ -107,6 +139,7 @@ describe("GitLabSyncService", () => {
           status: "COMPLETED" as const,
           branch: testBranch,
           conflictCount: 0,
+          errorMessage: null,
           startedAt: new Date(),
         },
         {
@@ -116,6 +149,7 @@ describe("GitLabSyncService", () => {
           status: "COMPLETED" as const,
           branch: "develop",
           conflictCount: 0,
+          errorMessage: null,
           startedAt: new Date(),
         },
       ];
@@ -133,6 +167,40 @@ describe("GitLabSyncService", () => {
 
       const result = await listSyncOperations(testProjectId, testUserId);
       expect(result).toEqual(mockOperations);
+    });
+
+    it("sanitizes legacy query errors without mutating listed operations", async () => {
+      const mockOperations = [
+        {
+          id: "op-legacy",
+          projectId: testProjectId,
+          operation: "IMPORT" as const,
+          status: "FAILED" as const,
+          branch: testBranch,
+          conflictCount: 0,
+          errorMessage: "Failed query: select * from secrets params: [token]",
+          startedAt: new Date(),
+        },
+      ];
+      const originalErrorMessage = mockOperations[0].errorMessage;
+
+      const mockDb = vi.mocked(getDb)();
+      mockDb.select = vi.fn(() => ({
+        from: vi.fn(() => ({
+          where: vi.fn(() => ({
+            orderBy: vi.fn(() => ({
+              limit: vi.fn(() => Promise.resolve(mockOperations)),
+            })),
+          })),
+        })),
+      })) as any;
+
+      const result = await listSyncOperations(testProjectId, testUserId);
+
+      expect(result[0].errorMessage).toBe(
+        "Import failed. Check your GitLab connection, branch name, and permissions, then try again."
+      );
+      expect(mockOperations[0].errorMessage).toBe(originalErrorMessage);
     });
 
     it("should return empty array when no operations exist", async () => {
@@ -160,6 +228,7 @@ describe("GitLabSyncService", () => {
           status: "COMPLETED" as const,
           branch: testBranch,
           conflictCount: 0,
+          errorMessage: null,
           startedAt: new Date(),
         },
       ];

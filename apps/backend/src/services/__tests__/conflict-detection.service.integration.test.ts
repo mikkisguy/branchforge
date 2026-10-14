@@ -534,13 +534,38 @@ describe("ConflictDetectionService (Integration)", () => {
         .where(eq(projectFiles.id, newGitlabFile.id));
     });
 
+    it("does not expose database query failures", async () => {
+      // Ownership performs its own database lookup before conflict detection.
+      const originalSelect = db.select.bind(db);
+      let calls = 0;
+      vi.spyOn(db, "select").mockImplementation((...args) => {
+        calls += 1;
+        if (calls === 2) {
+          throw new Error(
+            "Failed query: select secret from private_table\nparams: sensitive-value"
+          );
+        }
+        return originalSelect(...args);
+      });
+      const result = await detectConflicts(
+        testProjectId,
+        testUserId,
+        testBranch
+      );
+      expect(result.error).toBe(
+        "Conflict detection failed. Check your GitLab connection, branch name, and permissions, then try again."
+      );
+    });
+
     it("should handle API errors gracefully", async () => {
       // Set up local scene
       await db.insert(labels).values(testScene);
 
       // Mock GitLab API to throw error
       vi.spyOn(gitlabRepoService, "getFileContent").mockRejectedValue(
-        new Error("API Error")
+        new Error(
+          'GitLab API error: 500 - {"message":"internal upstream diagnostics"}'
+        )
       );
 
       const result = await detectConflicts(
@@ -552,7 +577,8 @@ describe("ConflictDetectionService (Integration)", () => {
       expect(result).toMatchObject({
         hasConflicts: false,
         conflicts: [],
-        error: "API Error",
+        error:
+          "Conflict detection failed. Check your GitLab connection, branch name, and permissions, then try again.",
       });
     });
 

@@ -579,10 +579,11 @@ describe("GitLab Routes (Integration)", () => {
     });
 
     it("should return 409 when structural file changes conflict", async () => {
+      const conflict = new ConflictError("Internal conflict diagnostics");
+      conflict.userMessage =
+        "Push or discard your structural file changes before pulling from GitLab";
       vi.spyOn(gitlabSyncService, "importFromGitlab").mockRejectedValue(
-        new ConflictError(
-          "Push or discard your structural file changes before pulling from GitLab"
-        )
+        conflict
       );
 
       const response = await fastify.inject({
