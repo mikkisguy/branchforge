@@ -22,7 +22,13 @@ export type SaveStatus = "saved" | "saving" | "error";
 export interface UseAutosaveOptions<T> {
   data: T;
   hashFn: (data: T) => string;
-  onSave: (data: T) => Promise<void>;
+  /**
+   * Persist the given data. Returning a value uses that value as the new saved
+   * baseline instead of the submitted data (e.g. server-normalized content),
+   * which prevents redundant save loops. Returning nothing preserves the
+   * submitted data as the baseline.
+   */
+  onSave: (data: T) => Promise<void | T>;
   debounceMs?: number;
   onError?: (error: Error) => void;
   /**
@@ -108,12 +114,13 @@ export function useAutosave<T>({
       let saveSucceeded = false;
 
       try {
-        await onSave(dataToSave);
+        const canonical = await onSave(dataToSave);
+        const savedData = canonical !== undefined ? canonical : dataToSave;
 
         // Only update saved state if discard hasn't been called
         if (!isDiscardedRef.current) {
-          savedHashRef.current = hashFn(dataToSave);
-          lastSavedDataRef.current = dataToSave;
+          savedHashRef.current = hashFn(savedData);
+          lastSavedDataRef.current = savedData;
           setIsDirty(false);
           setSaveStatus("saved");
         }

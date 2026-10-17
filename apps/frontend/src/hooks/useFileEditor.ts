@@ -23,6 +23,7 @@ interface SwitchFileTarget {
   id: string;
   content: string;
   contentHash?: string | null;
+  updatedAt?: string;
 }
 
 interface UseFileEditorReturn {
@@ -68,8 +69,20 @@ export function useFileEditor({
     null
   );
   const currentEditFileHashRef = useRef<string | null>(null);
-  const latestServerHashByFileIdRef = useRef<Record<string, string>>({});
+  const currentEditFileIdRef = useRef<string | null>(null);
+  const editedFileContentRef = useRef<string>("");
+  const latestSavedFileByIdRef = useRef<
+    Record<string, { content: string; contentHash: string; updatedAt: string }>
+  >({});
   const [hasSaveConflict, setHasSaveConflict] = useState(false);
+
+  useEffect(() => {
+    currentEditFileIdRef.current = currentEditFileId;
+  }, [currentEditFileId]);
+
+  useEffect(() => {
+    editedFileContentRef.current = editedFileContent;
+  }, [editedFileContent]);
 
   const {
     saveStatus: fileSaveStatus,
@@ -84,11 +97,12 @@ export function useFileEditor({
     skipSaveRef,
     onSave: useCallback(
       async (content: string) => {
-        if (!currentEditFileId) {
+        const fileIdAtSave = currentEditFileId;
+        if (!fileIdAtSave) {
           return;
         }
 
-        const result = await updateFileContent(currentEditFileId, content, {
+        const result = await updateFileContent(fileIdAtSave, content, {
           expectedContentHash: currentEditFileHashRef.current ?? undefined,
         });
 
@@ -96,28 +110,43 @@ export function useFileEditor({
           throw new SaveConflictError();
         }
 
-        if (currentEditFileId && result.contentHash) {
-          latestServerHashByFileIdRef.current[currentEditFileId] =
-            result.contentHash;
+        latestSavedFileByIdRef.current[fileIdAtSave] = {
+          content: result.normalizedContent ?? content,
+          contentHash: result.contentHash,
+          updatedAt: result.updatedAt,
+        };
+
+        if (currentEditFileIdRef.current === fileIdAtSave) {
+          currentEditFileHashRef.current = result.contentHash;
+          setHasSaveConflict(false);
         }
 
-        currentEditFileHashRef.current = result.contentHash;
-        setHasSaveConflict(false);
-
-        if (!projectId) {
-          return;
+        if (projectId) {
+          await Promise.all([
+            queryClient.invalidateQueries({
+              queryKey: projectFilesKeys.lists(projectId),
+            }),
+            queryClient.invalidateQueries({
+              // Invalidate all label caches scoped to this project so Write Mode
+              // mounts with stale data and refetches immediately.
+              queryKey: labelKeys.scoped(projectId),
+            }),
+          ]);
         }
 
-        await Promise.all([
-          queryClient.invalidateQueries({
-            queryKey: projectFilesKeys.lists(projectId),
-          }),
-          queryClient.invalidateQueries({
-            // Invalidate all label caches scoped to this project so Write Mode
-            // mounts with stale data and refetches immediately.
-            queryKey: labelKeys.scoped(projectId),
-          }),
-        ]);
+        // Apply server-normalized content only when the user is still on the
+        // same file and has not typed newer text since this save started.
+        if (
+          fileIdAtSave === currentEditFileIdRef.current &&
+          editedFileContentRef.current === content &&
+          result.normalizedContent !== undefined
+        ) {
+          const normalized = result.normalizedContent;
+          setEditedFileContent((current) =>
+            current === content ? normalized : current
+          );
+        }
+        return result.normalizedContent;
       },
       [currentEditFileId, projectId, queryClient, updateFileContent]
     ),
@@ -211,20 +240,37 @@ export function useFileEditor({
         }
       }
 
-      setEditedFileContent(file.content);
+      // A tab selection can hold a snapshot from before the flush above.
+      // Resolve the newest content as well as its hash before resetting autosave.
+      const cachedFiles = projectId
+        ? queryClient
+            .getQueriesData<ProjectFileNode[]>({
+              queryKey: projectFilesKeys.lists(projectId),
+            })
+            .flatMap(([, files]) => files ?? [])
+        : [];
+      const latestFile = [...projectFiles, ...cachedFiles]
+        .filter((candidate) => candidate.id === file.id)
+        .reduce(
+          (latest, candidate) =>
+            Date.parse(candidate.updatedAt) >
+            (Date.parse(latest.updatedAt ?? "") || 0)
+              ? candidate
+              : latest,
+          file
+        );
+      const saved = latestSavedFileByIdRef.current[file.id];
+      const target =
+        saved &&
+        Date.parse(saved.updatedAt) >=
+          (Date.parse(latestFile.updatedAt ?? "") || 0)
+          ? saved
+          : latestFile;
+      setEditedFileContent(target.content);
       setCurrentEditFileId(file.id);
-
-      let serverHash: string | null =
-        latestServerHashByFileIdRef.current[file.id] ?? null;
-
-      if (!serverHash) {
-        const projectFile = projectFiles.find((f) => f.id === file.id);
-        serverHash = projectFile?.contentHash ?? file.contentHash ?? null;
-      }
-
-      currentEditFileHashRef.current = serverHash;
+      currentEditFileHashRef.current = target.contentHash ?? null;
       setHasSaveConflict(false);
-      resetSavedHash(file.content);
+      resetSavedHash(target.content);
       return true;
     },
     [
@@ -232,6 +278,8 @@ export function useFileEditor({
       fileSaveStatus,
       isFileDirty,
       projectFiles,
+      projectId,
+      queryClient,
       resetSavedHash,
       showErrorToast,
       triggerFileSave,

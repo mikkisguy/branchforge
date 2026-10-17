@@ -65,6 +65,46 @@ describe("useAutosave", () => {
     expect(result.current.isDirty).toBe(false);
   });
 
+  it("uses returned canonical data as the saved baseline", async () => {
+    vi.useFakeTimers();
+
+    const onSave = vi.fn().mockImplementation((value: string) => {
+      if (value === "submitted") {
+        return Promise.resolve("normalized");
+      }
+      return Promise.resolve();
+    });
+
+    const { rerender } = renderHook(
+      ({ value }) =>
+        useAutosave({
+          data: value,
+          hashFn: (text: string) => text,
+          debounceMs: 100,
+          onSave,
+        }),
+      { initialProps: { value: "initial" } }
+    );
+
+    rerender({ value: "submitted" });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(120);
+    });
+
+    expect(onSave).toHaveBeenCalledTimes(1);
+    expect(onSave).toHaveBeenNthCalledWith(1, "submitted");
+
+    // Simulate the consumer updating its state to the server-normalized value
+    // returned by onSave. Matching the saved baseline must not re-trigger a save.
+    rerender({ value: "normalized" });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(120);
+    });
+
+    expect(onSave).toHaveBeenCalledTimes(1);
+  });
+
   it("retries triggerSave when an in-flight save fails", async () => {
     vi.useFakeTimers();
 

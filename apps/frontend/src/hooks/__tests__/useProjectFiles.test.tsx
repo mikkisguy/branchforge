@@ -65,6 +65,30 @@ describe("useProjectFiles", () => {
     queryClient.clear();
   });
 
+  it("forwards normalizedContent from a successful save", async () => {
+    vi.mocked(projectFilesApi.updateFile).mockResolvedValue({
+      success: true,
+      contentHash: "updated",
+      updatedAt: "2026-10-06T00:00:00Z",
+      normalizedContent: "label start:\n    return",
+    });
+    const { result } = renderHook(() => useProjectFiles("project-1"), {
+      wrapper,
+    });
+    await waitFor(() => expect(result.current.files).toEqual(mockFiles));
+    const response = await act(async () => {
+      return result.current.updateFileContent(
+        "file-1",
+        'define e = Character("E")\nlabel start:\n    return'
+      );
+    });
+    expect(response).toMatchObject({
+      success: true,
+      contentHash: "updated",
+      normalizedContent: "label start:\n    return",
+    });
+  });
+
   it("refreshes character queries after saving an authored declaration", async () => {
     vi.mocked(projectFilesApi.updateFile).mockResolvedValue({
       success: true,

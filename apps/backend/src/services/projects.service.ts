@@ -10,6 +10,7 @@ import {
   projectUsers,
   projectFiles,
   projectFilePendingOperations,
+  projectSettings,
   labels,
   labelLines,
   gitlabRepositories,
@@ -22,6 +23,7 @@ import type {
   UserRole,
   SourceOrigin,
   PublicProject,
+  UpdateProjectFileContentResponse,
 } from "@branchforge/shared";
 import {
   NotFoundError,
@@ -50,7 +52,9 @@ import {
   ensureCharacterSourcePreservation,
   updateCharacterDefinitionSnapshot,
   syncAuthoredCharacterDefinitions,
+  stripManagedCharacterDeclarations,
 } from "./character-source-preservation.service.js";
+import { DEFAULT_EXCLUDED_RENPY_TAGS } from "./rpy-statements.service.js";
 
 /**
  * Project row type from database queries (with optional role for shared projects)
@@ -137,19 +141,7 @@ export interface GetProjectFilesResult {
  * Result of the updateFileContent service call.
  * Errors (not found, forbidden, validation, conflict) are thrown, not returned.
  */
-export type UpdateFileContentResult = {
-  success: true;
-  contentHash: string;
-  updatedAt: string;
-  syncResult: Pick<
-    SyncLabelsResult,
-    | "labelsCreated"
-    | "labelsUpdated"
-    | "labelsDeleted"
-    | "linesProcessed"
-    | "errors"
-  >;
-};
+export type UpdateFileContentResult = UpdateProjectFileContentResponse;
 
 /**
  * Internal type for grouping labels by project file.
@@ -724,9 +716,9 @@ async function applyFileUpdate(
   fileUpdatedAt: Date;
   syncResultForFile: SyncLabelsResult | undefined;
   deletedCount: number;
+  normalizedContent?: string;
 }> {
   const db = getDb();
-  const newContentHash = calculateContentHash(content);
 
   const result = await db.transaction(async (tx) => {
     // Structural operations and autosaves share one lock order. Locking the
@@ -789,36 +781,64 @@ async function applyFileUpdate(
 
     const fileUpdatedAt = new Date();
 
-    // Update the file content
-    await tx
-      .update(projectFiles)
-      .set({
-        content,
-        fileType,
-        contentHash: newContentHash,
-        characterDefinitions: updateCharacterDefinitionSnapshot(
-          lockedFile.content,
-          content,
-          lockedFile.characterDefinitions
-        ),
-        updatedAt: fileUpdatedAt,
-      })
-      .where(eq(projectFiles.id, fileId));
+    // Resolve current exclusions under the project lock so stripping and DB
+    // promotion agree on which declarations remain source-owned.
+    const [settings] = await tx
+      .select({ excluded: projectSettings.excludedCharacterTags })
+      .from(projectSettings)
+      .where(eq(projectSettings.projectId, file.projectId))
+      .limit(1);
+    const excludedTags = new Set(
+      settings?.excluded ?? DEFAULT_EXCLUDED_RENPY_TAGS
+    );
 
-    await syncAuthoredCharacterDefinitions(
+    // Snapshot declarations from the authored input before stripping so
+    // screen/styling options round-trip through the managed record.
+    const characterDefinitions = updateCharacterDefinitionSnapshot(
+      lockedFile.content,
+      content,
+      lockedFile.characterDefinitions
+    );
+
+    const managedTags = await syncAuthoredCharacterDefinitions(
       tx,
       file.projectId,
       file.filePath,
       content,
-      lockedFile.content
+      lockedFile.content,
+      excludedTags
     );
-    // Sync labels from updated content (only for STORY files)
+
+    // Canonical stored content has manageable declarations removed atomically.
+    const canonicalContent = stripManagedCharacterDeclarations(
+      content,
+      file.filePath,
+      excludedTags,
+      managedTags
+    );
+    fileType = parseRPYFileWithLabels(canonicalContent, file.filePath).fileType;
+    const newContentHash = calculateContentHash(canonicalContent);
+
+    // Update the file content
+    await tx
+      .update(projectFiles)
+      .set({
+        content: canonicalContent,
+        fileType,
+        contentHash: newContentHash,
+        characterDefinitions,
+        updatedAt: fileUpdatedAt,
+      })
+      .where(eq(projectFiles.id, fileId));
+
+    // Sync labels from canonical stored content so label positions describe
+    // what is actually persisted.
     const syncResultForFile =
       fileType === "STORY"
         ? await syncLabelsFromFile(
             file.projectId,
             { filePath: file.filePath, fileType },
-            content,
+            canonicalContent,
             fileId,
             { skipCleanup: false, tx }
           )
@@ -861,15 +881,19 @@ async function applyFileUpdate(
     }
 
     return {
+      newContentHash,
       syncResultForFile,
       fileUpdatedAt,
       deletedCount,
+      canonicalContent,
     };
   });
 
+  const { canonicalContent, ...rest } = result;
   return {
-    newContentHash,
-    ...result,
+    ...rest,
+    normalizedContent:
+      content !== canonicalContent ? canonicalContent : undefined,
   };
 }
 
@@ -911,20 +935,26 @@ export async function updateFileContent(
   }
 
   // Phase 3: Apply the update in a transaction
-  const { newContentHash, fileUpdatedAt, syncResultForFile, deletedCount } =
-    await applyFileUpdate(
-      fileId,
-      userId,
-      content,
-      expectedContentHash,
-      file,
-      nextFileType
-    );
+  const {
+    newContentHash,
+    fileUpdatedAt,
+    syncResultForFile,
+    deletedCount,
+    normalizedContent,
+  } = await applyFileUpdate(
+    fileId,
+    userId,
+    content,
+    expectedContentHash,
+    file,
+    nextFileType
+  );
 
   return {
     success: true,
     contentHash: newContentHash,
     updatedAt: fileUpdatedAt.toISOString(),
+    normalizedContent,
     syncResult: {
       labelsCreated: syncResultForFile?.labelsCreated ?? 0,
       labelsUpdated: syncResultForFile?.labelsUpdated ?? 0,

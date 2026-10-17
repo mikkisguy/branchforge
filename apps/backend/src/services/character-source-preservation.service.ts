@@ -55,6 +55,38 @@ export function updateCharacterDefinitionSnapshot(
   return { ...definitions, ...next };
 }
 
+/**
+ * Strip safely manageable character declarations from authored content.
+ * Excluded tags, ambiguous duplicate tags, and unsupported forms remain
+ * source-owned so they round-trip unchanged.
+ */
+export function stripManagedCharacterDeclarations(
+  content: string,
+  filePath: string,
+  excludedTags: ReadonlySet<string>,
+  managedTags?: ReadonlySet<string>
+): string {
+  if (isSourceOwnedRpyFile(filePath)) return content;
+  const definitions = parseCharacterDefinitions(content);
+  const tagCounts = new Map<string, number>();
+  for (const definition of definitions) {
+    tagCounts.set(definition.tag, (tagCounts.get(definition.tag) ?? 0) + 1);
+  }
+  const toStrip: Array<{ start: number; end: number }> = [];
+  for (const definition of definitions) {
+    if (excludedTags.has(definition.tag)) continue;
+    if (managedTags && !managedTags.has(definition.tag)) continue;
+    if ((tagCounts.get(definition.tag) ?? 0) > 1) continue;
+    toStrip.push(definition);
+  }
+  let result = content;
+  for (const { start, end } of toStrip.reverse()) {
+    const endWithNewline = result[end] === "\n" ? end + 1 : end;
+    result = result.slice(0, start) + result.slice(endWithNewline);
+  }
+  return result;
+}
+
 /** Resolve accepted templates without consulting rejected or stale snapshots. */
 export function acceptedCharacterDefinitionContent(
   file: Parameters<typeof recoverLegacyCharacterSource>[0] & {
@@ -405,27 +437,53 @@ export async function syncAuthoredCharacterDefinitions(
   projectId: string,
   filePath: string,
   content: string,
-  previousContent: string
-): Promise<void> {
-  if (isSourceOwnedRpyFile(filePath)) return;
+  previousContent: string,
+  excludedTags: ReadonlySet<string>
+): Promise<Set<string>> {
+  const managedTags = new Set<string>();
+  if (isSourceOwnedRpyFile(filePath)) return managedTags;
   const previous = characterDefinitionSnapshot(previousContent);
   const definitions = characterDefinitionSnapshot(content);
+  const tagCounts = new Map<string, number>();
+  for (const definition of parseCharacterDefinitions(content)) {
+    tagCounts.set(definition.tag, (tagCounts.get(definition.tag) ?? 0) + 1);
+  }
+  if (Object.keys(definitions).length === 0) return managedTags;
+  const existing = await tx
+    .select({
+      tag: characters.renpyTag,
+      sourceDefinition: characters.sourceDefinition,
+    })
+    .from(characters)
+    .where(eq(characters.projectId, projectId));
+  const existingByTag = new Map(
+    existing.map((character) => [character.tag, character])
+  );
   for (const [tag, definition] of Object.entries(definitions)) {
+    if (excludedTags.has(tag) || (tagCounts.get(tag) ?? 0) > 1) continue;
     if (
       Object.hasOwn(previous, tag) &&
       previous[tag].declaration === definition.declaration
-    )
-      delete definitions[tag];
-  }
-  if (Object.keys(definitions).length === 0) return;
-  const [settings] = await tx
-    .select({ excluded: projectSettings.excludedCharacterTags })
-    .from(projectSettings)
-    .where(eq(projectSettings.projectId, projectId))
-    .limit(1);
-  const excluded = new Set(settings?.excluded ?? DEFAULT_EXCLUDED_RENPY_TAGS);
-  for (const [tag, definition] of Object.entries(definitions)) {
-    if (excluded.has(tag)) continue;
+    ) {
+      const character = existingByTag.get(tag);
+      if (character) {
+        // Recover the template without overwriting managed name/color edits.
+        if (!character.sourceDefinition) {
+          await tx
+            .update(characters)
+            .set({ sourceDefinition: definition })
+            .where(
+              and(
+                eq(characters.projectId, projectId),
+                eq(characters.renpyTag, tag),
+                isNull(characters.sourceDefinition)
+              )
+            );
+        }
+        managedTags.add(tag);
+      }
+      continue;
+    }
     const parsed = parseCharacterDefinitions(definition.declaration)[0];
     await tx
       .insert(characters)
@@ -448,5 +506,7 @@ export async function syncAuthoredCharacterDefinitions(
           updatedAt: new Date(),
         },
       });
+    managedTags.add(tag);
   }
+  return managedTags;
 }

@@ -813,6 +813,26 @@ export interface ProjectFileMutationResponse {
   hardDeleted: boolean;
 }
 
+/**
+ * Response from PUT /projects/files/:fileId content updates.
+ * When the server normalizes submitted text (e.g. strips managed character
+ * declarations), the canonical stored content is returned so the client can
+ * update its editor without a redundant round-trip.
+ */
+export interface UpdateProjectFileContentResponse {
+  success: true;
+  contentHash: string;
+  updatedAt: string;
+  normalizedContent?: string;
+  syncResult: {
+    labelsCreated: number;
+    labelsUpdated: number;
+    labelsDeleted: number;
+    linesProcessed: number;
+    errors: Array<{ label: string; error: string }>;
+  };
+}
+
 /** Response returned when deleting a project file. */
 export interface DeleteProjectFileResponse {
   deletedLabelCount: number;

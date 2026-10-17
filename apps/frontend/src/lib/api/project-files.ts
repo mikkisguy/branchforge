@@ -8,6 +8,7 @@
 import { API_BASE, request, getApiErrorMessage } from "./client";
 import type {
   ProjectFile,
+  UpdateProjectFileContentResponse,
   ImportZipResponse,
   ExportPreviewResponse,
   CreateProjectFileRequest,
@@ -34,11 +35,7 @@ export interface ProjectFileNode extends ProjectFile {
 }
 
 export type UpdateFileResponse =
-  | {
-      success: true;
-      contentHash: string;
-      updatedAt: string;
-    }
+  | Omit<UpdateProjectFileContentResponse, "syncResult">
   | {
       success: false;
       conflict: {
