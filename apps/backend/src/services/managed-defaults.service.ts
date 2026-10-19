@@ -100,6 +100,24 @@ export async function promoteManagedDefaults(
  */
 export async function catchUpManagedDefaults(projectId: string): Promise<void> {
   const db = getDb();
+  const candidates = await db
+    .select({
+      filePath: projectFiles.filePath,
+      content: projectFiles.content,
+    })
+    .from(projectFiles)
+    .where(
+      and(eq(projectFiles.projectId, projectId), isNull(projectFiles.deletedAt))
+    );
+  const hasCandidates = candidates.some((file) => {
+    const canonical = canonicalizeRpyFilePath(file.filePath);
+    if (!canonical.ok) return false;
+    const symbols = extractAndStripRpySymbols(file.content, canonical.filePath);
+    return symbols.variables.length > 0 || symbols.stats.length > 0;
+  });
+  if (!hasCandidates) return;
+
+  // The pre-check only skips work; promotion must read again under the lock.
   await db.transaction(async (tx) => {
     await lockProject(tx, projectId);
 
