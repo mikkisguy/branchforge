@@ -4,6 +4,12 @@ All notable changes to BranchForge will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v1.0.0-beta.19 - 2026-10-19
+
+- Fixed sensitive GitLab error details from leaking.
+- Fixed character declarations remaining in source files after becoming managed.
+- Fixed missing managed variable defaults in exports.
+
 ## v1.0.0-beta.18 - 2026-10-09
 
 - Fixed missing character definitions in exports and automatic returns breaking label flow.
