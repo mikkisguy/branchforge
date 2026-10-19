@@ -10,6 +10,7 @@ import {
   BRANCHFORGE_MANAGED_NOTICE,
   extractAndStripRpySymbols,
   extractLegacyRpySymbols,
+  DEFAULT_EXCLUDED_RENPY_TAGS,
 } from "./rpy-statements.service.js";
 
 /**
@@ -34,6 +35,15 @@ export function localContentBaselineHash(
   // policy or notice wording does not invent a local edit. Ignoring the path
   // here intentionally reproduces the legacy strip, never export behavior.
   if (file.contentHash) {
+    // The previous ownership-aware extractor used one combined notice.
+    // Recognize that exact content too, without hiding later authored edits.
+    const previous = extractLegacyRpySymbols(
+      file.originalContent,
+      file.filePath,
+      excludedTags ?? new Set(DEFAULT_EXCLUDED_RENPY_TAGS)
+    ).cleanedContent;
+    const previousHash = calculateContentHash(previous);
+    if (file.contentHash === previousHash) return previousHash;
     const legacy = extractLegacyRpySymbols(file.originalContent);
     if (
       legacy.characters.length ||

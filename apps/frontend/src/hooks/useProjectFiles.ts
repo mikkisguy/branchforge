@@ -8,8 +8,17 @@
 import { useCallback, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { projectFilesApi } from "@/lib/api/project-files";
-import type { ProjectFileNode } from "@/lib/api/project-files";
-import { projectFilesKeys, characterKeys } from "@/lib/query-keys";
+import type {
+  ProjectFileNode,
+  UpdateFileResponse,
+} from "@/lib/api/project-files";
+import {
+  projectFilesKeys,
+  characterKeys,
+  variableKeys,
+  statKeys,
+  exportKeys,
+} from "@/lib/query-keys";
 import type { SourceOrigin } from "@branchforge/shared";
 
 // ============================================================================
@@ -35,13 +44,7 @@ export interface UseProjectFilesReturn {
     fileId: string,
     content: string,
     options?: { expectedContentHash?: string }
-  ) => Promise<
-    | { success: true; contentHash: string; updatedAt: string }
-    | {
-        success: false;
-        conflict: { reason: "STALE_CONTENT_HASH"; currentContentHash: string };
-      }
-  >;
+  ) => Promise<UpdateFileResponse>;
   isUpdatingFile: boolean;
   createFile: (filePath: string) => Promise<ProjectFileNode>;
   isCreatingFile: boolean;
@@ -101,8 +104,12 @@ export function useProjectFiles(
         expectedContentHash,
       });
     },
-    onSuccess: () => {
-      // Script saves can update authored character declarations.
+    onSuccess: (result) => {
+      // Failed/conflicting responses must not invalidate as successful
+      // authored changes.
+      if (!result.success) return;
+      // Script saves can update authored character declarations and managed
+      // variable/stat defaults, which the export preview is generated from.
       if (projectId) {
         queryClient.invalidateQueries({ queryKey: characterKeys.all });
         queryClient.invalidateQueries({
@@ -110,6 +117,17 @@ export function useProjectFiles(
             ? projectFilesKeys.listsWithSource(projectId, options.source)
             : projectFilesKeys.lists(projectId),
         });
+        if (result.generatedFilesChanged) {
+          queryClient.invalidateQueries({
+            queryKey: variableKeys.lists(projectId),
+          });
+          queryClient.invalidateQueries({
+            queryKey: statKeys.lists(projectId),
+          });
+          queryClient.invalidateQueries({
+            queryKey: exportKeys.preview(projectId),
+          });
+        }
       }
     },
   });
@@ -190,6 +208,8 @@ export function useProjectFiles(
           success: true,
           contentHash: result.contentHash,
           updatedAt: result.updatedAt,
+          normalizedContent: result.normalizedContent,
+          generatedFilesChanged: result.generatedFilesChanged,
         };
       }
       return {

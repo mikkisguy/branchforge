@@ -70,3 +70,6 @@ tsconfig.schema.tsbuildinfo
 
 .playwright-mcp/
 paseo.json
+
+# Personal Command Code permissions
+/.commandcode/settings.local.json

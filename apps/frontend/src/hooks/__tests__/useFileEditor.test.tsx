@@ -60,6 +60,177 @@ describe("useFileEditor", () => {
     queryClient.clear();
   });
 
+  it.each(["label start:\n    return", ""])(
+    "updates the editor with server-normalized content %j after save",
+    async (normalizedContent) => {
+      const updateFileContent = vi.fn().mockResolvedValue({
+        success: true,
+        contentHash: "hash-normalized",
+        updatedAt: "2024-01-01T00:00:00.000Z",
+        normalizedContent,
+      });
+      const showErrorToast = vi.fn();
+
+      const { result } = renderHook(
+        () =>
+          useFileEditor({
+            projectId: "project-1",
+            projectFiles: [FILE_A],
+            updateFileContent,
+            showErrorToast,
+          }),
+        { wrapper }
+      );
+
+      await act(async () => {
+        const switched = await result.current.switchToFile(FILE_A);
+        expect(switched).toBe(true);
+      });
+
+      act(() => {
+        result.current.setEditedFileContent(
+          'define e = Character("E")\nlabel start:\n    return'
+        );
+      });
+
+      await act(async () => {
+        const saved = await result.current.triggerFileSave();
+        expect(saved).toBe(true);
+      });
+
+      expect(result.current.editedFileContent).toBe(normalizedContent);
+      expect(result.current.isFileDirty).toBe(false);
+      await act(async () => {
+        expect(await result.current.triggerFileSave()).toBe(true);
+      });
+      expect(updateFileContent).toHaveBeenCalledTimes(1);
+      expect(showErrorToast).not.toHaveBeenCalled();
+    }
+  );
+
+  it("reopens a stale tab snapshot using the latest normalized content and hash", async () => {
+    const normalizedContent = "label act_1:\n    return";
+    const updateFileContent = vi.fn().mockResolvedValue({
+      success: true,
+      contentHash: "hash-normalized",
+      updatedAt: "2024-01-02T00:00:00.000Z",
+      normalizedContent,
+    });
+    const { result } = renderHook(
+      () =>
+        useFileEditor({
+          projectId: "project-1",
+          projectFiles: [FILE_A, FILE_B],
+          updateFileContent,
+          showErrorToast: vi.fn(),
+        }),
+      { wrapper }
+    );
+    await act(async () => {
+      await result.current.switchToFile(FILE_A);
+    });
+    act(() => {
+      result.current.setEditedFileContent(
+        'define e = Character("E")\n' + FILE_A.content
+      );
+    });
+    await act(async () => {
+      await result.current.triggerFileSave();
+    });
+    await act(async () => {
+      await result.current.switchToFile(FILE_B);
+    });
+    await act(async () => {
+      await result.current.switchToFile(FILE_A);
+    });
+    expect(result.current.editedFileContent).toBe(normalizedContent);
+    expect(result.current.isFileDirty).toBe(false);
+    act(() => {
+      result.current.setEditedFileContent(normalizedContent + "\n# edit");
+    });
+    await act(async () => {
+      await result.current.triggerFileSave();
+    });
+    expect(updateFileContent).toHaveBeenLastCalledWith(
+      "file-1",
+      normalizedContent + "\n# edit",
+      { expectedContentHash: "hash-normalized" }
+    );
+  });
+
+  it("keeps newer typing when normalized content arrives after an edit", async () => {
+    vi.useFakeTimers();
+
+    try {
+      let resolveSave:
+        | ((value: {
+            success: true;
+            contentHash: string;
+            updatedAt: string;
+            normalizedContent?: string;
+          }) => void)
+        | undefined;
+      const updateFileContent = vi.fn().mockImplementation(
+        () =>
+          new Promise<{
+            success: true;
+            contentHash: string;
+            updatedAt: string;
+            normalizedContent?: string;
+          }>((resolve) => {
+            resolveSave = resolve;
+          })
+      );
+      const showErrorToast = vi.fn();
+
+      const { result } = renderHook(
+        () =>
+          useFileEditor({
+            projectId: "project-1",
+            projectFiles: [FILE_A],
+            updateFileContent,
+            showErrorToast,
+          }),
+        { wrapper }
+      );
+
+      await act(async () => {
+        const switched = await result.current.switchToFile(FILE_A);
+        expect(switched).toBe(true);
+      });
+
+      act(() => {
+        result.current.setEditedFileContent(
+          'define e = Character("E")\nlabel start:\n    return'
+        );
+      });
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1100);
+      });
+
+      expect(updateFileContent).toHaveBeenCalledTimes(1);
+
+      act(() => {
+        result.current.setEditedFileContent("newer typing");
+      });
+
+      await act(async () => {
+        resolveSave?.({
+          success: true,
+          contentHash: "hash-normalized",
+          updatedAt: "2024-01-01T00:00:00.000Z",
+          normalizedContent: "label start:\n    return",
+        });
+        await vi.advanceTimersByTimeAsync(0);
+      });
+
+      expect(result.current.editedFileContent).toBe("newer typing");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("switches files and saves edited content", async () => {
     const updateFileContent = vi.fn().mockResolvedValue({
       success: true,

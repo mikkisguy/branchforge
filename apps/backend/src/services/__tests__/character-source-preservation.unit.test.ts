@@ -3,6 +3,7 @@ import {
   recoverLegacyCharacterSource,
   updateCharacterDefinitionSnapshot,
   characterDefinitionSnapshot,
+  stripManagedCharacterDeclarations,
 } from "../character-source-preservation.service.js";
 import { extractLegacyRpySymbols } from "../rpy-statements.service.js";
 import { calculateContentHash } from "../../lib/hash.js";
@@ -48,6 +49,41 @@ describe("legacy character recovery evidence", () => {
     ).toBeNull();
   });
 
+  it("recognizes untouched imports with combined notices and excluded source", () => {
+    const raw = original + "\ndefault baked_dialogue_visible = False";
+    const previousContent = [
+      "# [BranchForge] Managed character definitions and boolean variable defaults were moved out of this file (exported as branchforge_definitions.rpy, branchforge_variables.rpy).",
+      "",
+      original.split("\n")[0],
+      "label start:",
+      '    "Narration"',
+      "    return",
+    ].join("\n");
+    const recovery = recoverLegacyCharacterSource(
+      {
+        ...file,
+        originalContent: raw,
+        content: previousContent,
+        contentHash: calculateContentHash(previousContent),
+      },
+      new Set(["narrator"])
+    );
+    expect(recovery?.definitions.e.declaration).toContain(
+      'what_font="font.ttf"'
+    );
+    expect(recovery?.content).toContain(original.split("\n")[0]);
+    expect(
+      recoverLegacyCharacterSource(
+        {
+          ...file,
+          originalContent: raw,
+          content: previousContent + "\n# edit",
+        },
+        new Set(["narrator"])
+      )
+    ).toBeNull();
+  });
+
   it("does not resurrect historical declarations removed in an accepted remote snapshot", () => {
     const recovery = recoverLegacyCharacterSource(
       {
@@ -80,5 +116,73 @@ describe("legacy character recovery evidence", () => {
     );
     expect(updated.narrator).toBeUndefined();
     expect(updated.e).toEqual(snapshot.e);
+  });
+});
+
+describe("stripManagedCharacterDeclarations", () => {
+  it("strips manageable character declarations and preserves dialogue", () => {
+    const source = `define e = Character("E", color="#abcdef", what_font="font.ttf")
+label start:
+    e "Hello"
+    return`;
+    const stripped = stripManagedCharacterDeclarations(
+      source,
+      "game/script.rpy",
+      new Set(["narrator"])
+    );
+    expect(stripped).not.toContain("define e =");
+    expect(stripped).toContain('e "Hello"');
+    expect(stripped).toContain("label start:");
+  });
+
+  it("preserves excluded tags in source", () => {
+    const source = `define narrator = Character(None, what_color="#cfcfcf")
+define e = Character("E", color="#abcdef")
+label start:`;
+    const stripped = stripManagedCharacterDeclarations(
+      source,
+      "game/script.rpy",
+      new Set(["narrator"])
+    );
+    expect(stripped).toContain("define narrator =");
+    expect(stripped).not.toContain("define e =");
+  });
+
+  it("leaves source-owned files untouched", () => {
+    const source = `define e = Character("E", color="#abcdef")
+label start:`;
+    for (const filePath of ["screens.rpy", "options.rpy", "gui.rpy"]) {
+      expect(
+        stripManagedCharacterDeclarations(source, filePath, new Set())
+      ).toBe(source);
+    }
+  });
+
+  it("preserves defaults and unsupported declarations", () => {
+    const source = `default affinity = 0
+define e = Character("E", color="#abcdef")
+define unsafe = Character(boss_name + "x", color="#abcdef")
+label start:`;
+    const stripped = stripManagedCharacterDeclarations(
+      source,
+      "game/script.rpy",
+      new Set()
+    );
+    expect(stripped).toContain("default affinity = 0");
+    expect(stripped).not.toContain('define e = Character("E"');
+    expect(stripped).toContain('define unsafe = Character(boss_name + "x"');
+  });
+
+  it("leaves ambiguous duplicate tags source-owned", () => {
+    const source = `define e = Character("First", color="#abcdef")
+define e = Character("Second", color="#123456")
+label start:`;
+    const stripped = stripManagedCharacterDeclarations(
+      source,
+      "game/script.rpy",
+      new Set()
+    );
+    expect(stripped).toContain('define e = Character("First"');
+    expect(stripped).toContain('define e = Character("Second"');
   });
 });

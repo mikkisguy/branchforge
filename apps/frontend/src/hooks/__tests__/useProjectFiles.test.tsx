@@ -7,9 +7,16 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { QueryClientProvider, type QueryClient } from "@tanstack/react-query";
 import { useProjectFiles } from "../useProjectFiles";
+import { useExportPreview } from "../useExportPreview";
 import { projectFilesApi } from "@/lib/api/project-files";
 import type { ProjectFileNode } from "@/lib/api/project-files";
-import { projectFilesKeys, characterKeys } from "@/lib/query-keys";
+import {
+  projectFilesKeys,
+  characterKeys,
+  variableKeys,
+  statKeys,
+  exportKeys,
+} from "@/lib/query-keys";
 import { createTestQueryClient } from "@/test/query-client";
 
 vi.mock("@/lib/api/project-files", () => ({
@@ -17,6 +24,7 @@ vi.mock("@/lib/api/project-files", () => ({
     listFiles: vi.fn(),
     updateFile: vi.fn(),
     createFile: vi.fn(),
+    getExportPreview: vi.fn(),
   },
 }));
 
@@ -65,6 +73,30 @@ describe("useProjectFiles", () => {
     queryClient.clear();
   });
 
+  it("forwards normalizedContent from a successful save", async () => {
+    vi.mocked(projectFilesApi.updateFile).mockResolvedValue({
+      success: true,
+      contentHash: "updated",
+      updatedAt: "2026-10-06T00:00:00Z",
+      normalizedContent: "label start:\n    return",
+    });
+    const { result } = renderHook(() => useProjectFiles("project-1"), {
+      wrapper,
+    });
+    await waitFor(() => expect(result.current.files).toEqual(mockFiles));
+    const response = await act(async () => {
+      return result.current.updateFileContent(
+        "file-1",
+        'define e = Character("E")\nlabel start:\n    return'
+      );
+    });
+    expect(response).toMatchObject({
+      success: true,
+      contentHash: "updated",
+      normalizedContent: "label start:\n    return",
+    });
+  });
+
   it("refreshes character queries after saving an authored declaration", async () => {
     vi.mocked(projectFilesApi.updateFile).mockResolvedValue({
       success: true,
@@ -85,6 +117,115 @@ describe("useProjectFiles", () => {
     expect(
       queryClient.getQueryState(characterKeys.lists("project-1"))?.isInvalidated
     ).toBe(true);
+  });
+
+  it("refreshes the active generated preview and managed lists after a save", async () => {
+    vi.mocked(projectFilesApi.updateFile).mockResolvedValue({
+      success: true,
+      contentHash: "updated",
+      updatedAt: "2026-10-17T00:00:00Z",
+      generatedFilesChanged: true,
+    });
+    const emptyFile = {
+      kind: "variables" as const,
+      fileName: "branchforge_variables.rpy",
+      content: "# Variables",
+      isEmpty: true,
+      emptyReason: "No managed variable defaults to export",
+    };
+    vi.mocked(projectFilesApi.getExportPreview).mockResolvedValue({
+      files: [emptyFile],
+    });
+    queryClient.setQueryData(variableKeys.lists("project-1"), []);
+    queryClient.setQueryData(statKeys.lists("project-1"), []);
+    queryClient.setQueryData(exportKeys.preview("project-2"), { files: [] });
+    const { result } = renderHook(
+      () => ({
+        files: useProjectFiles("project-1"),
+        preview: useExportPreview("project-1"),
+      }),
+      { wrapper }
+    );
+    await waitFor(() => {
+      expect(result.current.preview.data?.files[0].isEmpty).toBe(true);
+    });
+    vi.mocked(projectFilesApi.getExportPreview).mockResolvedValue({
+      files: [
+        {
+          ...emptyFile,
+          content: "default baked_dialogue_visible = False",
+          isEmpty: false,
+          emptyReason: null,
+        },
+      ],
+    });
+    await act(async () => {
+      await result.current.files.updateFileContent(
+        "file-1",
+        "default baked_dialogue_visible = False"
+      );
+    });
+    await waitFor(() => {
+      expect(result.current.preview.data?.files[0]).toMatchObject({
+        isEmpty: false,
+        content: "default baked_dialogue_visible = False",
+      });
+    });
+    for (const key of [
+      variableKeys.lists("project-1"),
+      statKeys.lists("project-1"),
+    ]) {
+      expect(queryClient.getQueryState(key)?.isInvalidated).toBe(true);
+    }
+    expect(
+      queryClient.getQueryState(exportKeys.preview("project-2"))?.isInvalidated
+    ).toBe(false);
+
+    vi.mocked(projectFilesApi.updateFile).mockResolvedValue({
+      success: true,
+      contentHash: "dialogue-update",
+      updatedAt: "2026-10-17T00:00:01Z",
+      generatedFilesChanged: false,
+    });
+    const requestCount = vi.mocked(projectFilesApi.getExportPreview).mock.calls
+      .length;
+    await act(async () => {
+      for (let i = 0; i < 3; i += 1) {
+        await result.current.files.updateFileContent(
+          "file-1",
+          `label start:\n    "Edit ${i}"`
+        );
+      }
+    });
+    expect(projectFilesApi.getExportPreview).toHaveBeenCalledTimes(
+      requestCount
+    );
+  });
+
+  it("does not invalidate generated data when the save conflicts", async () => {
+    vi.mocked(projectFilesApi.updateFile).mockResolvedValue({
+      success: false,
+      conflict: { reason: "STALE_CONTENT_HASH", currentContentHash: "newer" },
+    });
+    const keys = [
+      variableKeys.lists("project-1"),
+      statKeys.lists("project-1"),
+      exportKeys.preview("project-1"),
+    ];
+    for (const key of keys) queryClient.setQueryData(key, []);
+    const { result } = renderHook(() => useProjectFiles("project-1"), {
+      wrapper,
+    });
+    await act(async () => {
+      const response = await result.current.updateFileContent(
+        "file-1",
+        "default flag = False"
+      );
+      expect(response.success).toBe(false);
+    });
+    for (const key of keys) {
+      expect(queryClient.getQueryState(key)?.isInvalidated).toBe(false);
+    }
   });
 
   it("creates a file via the API and invalidates list queries", async () => {

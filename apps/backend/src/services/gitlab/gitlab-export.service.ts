@@ -57,6 +57,7 @@ import {
   DEFAULT_EXCLUDED_RENPY_TAGS,
 } from "../rpy-statements.service.js";
 import { ensureCharacterSourcePreservation } from "../character-source-preservation.service.js";
+import { catchUpManagedDefaults } from "../managed-defaults.service.js";
 import { assertExcludedCharactersHaveSourceOwnership } from "../export-consistency.service.js";
 
 import type { SyncOperation } from "../gitlab.types.js";
@@ -735,8 +736,9 @@ export async function exportToGitlab(
 ): Promise<SyncOperation> {
   await requireProjectOwnership(projectId, userId);
 
-  // Idempotent source-preservation maintenance must run after the ownership
-  // guard and before any file content is read or generated.
+  // Promote current defaults before character recovery can strip them.
+  // Both maintenance steps run after authorization and before export reads.
+  await catchUpManagedDefaults(projectId);
   await ensureCharacterSourcePreservation(projectId);
 
   const db = getDb();

@@ -40,6 +40,7 @@ import {
   DEFAULT_EXCLUDED_RENPY_TAGS,
 } from "./rpy-statements.service.js";
 import { ensureCharacterSourcePreservation } from "./character-source-preservation.service.js";
+import { catchUpManagedDefaults } from "./managed-defaults.service.js";
 import { assertExcludedCharactersHaveSourceOwnership } from "./export-consistency.service.js";
 import { checkRateLimit } from "./rate-limiter.service.js";
 import { logInfo, logError, logWarn, LogEventType } from "../lib/logger.js";
@@ -237,8 +238,9 @@ export async function generateExport(
   // Verify project access
   await requireProjectAccess(projectId, userId);
 
-  // Idempotent source-preservation maintenance must run after the access
-  // guard and before any file content is read or generated.
+  // Promote current defaults before character recovery can strip them.
+  // Both maintenance steps run after authorization and before export reads.
+  await catchUpManagedDefaults(projectId);
   await ensureCharacterSourcePreservation(projectId);
 
   const db = getDb();
@@ -507,8 +509,9 @@ export async function getExportPreview(
   // Verify project access
   await requireProjectAccess(projectId, userId);
 
-  // Idempotent source-preservation maintenance must run after the access
-  // guard and before any file content is read or generated.
+  // Promote current defaults before character recovery can strip them.
+  // Both maintenance steps run after authorization and before export reads.
+  await catchUpManagedDefaults(projectId);
   await ensureCharacterSourcePreservation(projectId);
 
   // Use the same ownership boundary as the ZIP export, including active

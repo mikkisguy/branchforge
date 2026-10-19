@@ -31,6 +31,10 @@ vi.mock("../rpy-generator.service.js", () => ({
   normalizeCharacterNameType: vi.fn((nameType: string) => nameType),
 }));
 
+vi.mock("../managed-defaults.service.js", () => ({
+  catchUpManagedDefaults: vi.fn(async () => {}),
+}));
+
 vi.mock("../character-source-preservation.service.js", () => ({
   ensureCharacterSourcePreservation: vi.fn(async () => {}),
 }));

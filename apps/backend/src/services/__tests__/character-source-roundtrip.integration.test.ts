@@ -2,6 +2,7 @@ import JSZip from "jszip";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { eq, inArray } from "drizzle-orm";
 import { getDb } from "../../db/index.js";
+import { calculateContentHash } from "../../lib/hash.js";
 import {
   users,
   projects,
@@ -17,7 +18,7 @@ import {
   projectSettingsSchema,
 } from "../../lib/validation/characters.js";
 import { importZipFile } from "../zip-import.service.js";
-import { updateFileContent } from "../projects.service.js";
+import { getProjectFiles, updateFileContent } from "../projects.service.js";
 import { charactersService } from "../characters.service.js";
 import { characterLinkerService } from "../character-linker.service.js";
 import {
@@ -64,6 +65,47 @@ describe("character source round trips", () => {
     await db.delete(projects).where(eq(projects.id, projectId));
     await db.delete(users).where(eq(users.id, userId));
   });
+
+  it.each(["preview", "zip", "file list"])(
+    "promotes current defaults before character recovery during %s",
+    async (kind) => {
+      const source =
+        'default baked_dialogue_visible = False\nlabel start:\n    "Hello"\n    return';
+      await db.insert(projectFiles).values({
+        projectId,
+        filePath: "game/script.rpy",
+        fileType: "STORY",
+        source: "ZIP",
+        content: source,
+        contentHash: calculateContentHash(source),
+        originalContent: source,
+      });
+      if (kind === "file list") {
+        await getProjectFiles(projectId, userId);
+      }
+      if (kind !== "zip") {
+        const preview = await getExportPreview(projectId, userId);
+        const variablesFile = preview.files.find(
+          (file) => file.kind === "variables"
+        );
+        expect(variablesFile?.isEmpty).toBe(false);
+        expect(variablesFile?.content).toContain(
+          "default baked_dialogue_visible = False"
+        );
+      } else {
+        const exported = await generateExport(projectId, userId);
+        const download = await getExportForDownload(
+          exported.id,
+          projectId,
+          userId
+        );
+        const files = JSON.parse(download.content) as Record<string, string>;
+        expect(files["game/branchforge_variables.rpy"]).toContain(
+          "default baked_dialogue_visible = False"
+        );
+      }
+    }
+  );
 
   it("imports, links, previews, and exports n and u as ordinary characters", async () => {
     const declarations = [
@@ -254,7 +296,18 @@ label start:
     const source =
       'define e = Character("Script name", who_color="#fedcba", what_italic=False, what_font="script.ttf")\n' +
       file.content;
-    await updateFileContent(file.id, userId, source, file.contentHash);
+    const saveResult = await updateFileContent(
+      file.id,
+      userId,
+      source,
+      file.contentHash
+    );
+    const [savedAfterEdit] = await db
+      .select()
+      .from(projectFiles)
+      .where(eq(projectFiles.id, file.id));
+    expect(savedAfterEdit.content).not.toContain("define e =");
+    expect(saveResult.normalizedContent).toBe(savedAfterEdit.content);
     const [character] = await db
       .select()
       .from(characters)
@@ -286,6 +339,110 @@ label start:
         (entry) => entry.kind === "definitions"
       )?.content
     ).toContain('what_font="script.ttf"');
+  });
+
+  it("strips a newly authored safe declaration on script save while preserving excluded and unsupported declarations", async () => {
+    await importZipFile(projectId, await archive(original));
+    const [file] = await db
+      .select()
+      .from(projectFiles)
+      .where(eq(projectFiles.projectId, projectId));
+    const screen = `screen invisible_say(who, what):
+    if who is not None:
+        text who id "who" alpha 0.0
+    text what id "what" alpha 0.0`;
+    const source = `${screen}
+define new_char = Character("[ne_first]", screen="invisible_say", color="#112233", what_italic=True, what_font="new.ttf")
+define narrator = Character(None, what_color="#cfcfcf", what_italic=True)
+define unsafe = Character(boss_name + "x", color="#445566")
+label start:
+    new_char "Hello"
+    return`;
+    const saveResult = await updateFileContent(
+      file.id,
+      userId,
+      source,
+      file.contentHash
+    );
+    expect(saveResult.normalizedContent).toBeDefined();
+    const [saved] = await db
+      .select()
+      .from(projectFiles)
+      .where(eq(projectFiles.id, file.id));
+    expect(saved.content).not.toContain("define new_char =");
+    expect(saved.content).toContain(screen);
+    expect(saveResult.contentHash).toBe(saved.contentHash);
+    expect(saved.content).toContain("define narrator =");
+    expect(saved.content).toContain("define unsafe = Character(boss_name");
+    expect(saved.content).toContain('new_char "Hello"');
+
+    const rows = await db
+      .select()
+      .from(characters)
+      .where(eq(characters.projectId, projectId));
+    const newChar = rows.find((row) => row.renpyTag === "new_char");
+    expect(newChar).toBeDefined();
+    expect(newChar?.sourceDefinition?.declaration).toContain(
+      'what_font="new.ttf"'
+    );
+
+    const preview = await getExportPreview(projectId, userId);
+    const definitions = preview.files.find(
+      (entry) => entry.kind === "definitions"
+    )?.content;
+    expect(definitions).toContain('define new_char = Character("[ne_first]"');
+    expect(definitions).toContain('screen="invisible_say"');
+    expect(definitions).toContain('what_font="new.ttf"');
+    const exported = await generateExport(projectId, userId);
+    const download = await getExportForDownload(exported.id, projectId, userId);
+    const files = JSON.parse(download.content) as Record<string, string>;
+    const story = files["game/script.rpy"];
+    const generated = files["game/branchforge_definitions.rpy"];
+    expect(story).toContain(screen);
+    const combined = story + generated;
+    expect(combined.match(/define new_char\s*=/g)).toHaveLength(1);
+    expect(combined.match(/define narrator\s*=/g)).toHaveLength(1);
+    expect(combined.match(/define unsafe\s*=/g)).toHaveLength(1);
+  });
+
+  it("recovers missing templates before stripping unchanged declarations without replacing managed edits", async () => {
+    await importZipFile(projectId, await archive(original));
+    const [file] = await db
+      .select()
+      .from(projectFiles)
+      .where(eq(projectFiles.projectId, projectId));
+    const source =
+      'define e = Character("Eileen", screen="invisible_say", what_font="legacy.ttf")\nlabel start:\n    e "Hello"\n    return';
+    const hash = calculateContentHash(source);
+    await db
+      .update(projectFiles)
+      .set({ content: source, contentHash: hash })
+      .where(eq(projectFiles.id, file.id));
+    await db
+      .update(characters)
+      .set({ name: "UI name", sourceDefinition: null })
+      .where(eq(characters.projectId, projectId));
+    const saved = await updateFileContent(
+      file.id,
+      userId,
+      source + "\n# unrelated edit",
+      hash
+    );
+    expect(saved.normalizedContent).not.toContain("define e =");
+    const [character] = await db
+      .select()
+      .from(characters)
+      .where(eq(characters.projectId, projectId));
+    expect(character.name).toBe("UI name");
+    expect(character.sourceDefinition?.declaration).toContain(
+      'screen="invisible_say"'
+    );
+    const definitions = (await getExportPreview(projectId, userId)).files.find(
+      (entry) => entry.kind === "definitions"
+    )?.content;
+    expect(definitions).toContain('Character("UI name"');
+    expect(definitions).toContain('screen="invisible_say"');
+    expect(definitions).toContain('what_font="legacy.ttf"');
   });
 
   it("does not resurrect a deleted excluded narrator after unrelated settings changes", async () => {

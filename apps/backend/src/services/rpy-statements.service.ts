@@ -78,8 +78,8 @@ export interface RpySymbolExtraction {
    *  managed `default <key> = <value>` lines removed. Only boolean
    *  (`True`/`False`) and numeric defaults are managed; unknown
    *  default RHS values remain verbatim. When anything managed was
-   *  stripped, a single `# [BranchForge] ...` notice is placed on
-   *  the absolute first line, followed by one blank line
+   *  stripped, one `# [BranchForge] ...` notice per category is placed
+   *  at the top, followed by one blank line
    *  (idempotent across re-imports). Other content is preserved
    *  verbatim. */
   cleanedContent: string;
@@ -243,10 +243,10 @@ export function computeCommonDirectoryPrefix(filePaths: string[]): string {
  * - Recognises single-line `default <key> = <value>` statements.
  * - Leaves everything else (labels, dialogue, comments, blank lines)
  *   untouched.
- * - If any managed statement was stripped, prepends a single
- *   `# [BranchForge] ...` notice as the absolute first line,
- *   followed by one blank line, replacing any prior BranchForge
- *   import notices (idempotent across re-imports). Leading blank
+ * - If any managed statement was stripped, prepends one
+ *   `# [BranchForge] ...` notice per category, followed by one blank
+ *   line. Prior notice categories are retained without duplication
+ *   (idempotent across re-imports). Leading blank
  *   lines in the remaining content are collapsed as part of that
  *   idempotency (intentional trade-off vs preserving author-leading
  *   whitespace before the first managed statement).
@@ -274,14 +274,19 @@ export function extractAndStripRpySymbols(
 }
 
 /** Reproduce historical stripping only for legacy recovery/baseline evidence. */
-export function extractLegacyRpySymbols(content: string): RpySymbolExtraction {
-  return extractRpySymbols(content, undefined, undefined);
+export function extractLegacyRpySymbols(
+  content: string,
+  filePath?: string,
+  excludedTags?: ReadonlySet<string>
+): RpySymbolExtraction {
+  return extractRpySymbols(content, filePath, excludedTags, true);
 }
 
 function extractRpySymbols(
   content: string,
   filePath: string | undefined,
-  excludedTags: ReadonlySet<string> | undefined
+  excludedTags: ReadonlySet<string> | undefined,
+  useLegacyNotices = false
 ): RpySymbolExtraction {
   if (filePath && isSourceOwnedRpyFile(filePath)) {
     return {
@@ -441,21 +446,46 @@ function extractRpySymbols(
   }
 
   if (strippedSomething) {
-    // Drop prior BranchForge notices (current + legacy breadcrumbs),
-    // then place exactly one fresh notice + blank at the top.
+    // Keep known relocation categories from earlier exports. Historical
+    // recovery retains its exact combined-notice format for baseline evidence.
+    const priorCategories = new Set<ManagedCategory>();
+    if (!useLegacyNotices) {
+      for (const line of output) {
+        if (!isBranchForgeImportNotice(line.trim())) continue;
+        for (const category of Object.keys(
+          CATEGORY_TO_FILE
+        ) as ManagedCategory[]) {
+          if (line.includes(CATEGORY_TO_FILE[category])) {
+            priorCategories.add(category);
+          }
+        }
+      }
+    }
     // Collapse leading blanks so re-import does not stack empties.
     const cleaned = output.filter((l) => !isBranchForgeImportNotice(l.trim()));
     while (cleaned.length > 0 && cleaned[0].trim() === "") {
       cleaned.shift();
     }
     const categories: ManagedCategory[] = [];
-    if (charactersByTag.size > 0) categories.push("character definitions");
-    if (variablesByKey.size > 0) categories.push("boolean variable defaults");
-    if (statsByKey.size > 0) categories.push("numeric stat defaults");
-    const notice = buildManagedNotice(categories);
-    if (notice) {
-      cleaned.unshift(notice, "");
+    if (
+      charactersByTag.size > 0 ||
+      priorCategories.has("character definitions")
+    ) {
+      categories.push("character definitions");
     }
+    if (
+      variablesByKey.size > 0 ||
+      priorCategories.has("boolean variable defaults")
+    ) {
+      categories.push("boolean variable defaults");
+    }
+    if (statsByKey.size > 0 || priorCategories.has("numeric stat defaults")) {
+      categories.push("numeric stat defaults");
+    }
+    const notices = useLegacyNotices
+      ? [buildManagedNotice(categories)]
+      : categories.map((category) => buildManagedNotice([category]));
+    cleaned.unshift(...notices.filter((notice) => notice !== null), "");
     return {
       cleanedContent: cleaned.join("\n"),
       characters: Array.from(charactersByTag.values()),
