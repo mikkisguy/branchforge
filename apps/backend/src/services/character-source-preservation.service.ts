@@ -1,6 +1,7 @@
 import { and, asc, eq, isNull } from "drizzle-orm";
 import type { CharacterSourceDefinition } from "@branchforge/shared";
 import { getDb } from "../db/index.js";
+import { promoteManagedDefaults } from "./managed-defaults.service.js";
 import {
   characters,
   projectFiles,
@@ -160,7 +161,15 @@ export function recoverLegacyCharacterSource(
       file.filePath,
       excludedTags
     ).cleanedContent;
-    if (![legacy, oldNotice, modern, raw].includes(file.content)) continue;
+    const previousModern = extractLegacyRpySymbols(
+      raw,
+      file.filePath,
+      excludedTags
+    ).cleanedContent;
+    if (
+      ![legacy, oldNotice, previousModern, modern, raw].includes(file.content)
+    )
+      continue;
     return {
       content: modern,
       definitions: isSourceOwnedRpyFile(file.filePath)
@@ -202,6 +211,9 @@ export async function ensureCharacterSourcePreservation(
           isNull(projectFiles.deletedAt)
         )
       );
+    // Any entry point can trigger recovery. Preserve current defaults in
+    // this transaction before recovery removes declarations from content.
+    await promoteManagedDefaults(tx, projectId, files);
     const templates = new Map<string, CharacterSourceDefinition[]>();
     const legacyBaselines = new Map<
       string,

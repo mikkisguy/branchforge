@@ -18,7 +18,7 @@ import {
   projectSettingsSchema,
 } from "../../lib/validation/characters.js";
 import { importZipFile } from "../zip-import.service.js";
-import { updateFileContent } from "../projects.service.js";
+import { getProjectFiles, updateFileContent } from "../projects.service.js";
 import { charactersService } from "../characters.service.js";
 import { characterLinkerService } from "../character-linker.service.js";
 import {
@@ -65,6 +65,47 @@ describe("character source round trips", () => {
     await db.delete(projects).where(eq(projects.id, projectId));
     await db.delete(users).where(eq(users.id, userId));
   });
+
+  it.each(["preview", "zip", "file list"])(
+    "promotes current defaults before character recovery during %s",
+    async (kind) => {
+      const source =
+        'default baked_dialogue_visible = False\nlabel start:\n    "Hello"\n    return';
+      await db.insert(projectFiles).values({
+        projectId,
+        filePath: "game/script.rpy",
+        fileType: "STORY",
+        source: "ZIP",
+        content: source,
+        contentHash: calculateContentHash(source),
+        originalContent: source,
+      });
+      if (kind === "file list") {
+        await getProjectFiles(projectId, userId);
+      }
+      if (kind !== "zip") {
+        const preview = await getExportPreview(projectId, userId);
+        const variablesFile = preview.files.find(
+          (file) => file.kind === "variables"
+        );
+        expect(variablesFile?.isEmpty).toBe(false);
+        expect(variablesFile?.content).toContain(
+          "default baked_dialogue_visible = False"
+        );
+      } else {
+        const exported = await generateExport(projectId, userId);
+        const download = await getExportForDownload(
+          exported.id,
+          projectId,
+          userId
+        );
+        const files = JSON.parse(download.content) as Record<string, string>;
+        expect(files["game/branchforge_variables.rpy"]).toContain(
+          "default baked_dialogue_visible = False"
+        );
+      }
+    }
+  );
 
   it("imports, links, previews, and exports n and u as ordinary characters", async () => {
     const declarations = [

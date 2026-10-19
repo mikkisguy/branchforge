@@ -824,6 +824,7 @@ export interface UpdateProjectFileContentResponse {
   contentHash: string;
   updatedAt: string;
   normalizedContent?: string;
+  generatedFilesChanged?: boolean;
   syncResult: {
     labelsCreated: number;
     labelsUpdated: number;

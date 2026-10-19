@@ -54,6 +54,9 @@ import { testEmail, testUuid } from "../../utils/test-ids.js";
 import { calculateContentHash } from "../../lib/hash.js";
 import * as labelsService from "../labels.service.js";
 import { extractAndStripRpySymbols } from "../rpy-statements.service.js";
+import { updateFileContent } from "../projects.service.js";
+import { parseRPYFileWithLabels as parseRealRPY } from "../rpy/parser.js";
+import { generateVariablesFile } from "../rpy-generator.service.js";
 
 describe("GitLabSyncService (Integration)", () => {
   let db: ReturnType<typeof getDb>;
@@ -1285,7 +1288,18 @@ describe("GitLabSyncService (Integration)", () => {
           remoteRevision: "existing-revision",
         })
         .where(eq(projectFiles.id, testGitlabFileId));
-      mockRemoteContent(exportedContent);
+      vi.spyOn(
+        gitlabRepoService,
+        "getFileContentWithMetadata"
+      ).mockImplementation(async (_projectId, _userId, filePath) => ({
+        content:
+          filePath === "game/branchforge_variables.rpy"
+            ? generateVariablesFile([{ key: "has_key" }])
+            : exportedContent,
+        lastCommitId: "remote-rev-1",
+        contentSha256: null,
+        blobId: null,
+      }));
       const commitSpy = vi.spyOn(gitlabFileService, "batchCommitFiles");
       const result = await exportToGitlab(
         testProjectId,
@@ -1353,6 +1367,75 @@ describe("GitLabSyncService (Integration)", () => {
       expect(result.errorMessage).toContain("remote file changed");
       expect(commitSpy).not.toHaveBeenCalled();
     });
+
+    it.each(["save", "current"])(
+      "exports unpromoted defaults from %s content in the same GitLab commit",
+      async (kind) => {
+        vi.spyOn(rpyParserService, "parseRPYFileWithLabels").mockImplementation(
+          parseRealRPY
+        );
+        await db
+          .update(projectFiles)
+          .set({
+            originalContent: testGitlabFile.content,
+            remoteContent: testGitlabFile.content,
+            remoteContentHash: calculateContentHash(testGitlabFile.content),
+            lastPushedContentHash: calculateContentHash(testGitlabFile.content),
+          })
+          .where(eq(projectFiles.id, testGitlabFileId));
+        const source = `default baked_dialogue_visible = False\n${testGitlabFile.content}`;
+        if (kind === "save") {
+          await updateFileContent(testGitlabFileId, testUserId, source);
+        } else {
+          await db
+            .update(projectFiles)
+            .set({
+              content: source,
+              contentHash: calculateContentHash(source),
+            })
+            .where(eq(projectFiles.id, testGitlabFileId));
+        }
+        vi.spyOn(
+          gitlabRepoService,
+          "getFileContentWithMetadata"
+        ).mockImplementation(async (_projectId, _userId, filePath) => ({
+          content:
+            filePath === testGitlabFile.filePath
+              ? testGitlabFile.content
+              : null,
+          lastCommitId: "remote-rev-1",
+          contentSha256: null,
+          blobId: null,
+        }));
+        const commit = vi
+          .spyOn(gitlabFileService, "batchCommitFiles")
+          .mockResolvedValue("commit-defaults");
+        const result = await exportToGitlab(
+          testProjectId,
+          testUserId,
+          testBranch
+        );
+        expect(result.status, result.errorMessage ?? undefined).toBe(
+          "COMPLETED"
+        );
+        const actions = commit.mock.calls[0]?.[4] ?? [];
+        const generated = actions.find(
+          (action) => action.filePath === "game/branchforge_variables.rpy"
+        );
+        const story = actions.find(
+          (action) => action.filePath === testGitlabFile.filePath
+        );
+        expect(generated?.action).toBe("create");
+        expect(generated?.content).toContain(
+          "default baked_dialogue_visible = False"
+        );
+        expect(story?.content).toBeDefined();
+        expect(story?.content).not.toContain(
+          "default baked_dialogue_visible ="
+        );
+        expect(commit).toHaveBeenCalledTimes(1);
+      }
+    );
 
     it("creates generated files when absent and updates them after export", async () => {
       await db.insert(variables).values({

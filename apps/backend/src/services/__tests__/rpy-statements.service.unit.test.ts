@@ -12,6 +12,7 @@ import { describe, it, expect } from "vitest";
 import {
   BRANCHFORGE_MANAGED_NOTICE,
   computeCommonDirectoryPrefix,
+  extractLegacyRpySymbols,
   extractAndStripRpySymbols,
 } from "../rpy-statements.service.js";
 
@@ -428,7 +429,59 @@ describe("rpy-statements.service", () => {
       expect(result.cleanedContent).not.toContain("# [BranchForge]");
     });
 
-    it("keeps a single top notice across re-import (idempotent)", () => {
+    it("adds a variable notice without replacing the earlier character notice", () => {
+      const first = extractAndStripRpySymbols(
+        'define e = Character("Eileen")\nlabel start:\n    return'
+      );
+      const second = extractAndStripRpySymbols(
+        `${first.cleanedContent}\ndefault baked_dialogue_visible = False`
+      );
+      expect(second.cleanedContent.split("\n").slice(0, 3)).toEqual([
+        CHARACTER_NOTICE,
+        VARIABLE_NOTICE,
+        "",
+      ]);
+      expect(second.cleanedContent).not.toContain("default baked_dialogue");
+      const repeated = extractAndStripRpySymbols(
+        `${second.cleanedContent}\ndefault baked_dialogue_visible = False`
+      );
+      expect(
+        repeated.cleanedContent
+          .split("\n")
+          .filter((line) => line.startsWith("# [BranchForge]"))
+      ).toEqual([CHARACTER_NOTICE, VARIABLE_NOTICE]);
+      expect(
+        extractAndStripRpySymbols(second.cleanedContent).cleanedContent
+      ).toBe(second.cleanedContent);
+    });
+
+    it("splits combined notices while preserving all known relocation categories", () => {
+      const combined =
+        "# [BranchForge] Managed character definitions and boolean variable defaults were moved out of this file (exported as branchforge_definitions.rpy, branchforge_variables.rpy).";
+      const result = extractAndStripRpySymbols(
+        `${combined}\n\ndefault trust = 50\nlabel start:\n    return`
+      );
+      expect(result.cleanedContent.split("\n").slice(0, 4)).toEqual([
+        CHARACTER_NOTICE,
+        VARIABLE_NOTICE,
+        STAT_NOTICE,
+        "",
+      ]);
+    });
+
+    it("preserves the historical combined notice format for legacy recovery", () => {
+      const source = 'define e = Character("Eileen")\ndefault flag = False';
+      expect(
+        extractLegacyRpySymbols(source).cleanedContent.split("\n")[0]
+      ).toBe(
+        "# [BranchForge] Managed character definitions and boolean variable defaults were moved out of this file (exported as branchforge_definitions.rpy, branchforge_variables.rpy)."
+      );
+      expect(
+        extractAndStripRpySymbols(source).cleanedContent.split("\n").slice(0, 2)
+      ).toEqual([CHARACTER_NOTICE, VARIABLE_NOTICE]);
+    });
+
+    it("keeps a single notice per category across re-import (idempotent)", () => {
       const content = [
         BRANCHFORGE_MANAGED_NOTICE,
         "# [BranchForge] Character 'e' moved to Characters → exported as branchforge_definitions.rpy",

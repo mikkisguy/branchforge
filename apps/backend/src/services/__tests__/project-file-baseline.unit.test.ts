@@ -11,6 +11,35 @@ import {
 } from "../rpy-statements.service.js";
 
 describe("project-file-baseline", () => {
+  it("recognizes combined notices with current ownership without masking edits", () => {
+    const originalContent = [
+      "define narrator = Character(None, what_italic=True)",
+      'define e = Character("E")',
+      "default baked_dialogue_visible = False",
+      "label start:",
+      "    return",
+    ].join("\n");
+    const previousContent = [
+      "# [BranchForge] Managed character definitions and boolean variable defaults were moved out of this file (exported as branchforge_definitions.rpy, branchforge_variables.rpy).",
+      "",
+      originalContent.split("\n")[0],
+      "label start:",
+      "    return",
+    ].join("\n");
+    const file = {
+      filePath: "game/script.rpy",
+      originalContent,
+      contentHash: calculateContentHash(previousContent),
+      lastPushedContentHash: null,
+    };
+    expect(hasUnpushedLocalContent(file)).toBe(false);
+    expect(
+      hasUnpushedLocalContent({
+        ...file,
+        contentHash: calculateContentHash(previousContent + "\n# edit"),
+      })
+    ).toBe(true);
+  });
   it("recognizes category-specific historical notices after ownership changes", () => {
     const originalContent =
       "define narrator = Character(None, what_italic=True)\nlabel start:\n    return";

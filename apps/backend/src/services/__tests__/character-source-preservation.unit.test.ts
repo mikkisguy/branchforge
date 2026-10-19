@@ -49,6 +49,41 @@ describe("legacy character recovery evidence", () => {
     ).toBeNull();
   });
 
+  it("recognizes untouched imports with combined notices and excluded source", () => {
+    const raw = original + "\ndefault baked_dialogue_visible = False";
+    const previousContent = [
+      "# [BranchForge] Managed character definitions and boolean variable defaults were moved out of this file (exported as branchforge_definitions.rpy, branchforge_variables.rpy).",
+      "",
+      original.split("\n")[0],
+      "label start:",
+      '    "Narration"',
+      "    return",
+    ].join("\n");
+    const recovery = recoverLegacyCharacterSource(
+      {
+        ...file,
+        originalContent: raw,
+        content: previousContent,
+        contentHash: calculateContentHash(previousContent),
+      },
+      new Set(["narrator"])
+    );
+    expect(recovery?.definitions.e.declaration).toContain(
+      'what_font="font.ttf"'
+    );
+    expect(recovery?.content).toContain(original.split("\n")[0]);
+    expect(
+      recoverLegacyCharacterSource(
+        {
+          ...file,
+          originalContent: raw,
+          content: previousContent + "\n# edit",
+        },
+        new Set(["narrator"])
+      )
+    ).toBeNull();
+  });
+
   it("does not resurrect historical declarations removed in an accepted remote snapshot", () => {
     const recovery = recoverLegacyCharacterSource(
       {

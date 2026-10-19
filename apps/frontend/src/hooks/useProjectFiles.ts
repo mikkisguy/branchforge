@@ -12,7 +12,13 @@ import type {
   ProjectFileNode,
   UpdateFileResponse,
 } from "@/lib/api/project-files";
-import { projectFilesKeys, characterKeys } from "@/lib/query-keys";
+import {
+  projectFilesKeys,
+  characterKeys,
+  variableKeys,
+  statKeys,
+  exportKeys,
+} from "@/lib/query-keys";
 import type { SourceOrigin } from "@branchforge/shared";
 
 // ============================================================================
@@ -98,8 +104,12 @@ export function useProjectFiles(
         expectedContentHash,
       });
     },
-    onSuccess: () => {
-      // Script saves can update authored character declarations.
+    onSuccess: (result) => {
+      // Failed/conflicting responses must not invalidate as successful
+      // authored changes.
+      if (!result.success) return;
+      // Script saves can update authored character declarations and managed
+      // variable/stat defaults, which the export preview is generated from.
       if (projectId) {
         queryClient.invalidateQueries({ queryKey: characterKeys.all });
         queryClient.invalidateQueries({
@@ -107,6 +117,17 @@ export function useProjectFiles(
             ? projectFilesKeys.listsWithSource(projectId, options.source)
             : projectFilesKeys.lists(projectId),
         });
+        if (result.generatedFilesChanged) {
+          queryClient.invalidateQueries({
+            queryKey: variableKeys.lists(projectId),
+          });
+          queryClient.invalidateQueries({
+            queryKey: statKeys.lists(projectId),
+          });
+          queryClient.invalidateQueries({
+            queryKey: exportKeys.preview(projectId),
+          });
+        }
       }
     },
   });
@@ -188,6 +209,7 @@ export function useProjectFiles(
           contentHash: result.contentHash,
           updatedAt: result.updatedAt,
           normalizedContent: result.normalizedContent,
+          generatedFilesChanged: result.generatedFilesChanged,
         };
       }
       return {

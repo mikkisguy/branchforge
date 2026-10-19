@@ -54,7 +54,11 @@ import {
   syncAuthoredCharacterDefinitions,
   stripManagedCharacterDeclarations,
 } from "./character-source-preservation.service.js";
-import { DEFAULT_EXCLUDED_RENPY_TAGS } from "./rpy-statements.service.js";
+import { promoteManagedDefaults } from "./managed-defaults.service.js";
+import {
+  DEFAULT_EXCLUDED_RENPY_TAGS,
+  collectSourceOwnedRpySymbolKeys,
+} from "./rpy-statements.service.js";
 
 /**
  * Project row type from database queries (with optional role for shared projects)
@@ -717,6 +721,7 @@ async function applyFileUpdate(
   syncResultForFile: SyncLabelsResult | undefined;
   deletedCount: number;
   normalizedContent?: string;
+  generatedFilesChanged: boolean;
 }> {
   const db = getDb();
 
@@ -819,6 +824,25 @@ async function applyFileUpdate(
     fileType = parseRPYFileWithLabels(canonicalContent, file.filePath).fileType;
     const newContentHash = calculateContentHash(canonicalContent);
 
+    // Promote boolean/numeric defaults from the authored content into the
+    // managed variables/stats tables inside this same locked transaction, so
+    // a saved default is exportable as soon as the file commit lands.
+    // Existing rows (metadata/values) are preserved.
+    const defaultsInserted = await promoteManagedDefaults(tx, file.projectId, [
+      { filePath: file.filePath, content },
+    ]);
+    const previousOwned = collectSourceOwnedRpySymbolKeys(
+      [{ filePath: file.filePath, content: lockedFile.content }],
+      excludedTags
+    );
+    const nextOwned = collectSourceOwnedRpySymbolKeys(
+      [{ filePath: file.filePath, content: canonicalContent }],
+      excludedTags
+    );
+    const ownershipChanged =
+      previousOwned.size !== nextOwned.size ||
+      [...previousOwned].some((key) => !nextOwned.has(key));
+
     // Update the file content
     await tx
       .update(projectFiles)
@@ -886,6 +910,8 @@ async function applyFileUpdate(
       fileUpdatedAt,
       deletedCount,
       canonicalContent,
+      generatedFilesChanged:
+        defaultsInserted || managedTags.size > 0 || ownershipChanged,
     };
   });
 
@@ -941,6 +967,7 @@ export async function updateFileContent(
     syncResultForFile,
     deletedCount,
     normalizedContent,
+    generatedFilesChanged,
   } = await applyFileUpdate(
     fileId,
     userId,
@@ -955,6 +982,7 @@ export async function updateFileContent(
     contentHash: newContentHash,
     updatedAt: fileUpdatedAt.toISOString(),
     normalizedContent,
+    generatedFilesChanged,
     syncResult: {
       labelsCreated: syncResultForFile?.labelsCreated ?? 0,
       labelsUpdated: syncResultForFile?.labelsUpdated ?? 0,
