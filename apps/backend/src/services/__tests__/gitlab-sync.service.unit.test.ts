@@ -198,7 +198,7 @@ describe("GitLabSyncService", () => {
       const result = await listSyncOperations(testProjectId, testUserId);
 
       expect(result[0].errorMessage).toBe(
-        "Import failed. Check your GitLab connection, branch name, and permissions, then try again."
+        "Import failed. Try again. If the problem persists, contact your administrator."
       );
       expect(mockOperations[0].errorMessage).toBe(originalErrorMessage);
     });

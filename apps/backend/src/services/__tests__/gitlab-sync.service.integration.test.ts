@@ -2483,6 +2483,159 @@ describe("GitLabSyncService (Integration)", () => {
   });
 
   describe("importFromGitlab", () => {
+    describe.each([
+      "branchforge_wins",
+      "gitlab_wins",
+      "manual_review",
+    ] as const)("label restoration with %s", (strategy) => {
+      it.each([
+        ["start", "start"],
+        ["start", "START"],
+        ["START", "start"],
+      ])(
+        "keeps active %s when a deleted %s duplicate exists",
+        async (activeName, deletedName) => {
+          await db.insert(labelsTable).values({
+            ...testScene,
+            labelName: activeName,
+          });
+          const deletedId = testUuid("26000000", 2);
+          const deletedAt = new Date("2026-09-24T18:05:24Z");
+          await db.insert(labelsTable).values({
+            ...testScene,
+            id: deletedId,
+            labelName: deletedName,
+            deletedAt,
+            updatedAt: new Date("2030-01-01T00:00:00Z"),
+          });
+          const content = 'label start:\n    "Remote dialogue"\n    return';
+          // A clean baseline makes every policy accept the fetched content.
+          await db
+            .update(projectFiles)
+            .set({
+              content: testGitlabFile.content,
+              contentHash: calculateContentHash(testGitlabFile.content),
+              remoteContentHash: calculateContentHash(testGitlabFile.content),
+            })
+            .where(eq(projectFiles.id, testGitlabFileId));
+          vi.spyOn(gitlabRepoService, "listRpyFiles").mockResolvedValue([
+            { name: "script.rpy", path: "game/script.rpy" },
+          ]);
+          vi.spyOn(
+            gitlabRepoService,
+            "getFileContentWithMetadata"
+          ).mockResolvedValue({
+            content,
+            lastCommitId: "remote-rev",
+            contentSha256: null,
+            blobId: null,
+          });
+          const result = await importFromGitlab(
+            testProjectId,
+            testUserId,
+            testBranch,
+            strategy
+          );
+          expect(result.status).toBe("COMPLETED");
+          const rows = await db
+            .select()
+            .from(labelsTable)
+            .where(eq(labelsTable.projectFileId, testGitlabFileId));
+          expect(rows).toHaveLength(2);
+          expect(
+            rows.find((row) => row.id === testScene.id)?.deletedAt
+          ).toBeNull();
+          expect(rows.find((row) => row.id === deletedId)?.deletedAt).toEqual(
+            deletedAt
+          );
+          const lines = await db
+            .select()
+            .from(labelLines)
+            .where(eq(labelLines.labelId, testScene.id));
+          expect(JSON.stringify(lines)).toContain("Remote dialogue");
+          expect(rows.find((row) => row.id === testScene.id)?.labelName).toBe(
+            "start"
+          );
+          await labelsService.updateLabel(testScene.id, testUserId, {
+            labelName: "renamed_start",
+          });
+          const [renamedFile] = await db
+            .select()
+            .from(projectFiles)
+            .where(eq(projectFiles.id, testGitlabFileId));
+          expect(renamedFile.content).toContain("label renamed_start:");
+        }
+      );
+
+      it("restores the newest deleted match with a stable ID tie-breaker", async () => {
+        const olderId = testUuid("26000000", 3);
+        const otherId = testUuid("26000000", 2);
+        for (const [id, updatedAt] of [
+          [olderId, new Date("2025-01-01")],
+          [otherId, new Date("2026-01-01")],
+          [testScene.id, new Date("2026-01-01")],
+        ] as const) {
+          await db.insert(labelsTable).values({
+            ...testScene,
+            id,
+            labelName: "START",
+            deletedAt: new Date("2026-09-24"),
+            updatedAt,
+          });
+        }
+        await db
+          .update(projectFiles)
+          .set({
+            contentHash: calculateContentHash(testGitlabFile.content),
+            remoteContentHash: calculateContentHash(testGitlabFile.content),
+          })
+          .where(eq(projectFiles.id, testGitlabFileId));
+        vi.spyOn(gitlabRepoService, "listRpyFiles").mockResolvedValue([
+          { name: "script.rpy", path: "game/script.rpy" },
+        ]);
+        vi.spyOn(
+          gitlabRepoService,
+          "getFileContentWithMetadata"
+        ).mockResolvedValue({
+          content: 'label start:\n    "Restored dialogue"\n    return',
+          lastCommitId: "remote-rev",
+          contentSha256: null,
+          blobId: null,
+        });
+        const result = await importFromGitlab(
+          testProjectId,
+          testUserId,
+          testBranch,
+          strategy
+        );
+        expect(result.status).toBe("COMPLETED");
+        const rows = await db
+          .select()
+          .from(labelsTable)
+          .where(eq(labelsTable.projectFileId, testGitlabFileId));
+        expect(rows).toHaveLength(3);
+        expect(
+          rows.filter((row) => row.deletedAt === null).map((row) => row.id)
+        ).toEqual([testScene.id]);
+        const lines = await db
+          .select()
+          .from(labelLines)
+          .where(eq(labelLines.labelId, testScene.id));
+        expect(JSON.stringify(lines)).toContain("Restored dialogue");
+        expect(rows.find((row) => row.id === testScene.id)?.labelName).toBe(
+          "start"
+        );
+        await labelsService.updateLabel(testScene.id, testUserId, {
+          labelName: "renamed_start",
+        });
+        const [renamedFile] = await db
+          .select()
+          .from(projectFiles)
+          .where(eq(projectFiles.id, testGitlabFileId));
+        expect(renamedFile.content).toContain("label renamed_start:");
+      });
+    });
+
     it("preserves known character-source recovery guidance", async () => {
       const preservation =
         await import("../character-source-preservation.service.js");
@@ -3309,14 +3462,14 @@ describe("GitLabSyncService (Integration)", () => {
 
       expect(result.status).toBe("FAILED");
       expect(result.errorMessage).toBe(
-        "Import failed. Check your GitLab connection, branch name, and permissions, then try again."
+        "Import failed. Try again. If the problem persists, contact your administrator."
       );
       const [savedFailure] = await db
         .select()
         .from(gitlabSyncOperations)
         .where(eq(gitlabSyncOperations.id, result.id));
       expect(savedFailure.errorMessage).toBe(
-        "Import failed. Check your GitLab connection, branch name, and permissions, then try again."
+        "Import failed. Try again. If the problem persists, contact your administrator."
       );
 
       const [file] = await db
@@ -3386,14 +3539,14 @@ describe("GitLabSyncService (Integration)", () => {
 
       expect(result.status).toBe("FAILED");
       expect(result.errorMessage).toBe(
-        "Import failed. Check your GitLab connection, branch name, and permissions, then try again."
+        "Import failed. Try again. If the problem persists, contact your administrator."
       );
       const [savedFailure] = await db
         .select()
         .from(gitlabSyncOperations)
         .where(eq(gitlabSyncOperations.id, result.id));
       expect(savedFailure.errorMessage).toBe(
-        "Import failed. Check your GitLab connection, branch name, and permissions, then try again."
+        "Import failed. Try again. If the problem persists, contact your administrator."
       );
 
       const [file] = await db
@@ -3422,7 +3575,7 @@ describe("GitLabSyncService (Integration)", () => {
       expect(result).toMatchObject({
         status: "FAILED",
         errorMessage:
-          "Import failed. Check your GitLab connection, branch name, and permissions, then try again.",
+          "Import failed. Try again. If the problem persists, contact your administrator.",
       });
     });
 

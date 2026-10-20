@@ -9,6 +9,15 @@ import {
 } from "../gitlab/gitlab-error.helpers.js";
 
 describe("GitLab public errors", () => {
+  it("hides internal import errors with neutral recovery guidance", () => {
+    const message =
+      "Import failed. Try again. If the problem persists, contact your administrator.";
+    expect(
+      safeGitLabSyncErrorMessage("IMPORT", "Failed query: private params")
+    ).toBe(message);
+    expect(safeGitLabSyncErrorMessage("IMPORT", message)).toBe(message);
+  });
+
   it.each([
     "",
     "   ",

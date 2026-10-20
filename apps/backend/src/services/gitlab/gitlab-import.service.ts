@@ -18,7 +18,7 @@ import {
   variables,
   projectSettings,
 } from "../../db/schema/index.js";
-import { eq, and, isNull, sql } from "drizzle-orm";
+import { eq, and, isNull, sql, desc, asc } from "drizzle-orm";
 import {
   parseRPYFileWithLabels,
   convertToBranchForgeFormatFromLabels,
@@ -723,18 +723,28 @@ export async function importFromGitlab(
         const fileScenes = await tx
           .select()
           .from(labels)
-          .where(eq(labels.projectFileId, projectFile.id));
+          .where(eq(labels.projectFileId, projectFile.id))
+          // Active rows win over historical duplicates. Restore the most
+          // recently updated deleted row only when no active match exists.
+          .orderBy(
+            sql`${labels.deletedAt} IS NULL DESC`,
+            desc(labels.updatedAt),
+            asc(labels.id)
+          );
 
         const scenesByLabel = new Map<string, (typeof fileScenes)[0]>();
         for (const scene of fileScenes) {
           if (scene.labelName) {
-            scenesByLabel.set(scene.labelName, scene);
+            const key = scene.labelName.toLowerCase();
+            if (!scenesByLabel.has(key)) {
+              scenesByLabel.set(key, scene);
+            }
           }
         }
 
         for (let i = 0; i < prepared.parsed.labels.length; i++) {
           const label = prepared.parsed.labels[i];
-          const existingScene = scenesByLabel.get(label.label);
+          const existingScene = scenesByLabel.get(label.label.toLowerCase());
           const labelData = convertToBranchForgeFormatFromLabels(
             prepared.parsed,
             label.label,
@@ -742,34 +752,7 @@ export async function importFromGitlab(
           );
           const labelContentHash = calculateLinesHash(labelData.entries);
 
-          if (existingScene && existingScene.deletedAt) {
-            await tx
-              .delete(labelLines)
-              .where(eq(labelLines.labelId, existingScene.id));
-
-            const allValues = mapEntriesToLabelLineValues(
-              labelData.entries,
-              existingScene.id,
-              projectFile.id,
-              charactersByTag
-            );
-            if (allValues.length > 0) {
-              await tx.insert(labelLines).values(allValues);
-            }
-
-            await tx
-              .update(labels)
-              .set({
-                contentHash: labelContentHash,
-                lastSyncedHash: labelContentHash,
-                syncStatus: "SYNCED",
-                lastImportedAt: new Date(),
-                importCommitSha,
-                updatedAt: new Date(),
-                deletedAt: null,
-              })
-              .where(eq(labels.id, existingScene.id));
-          } else if (existingScene && !existingScene.deletedAt) {
+          if (existingScene) {
             // Accepted remote file content: overwrite labels to match Script Mode.
             await tx
               .delete(labelLines)
@@ -788,12 +771,14 @@ export async function importFromGitlab(
             await tx
               .update(labels)
               .set({
+                labelName: label.label,
                 contentHash: labelContentHash,
                 lastSyncedHash: labelContentHash,
                 syncStatus: "SYNCED",
                 lastImportedAt: new Date(),
                 importCommitSha,
                 updatedAt: new Date(),
+                deletedAt: null,
               })
               .where(eq(labels.id, existingScene.id));
           } else {
@@ -819,6 +804,7 @@ export async function importFromGitlab(
               })
               .returning();
 
+            scenesByLabel.set(label.label.toLowerCase(), newScene);
             const allValues = mapEntriesToLabelLineValues(
               labelData.entries,
               newScene.id,

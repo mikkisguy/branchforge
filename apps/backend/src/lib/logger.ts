@@ -190,6 +190,32 @@ export function logSecurityEvent(
   );
 }
 
+/** Keep nested database diagnostics server-side without serializing arbitrary fields. */
+function errorCauses(error: unknown): Record<string, string>[] {
+  const causes: Record<string, string>[] = [];
+  const seen = new Set<unknown>([error]);
+  let current: unknown = error;
+  while (
+    current instanceof Error &&
+    current.cause !== undefined &&
+    causes.length < 5
+  ) {
+    current = current.cause;
+    if (seen.has(current)) break;
+    seen.add(current);
+    if (typeof current !== "object" || current === null) break;
+    const diagnostic: Record<string, string> = {};
+    const fields = current as Record<string, unknown>;
+    for (const key of ["message", "code", "constraint"] as const) {
+      if (typeof fields[key] === "string") {
+        diagnostic[key] = fields[key];
+      }
+    }
+    causes.push(diagnostic);
+  }
+  return causes;
+}
+
 /**
  * Log an error with structured context
  */
@@ -202,6 +228,7 @@ export function logError(
     ? {
         error: error instanceof Error ? error.message : String(error),
         ...(error instanceof Error && { stack: error.stack }),
+        causes: errorCauses(error),
       }
     : {};
 
