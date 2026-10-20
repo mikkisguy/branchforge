@@ -105,7 +105,8 @@ export async function updateIncomingJumpsForLabels(
   }
 
   // 4. Batch-resolve names to label IDs (single query)
-  const nameToId = new Map<string, string>();
+  const exactNameToId = new Map<string, string>();
+  const foldedNameToIds = new Map<string, Set<string>>();
   if (targetNames.size > 0) {
     const resolvedLabels = await context
       .select({ id: labels.id, labelName: labels.labelName })
@@ -113,17 +114,31 @@ export async function updateIncomingJumpsForLabels(
       .where(
         and(
           eq(labels.projectId, projectId),
-          inArray(labels.labelName, Array.from(targetNames)),
+          inArray(
+            sql`lower(${labels.labelName})`,
+            Array.from(targetNames, (name) => name.toLowerCase())
+          ),
           isNull(labels.deletedAt)
         )
       );
 
     for (const l of resolvedLabels) {
       if (l.labelName) {
-        nameToId.set(l.labelName.toLowerCase(), l.id);
+        exactNameToId.set(l.labelName, l.id);
+        const foldedName = l.labelName.toLowerCase();
+        const ids = foldedNameToIds.get(foldedName) ?? new Set<string>();
+        ids.add(l.id);
+        foldedNameToIds.set(foldedName, ids);
       }
     }
   }
+
+  const resolveName = (name: string): string | undefined => {
+    const exactId = exactNameToId.get(name);
+    if (exactId) return exactId;
+    const ids = foldedNameToIds.get(name.toLowerCase());
+    return ids?.size === 1 ? ids.values().next().value : undefined;
+  };
 
   // 5. Compute incoming jumps for all affected labels in a single pass
   const incomingJumpsByLabel = new Map<string, IncomingJump[]>();
@@ -146,7 +161,7 @@ export async function updateIncomingJumpsForLabels(
             ? validUuidTargets.has(option.targetLabelId)
               ? option.targetLabelId
               : undefined
-            : nameToId.get(option.targetLabelId.toLowerCase());
+            : resolveName(option.targetLabelId);
           if (resolvedId && targetSet.has(resolvedId)) {
             const key = `${sourceLabel.id}::${option.label}`;
             const seenKeys = seen.get(resolvedId) ?? new Set();
@@ -180,7 +195,7 @@ export async function updateIncomingJumpsForLabels(
     const jumpMatch = line.content.match(/^jump\s+([a-zA-Z_][a-zA-Z0-9_]*)/);
     if (jumpMatch) {
       const targetLabelName = jumpMatch[1];
-      const resolvedId = nameToId.get(targetLabelName.toLowerCase());
+      const resolvedId = resolveName(targetLabelName);
       if (resolvedId && targetSet.has(resolvedId)) {
         const key = `${sourceLabel.id}::automatic`;
         const seenKeys = seen.get(resolvedId) ?? new Set();

@@ -10,7 +10,7 @@ const SAFE_EXPORT_MESSAGES: readonly string[] = [
 const SAFE_IMPORT_MESSAGES: readonly string[] = [
   "Server restarted while sync was in progress",
   "A character cannot be excluded until its source can be preserved.",
-  "Import failed. Check your GitLab connection, branch name, and permissions, then try again.",
+  "Import failed. Try again. If the problem persists, contact your administrator.",
   "Push or discard your structural file changes before pulling from GitLab",
   "No importable content found in the fetched files. Each file was either empty or contained only whitespace.",
 ];
@@ -51,7 +51,9 @@ export function formatGitLabSyncError(
 ): string {
   const operation = operationType === "export" ? "Export" : "Import";
   const recovery =
-    "Check your GitLab connection, branch name, and permissions, then try again.";
+    operationType === "import"
+      ? "Try again. If the problem persists, contact your administrator."
+      : "Check your GitLab connection, branch name, and permissions, then try again.";
 
   if (!message?.trim()) return `${operation} failed. ${recovery}`;
 

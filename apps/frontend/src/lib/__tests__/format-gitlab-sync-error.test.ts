@@ -27,7 +27,10 @@ describe("formatGitLabSyncError", () => {
   it.each(["export", "import"] as const)(
     "replaces internal error details for %s",
     (operation) => {
-      const generic = `${operation === "export" ? "Export" : "Import"} failed. Check your GitLab connection, branch name, and permissions, then try again.`;
+      const generic =
+        operation === "import"
+          ? "Import failed. Try again. If the problem persists, contact your administrator."
+          : "Export failed. Check your GitLab connection, branch name, and permissions, then try again.";
       const unsafeMessages = [
         "Failed query: select * from users params: [secret-token]",
         "TypeError: request failed\n    at sync.ts:42",
@@ -41,6 +44,12 @@ describe("formatGitLabSyncError", () => {
       }
     }
   );
+
+  it("preserves neutral import failure guidance", () => {
+    const message =
+      "Import failed. Try again. If the problem persists, contact your administrator.";
+    expect(formatGitLabSyncError(message, "import")).toBe(message);
+  });
 
   it("preserves known safe recovery guidance", () => {
     expect(

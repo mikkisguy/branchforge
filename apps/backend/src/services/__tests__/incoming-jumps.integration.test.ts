@@ -16,7 +16,11 @@ import {
   projectFiles,
 } from "../../db/schema/index.js";
 import { eq, inArray } from "drizzle-orm";
-import { syncLabelsFromFile, getLabel } from "../labels.service.js";
+import {
+  syncLabelsFromFile,
+  getLabel,
+  updateIncomingJumpsForLabels,
+} from "../labels.service.js";
 import { importZipFile } from "../zip-import.service.js";
 import { calculateContentHash } from "../../lib/hash.js";
 import { testEmail, testUuid } from "../../utils/test-ids.js";
@@ -425,4 +429,110 @@ label home_scene2:
       !startLabel!.incomingJumps || startLabel!.incomingJumps.length === 0
     ).toBe(true);
   });
+  it.each(["exact", "ambiguous", "fallback"] as const)(
+    "resolves %s names consistently for menu and automatic jumps",
+    async (scenario) => {
+      const lowerName = `target_${scenario}`;
+      const upperName = `TARGET_${scenario.toUpperCase()}`;
+      const names =
+        scenario === "fallback" ? [upperName] : [lowerName, upperName];
+      const [source, lower, upper] = await db
+        .insert(labelsTable)
+        .values([
+          {
+            projectId: testProjectId,
+            projectFileId: testFile1Id,
+            labelNumber: 100,
+            title: `source_${scenario}`,
+            labelName: `source_${scenario}`,
+          },
+          {
+            projectId: testProjectId,
+            projectFileId: testFile1Id,
+            labelNumber: 101,
+            title: lowerName,
+            labelName: lowerName,
+          },
+          {
+            projectId: testProjectId,
+            projectFileId: testFile2Id,
+            labelNumber: 102,
+            title: scenario === "exact" ? upperName : `Target_${scenario}`,
+            labelName: scenario === "exact" ? upperName : `Target_${scenario}`,
+            // Deleted candidates must not make a unique fallback ambiguous.
+            deletedAt: scenario === "fallback" ? new Date() : null,
+          },
+        ])
+        .returning();
+      for (const [index, name] of names.entries()) {
+        await db.insert(labelLines).values([
+          {
+            labelId: source.id,
+            projectFileId: testFile1Id,
+            sequence: index * 2,
+            content: "menu:",
+            contentType: "MENU",
+            menuOptions: [
+              {
+                label: name,
+                targetLabelId: name,
+                targetLabelName: name,
+              },
+            ],
+          },
+          {
+            labelId: source.id,
+            projectFileId: testFile1Id,
+            sequence: index * 2 + 1,
+            content: `jump ${name}`,
+            contentType: "JUMP",
+          },
+        ]);
+      }
+      await updateIncomingJumpsForLabels(
+        db,
+        [lower.id, upper.id],
+        testProjectId
+      );
+      const resolved = await db
+        .select()
+        .from(labelsTable)
+        .where(inArray(labelsTable.id, [lower.id, upper.id]));
+      const lowerJumps = resolved.find(
+        (label) => label.id === lower.id
+      )?.incomingJumps;
+      const upperJumps = resolved.find(
+        (label) => label.id === upper.id
+      )?.incomingJumps;
+      // The ambiguous case also targets the exact lower spelling: that
+      // must not hide the untargeted case variant from fallback resolution.
+      const expectedName = scenario === "fallback" ? upperName : lowerName;
+      expect(lowerJumps).toEqual([
+        expect.objectContaining({
+          sourceLabelId: source.id,
+          jumpType: "MENU_CHOICE",
+          choiceText: expectedName,
+        }),
+        expect.objectContaining({
+          sourceLabelId: source.id,
+          jumpType: "AUTOMATIC",
+        }),
+      ]);
+      expect(upperJumps).toEqual(
+        scenario === "exact"
+          ? [
+              expect.objectContaining({
+                sourceLabelId: source.id,
+                jumpType: "MENU_CHOICE",
+                choiceText: upperName,
+              }),
+              expect.objectContaining({
+                sourceLabelId: source.id,
+                jumpType: "AUTOMATIC",
+              }),
+            ]
+          : []
+      );
+    }
+  );
 });

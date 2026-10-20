@@ -24,7 +24,7 @@ const SAFE_EXPORT_MESSAGES: readonly string[] = [
 const SAFE_IMPORT_MESSAGES: readonly string[] = [
   "Server restarted while sync was in progress",
   "A character cannot be excluded until its source can be preserved.",
-  "Import failed. Check your GitLab connection, branch name, and permissions, then try again.",
+  "Import failed. Try again. If the problem persists, contact your administrator.",
   "Push or discard your structural file changes before pulling from GitLab",
   "No importable content found in the fetched files. Each file was either empty or contained only whitespace.",
 ];
@@ -32,7 +32,7 @@ const SAFE_IMPORT_MESSAGES: readonly string[] = [
 const GENERIC_EXPORT_MESSAGE =
   "Export failed. Check your GitLab connection, branch name, and permissions, then try again.";
 export const GENERIC_IMPORT_MESSAGE =
-  "Import failed. Check your GitLab connection, branch name, and permissions, then try again.";
+  "Import failed. Try again. If the problem persists, contact your administrator.";
 const GENERIC_SYNC_MESSAGE =
   "Sync failed. Check your GitLab connection, branch name, and permissions, then try again.";
 
