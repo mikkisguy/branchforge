@@ -2567,6 +2567,109 @@ describe("GitLabSyncService (Integration)", () => {
         }
       );
 
+      it("prefers an exact deleted identity over a newer case variant", async () => {
+        const deletedAt = new Date("2026-09-24");
+        await db.insert(labelsTable).values([
+          { ...testScene, deletedAt, updatedAt: new Date("2025-01-01") },
+          {
+            ...testScene,
+            id: testUuid("26000000", 2),
+            labelName: "START",
+            deletedAt,
+            updatedAt: new Date("2026-01-01"),
+          },
+        ]);
+        await db
+          .update(projectFiles)
+          .set({
+            contentHash: calculateContentHash(testGitlabFile.content),
+            remoteContentHash: calculateContentHash(testGitlabFile.content),
+          })
+          .where(eq(projectFiles.id, testGitlabFileId));
+        vi.spyOn(gitlabRepoService, "listRpyFiles").mockResolvedValue([
+          { name: "script.rpy", path: "game/script.rpy" },
+        ]);
+        vi.spyOn(
+          gitlabRepoService,
+          "getFileContentWithMetadata"
+        ).mockResolvedValue({
+          content: 'label start:\n    "Exact identity"\n    return',
+          lastCommitId: "remote-rev",
+          contentSha256: null,
+          blobId: null,
+        });
+        const result = await importFromGitlab(
+          testProjectId,
+          testUserId,
+          testBranch,
+          strategy
+        );
+        expect(result.status).toBe("COMPLETED");
+        const rows = await db
+          .select()
+          .from(labelsTable)
+          .where(eq(labelsTable.projectFileId, testGitlabFileId));
+        expect(
+          rows.filter((row) => row.deletedAt === null).map((row) => row.id)
+        ).toEqual([testScene.id]);
+      });
+
+      it.each([false, true])(
+        "rolls back case-distinct labels rather than sharing a row (existing: %s)",
+        async (existing) => {
+          if (existing) {
+            await db
+              .insert(labelsTable)
+              .values({ ...testScene, labelName: "START" });
+          }
+          await db
+            .update(projectFiles)
+            .set({
+              contentHash: calculateContentHash(testGitlabFile.content),
+              remoteContentHash: calculateContentHash(testGitlabFile.content),
+            })
+            .where(eq(projectFiles.id, testGitlabFileId));
+          const [beforeFile] = await db
+            .select()
+            .from(projectFiles)
+            .where(eq(projectFiles.id, testGitlabFileId));
+          const beforeLabels = await db
+            .select()
+            .from(labelsTable)
+            .where(eq(labelsTable.projectFileId, testGitlabFileId));
+          vi.spyOn(gitlabRepoService, "listRpyFiles").mockResolvedValue([
+            { name: "script.rpy", path: "game/script.rpy" },
+          ]);
+          vi.spyOn(
+            gitlabRepoService,
+            "getFileContentWithMetadata"
+          ).mockResolvedValue({
+            content:
+              'label start:\n    "Lower"\n    return\nlabel START:\n    "Upper"\n    return',
+            lastCommitId: "remote-rev",
+            contentSha256: null,
+            blobId: null,
+          });
+          const result = await importFromGitlab(
+            testProjectId,
+            testUserId,
+            testBranch,
+            strategy
+          );
+          expect(result.status).toBe("FAILED");
+          const [afterFile] = await db
+            .select()
+            .from(projectFiles)
+            .where(eq(projectFiles.id, testGitlabFileId));
+          expect(afterFile).toEqual(beforeFile);
+          const afterLabels = await db
+            .select()
+            .from(labelsTable)
+            .where(eq(labelsTable.projectFileId, testGitlabFileId));
+          expect(afterLabels).toEqual(beforeLabels);
+        }
+      );
+
       it("restores the newest deleted match with a stable ID tie-breaker", async () => {
         const olderId = testUuid("26000000", 3);
         const otherId = testUuid("26000000", 2);

@@ -732,19 +732,53 @@ export async function importFromGitlab(
             asc(labels.id)
           );
 
-        const scenesByLabel = new Map<string, (typeof fileScenes)[0]>();
+        type FileScene = (typeof fileScenes)[0];
+        const scenesByLabel = new Map<string, FileScene[]>();
+        const scenesByFoldedLabel = new Map<string, FileScene[]>();
         for (const scene of fileScenes) {
-          if (scene.labelName) {
-            const key = scene.labelName.toLowerCase();
-            if (!scenesByLabel.has(key)) {
-              scenesByLabel.set(key, scene);
+          if (!scene.labelName) continue;
+          for (const [map, key] of [
+            [scenesByLabel, scene.labelName],
+            [scenesByFoldedLabel, scene.labelName.toLowerCase()],
+          ] as const) {
+            const candidates = map.get(key) ?? [];
+            candidates.push(scene);
+            map.set(key, candidates);
+          }
+        }
+
+        const claimedSceneIds = new Set<string>();
+        const matchedScenes = new Map<number, FileScene>();
+        // Reserve exact identities across the whole file before allowing a
+        // case-only fallback, so an earlier label cannot steal a later match.
+        for (const exact of [true, false]) {
+          for (const [index, label] of prepared.parsed.labels.entries()) {
+            if (matchedScenes.has(index)) continue;
+            const foldedName = label.label.toLowerCase();
+            const foldedCandidates = scenesByFoldedLabel.get(foldedName) ?? [];
+            const hasActiveMatch = foldedCandidates.some(
+              (scene) => !scene.deletedAt
+            );
+            const candidates = exact
+              ? (scenesByLabel.get(label.label) ?? [])
+              : foldedCandidates;
+            const scene = candidates.find(
+              (candidate) =>
+                !claimedSceneIds.has(candidate.id) &&
+                // Restoring even an exact deleted match must not collide
+                // with an active case variant under the unique index.
+                (!candidate.deletedAt || !hasActiveMatch)
+            );
+            if (scene) {
+              matchedScenes.set(index, scene);
+              claimedSceneIds.add(scene.id);
             }
           }
         }
 
         for (let i = 0; i < prepared.parsed.labels.length; i++) {
           const label = prepared.parsed.labels[i];
-          const existingScene = scenesByLabel.get(label.label.toLowerCase());
+          const existingScene = matchedScenes.get(i);
           const labelData = convertToBranchForgeFormatFromLabels(
             prepared.parsed,
             label.label,
@@ -804,7 +838,8 @@ export async function importFromGitlab(
               })
               .returning();
 
-            scenesByLabel.set(label.label.toLowerCase(), newScene);
+            // New rows belong only to this parsed label, never a later one.
+            claimedSceneIds.add(newScene.id);
             const allValues = mapEntriesToLabelLineValues(
               labelData.entries,
               newScene.id,
