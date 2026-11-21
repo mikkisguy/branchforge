@@ -1,6 +1,6 @@
 {
   "name": "branchforge",
-  "version": "1.0.0-beta.20",
+  "version": "1.0.0-beta.21",
   "private": true,
   "description": "Visual Novel Studio for Ren'Py",
   "scripts": {
@@ -60,5 +60,5 @@
       "pnpm exec prettier --write"
     ]
   },
-  "packageManager": "pnpm@12.9.1+sha512.06b055fff5cd20dc12781de173ced3310ce0951bf2ec620211a16045d5444d5c93a663210764ef29a653a610459ba0368f0e74f84d80c54723cf95aae7bc0d6d"
+  "packageManager": "pnpm@12.21.0+sha512.66fd8278ee28935ce951792d34367ff3af5c432a2756445823029533835b8da529bbe0be5130afd56ed0713fb8789e47bad82d93bd5ae2fe54b15562d6276ef0"
 }
