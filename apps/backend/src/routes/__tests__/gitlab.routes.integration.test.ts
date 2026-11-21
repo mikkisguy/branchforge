@@ -503,8 +503,10 @@ describe("GitLab Routes (Integration)", () => {
           status: "PENDING",
           branch: testBranch,
           conflictCount: 0,
+          errorMessage: null,
           startedAt: new Date(),
-        } as any);
+          completedAt: null,
+        });
 
         const response = await fastify.inject({
           method: "POST",
