@@ -46,13 +46,19 @@ describe("Session Operations", () => {
   });
 
   describe("setSession", () => {
-    it("should skip sessions without userId", async () => {
-      const mockSession = { user: {} } as Session;
-      vi.mocked(sessionToDbData).mockReturnValue({ userId: "", data: {} });
+    it("persists an ownerless session before login attaches a user", async () => {
+      vi.mocked(sessionToDbData).mockReturnValue({ userId: null, data: {} });
+      const values = vi.fn().mockResolvedValue(undefined);
+      mockDb.insert.mockReturnValue({ values });
 
-      await setSession("session-123", mockSession);
+      await setSession("session-123", {} as Session);
 
-      expect(mockDb.insert).not.toHaveBeenCalled();
+      expect(values).toHaveBeenCalledWith({
+        id: "session-123",
+        userId: null,
+        data: {},
+        expiresAt: expect.any(Date),
+      });
     });
 
     it("should insert a new session", async () => {
@@ -66,8 +72,7 @@ describe("Session Operations", () => {
       });
 
       const mockInsert = {
-        values: vi.fn().mockReturnThis(),
-        onConflictDoUpdate: vi.fn().mockResolvedValue(undefined),
+        values: vi.fn().mockResolvedValue(undefined),
       };
       mockDb.insert.mockReturnValue(mockInsert as never);
 
@@ -83,34 +88,6 @@ describe("Session Operations", () => {
       });
     });
 
-    it("should handle onConflictDoUpdate for existing sessions", async () => {
-      const mockSession = {
-        user: { id: "user-123" },
-        cookie: { maxAge: 3600000 },
-      } as Session;
-      vi.mocked(sessionToDbData).mockReturnValue({
-        userId: "user-123",
-        data: { csrfToken: "token" },
-      });
-
-      const mockInsert = {
-        values: vi.fn().mockReturnThis(),
-        onConflictDoUpdate: vi.fn().mockResolvedValue(undefined),
-      };
-      mockDb.insert.mockReturnValue(mockInsert as never);
-
-      await setSession("session-123", mockSession);
-
-      expect(mockInsert.onConflictDoUpdate).toHaveBeenCalled();
-      const onConflictArgs = mockInsert.onConflictDoUpdate.mock.calls[0][0];
-      expect(onConflictArgs.set).toMatchObject({
-        userId: "user-123",
-        data: { csrfToken: "token" },
-      });
-      expect(onConflictArgs.set.expiresAt).toBeInstanceOf(Date);
-      expect(onConflictArgs.set.updatedAt).toBeInstanceOf(Date);
-    });
-
     it("should use default 24h maxAge when cookie maxAge is not set", async () => {
       const mockSession = {
         user: { id: "user-123" },
@@ -121,8 +98,7 @@ describe("Session Operations", () => {
       });
 
       const mockInsert = {
-        values: vi.fn().mockReturnThis(),
-        onConflictDoUpdate: vi.fn().mockResolvedValue(undefined),
+        values: vi.fn().mockResolvedValue(undefined),
       };
       mockDb.insert.mockReturnValue(mockInsert as never);
 
@@ -171,8 +147,7 @@ describe("Session Operations", () => {
       });
 
       const mockInsert = {
-        values: vi.fn().mockReturnThis(),
-        onConflictDoUpdate: vi.fn().mockResolvedValue(undefined),
+        values: vi.fn().mockResolvedValue(undefined),
       };
       mockDb.insert.mockReturnValue(mockInsert as never);
 
@@ -231,8 +206,7 @@ describe("Session Operations", () => {
       });
 
       const mockInsert = {
-        values: vi.fn().mockReturnThis(),
-        onConflictDoUpdate: vi.fn().mockResolvedValue(undefined),
+        values: vi.fn().mockResolvedValue(undefined),
       };
       mockDb.insert.mockReturnValue(mockInsert as never);
 
@@ -287,7 +261,7 @@ describe("Session Operations", () => {
       expect(dbDataToSession).toHaveBeenCalledWith(mockRow);
     });
 
-    it("should return null for expired sessions and delete them", async () => {
+    it("should return null for expired sessions without deleting the row", async () => {
       const mockRow = {
         id: "session-123",
         userId: "user-123",
@@ -304,15 +278,10 @@ describe("Session Operations", () => {
       };
       mockDb.select.mockReturnValue(mockSelect as never);
 
-      const mockDelete = {
-        where: vi.fn().mockResolvedValue({ rowCount: 1 }),
-      };
-      mockDb.delete.mockReturnValue(mockDelete as never);
-
       const result = await getSession("session-123");
 
       expect(result).toBeNull();
-      expect(mockDb.delete).toHaveBeenCalled();
+      expect(mockDb.delete).not.toHaveBeenCalled();
     });
   });
 

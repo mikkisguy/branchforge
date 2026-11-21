@@ -22,10 +22,8 @@ export const userSessions = pgTable(
     // Session ID (the cookie value)
     id: text("id").primaryKey(),
 
-    // Reference to the user who owns this session
-    userId: uuid("user_id")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
+    // Fastify persists a new generation before login assigns its owner.
+    userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
 
     // Session data (JSON blob containing user object, etc.)
     data: jsonb("data").notNull(),

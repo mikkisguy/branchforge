@@ -7,6 +7,7 @@ vi.mock("../../session-store.service.js", () => ({
 }));
 
 vi.mock("../session-operations.js", () => ({
+  compareAndSetSession: vi.fn().mockResolvedValue(true),
   setSession: vi.fn().mockResolvedValue(undefined),
   getSession: vi.fn().mockResolvedValue(null),
   destroySession: vi.fn().mockResolvedValue(undefined),
@@ -72,6 +73,7 @@ describe("Session Store Factory", () => {
   describe("createSessionStore", () => {
     it("should create a store with all required methods", () => {
       expect(store).toHaveProperty("set");
+      expect(store).toHaveProperty("compareAndSet");
       expect(store).toHaveProperty("get");
       expect(store).toHaveProperty("destroy");
       expect(store).toHaveProperty("cleanup");
@@ -117,6 +119,22 @@ describe("Session Store Factory", () => {
   });
 
   describe("set", () => {
+    it("waits for persistence before acknowledging a new session", async () => {
+      let complete!: () => void;
+      const persistence = new Promise<void>((resolve) => {
+        complete = resolve;
+      });
+      vi.mocked(retryWithBackoff).mockReturnValue(persistence);
+      const callback = vi.fn();
+
+      store.set("session-123", mockSession, callback);
+
+      expect(callback).not.toHaveBeenCalled();
+      complete();
+      await persistence;
+      expect(callback).toHaveBeenCalledExactlyOnceWith();
+    });
+
     it("should call callback after successful set", async () => {
       const callback = vi.fn();
       vi.mocked(retryWithBackoff).mockResolvedValue(undefined);
@@ -202,6 +220,22 @@ describe("Session Store Factory", () => {
     });
   });
 
+  it("reports a stale generation without adding it to the dead letter queue", async () => {
+    vi.mocked(retryWithBackoff).mockResolvedValue(false);
+    const error = await new Promise<Error | null | undefined>((resolve) => {
+      store.compareAndSet(
+        "session-123",
+        "old-generation",
+        mockSession,
+        resolve
+      );
+    });
+
+    expect(error).toMatchObject({ code: "ENOENT" });
+    expect(retryWithBackoff).toHaveBeenCalledTimes(1);
+    expect(addToDeadLetterQueue).not.toHaveBeenCalled();
+  });
+
   describe("get", () => {
     it("should call getSession and pass result to callback", () => {
       const callback = vi.fn();
@@ -229,6 +263,18 @@ describe("Session Store Factory", () => {
   });
 
   describe("destroy", () => {
+    it("returns a persistence error instead of acknowledging logout", async () => {
+      const error = new Error("Database unavailable");
+      vi.mocked(retryWithBackoff).mockRejectedValue(error);
+
+      const result = await new Promise<Error | null | undefined>((resolve) => {
+        store.destroy("session-123", resolve);
+      });
+
+      expect(result).toBe(error);
+      expect(addToDeadLetterQueue).toHaveBeenCalledOnce();
+    });
+
     it("should call callback after successful destroy", async () => {
       const callback = vi.fn();
       vi.mocked(retryWithBackoff).mockResolvedValue(undefined);

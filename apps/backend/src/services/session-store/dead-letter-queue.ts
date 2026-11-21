@@ -7,7 +7,7 @@ export type DeadLetterAlertCallback = (entry: DeadLetterEntry) => void;
 
 export interface DeadLetterEntry {
   sessionId: string;
-  operation: "set" | "destroy";
+  operation: "set" | "compareAndSet" | "destroy";
   sessionData?: Session;
   timestamp: Date;
   lastError: string;
