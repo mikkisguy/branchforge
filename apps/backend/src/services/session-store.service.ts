@@ -86,14 +86,16 @@ export function validateSessionData(
 
 export type ValidatedSessionData = SessionData;
 
+export const SESSION_METADATA_KEY = "__fastifySessionMetadata";
+
 /**
  * Convert Fastify session data to database format
  */
 export function sessionToDbData(session: Session): {
-  userId: string;
+  userId: string | null;
   data: Record<string, unknown>;
 } {
-  const userId = (session.user as { id?: string } | undefined)?.id || "";
+  const userId = (session.user as { id?: string } | undefined)?.id || null;
 
   const rawData: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(session)) {
@@ -101,13 +103,25 @@ export function sessionToDbData(session: Session): {
       key !== "expires" &&
       key !== "cookie" &&
       key !== "sessionId" &&
-      key !== "encryptedSessionId"
+      key !== "encryptedSessionId" &&
+      key !== SESSION_METADATA_KEY
     ) {
       rawData[key] = value;
     }
   }
 
   const data = validateSessionData(rawData);
+  // Fastify owns this metadata. Validate it separately from application data.
+  const metadata: unknown =
+    SESSION_METADATA_KEY in session ? session[SESSION_METADATA_KEY] : null;
+  if (
+    typeof metadata === "object" &&
+    metadata !== null &&
+    "generation" in metadata &&
+    typeof metadata.generation === "string"
+  ) {
+    data[SESSION_METADATA_KEY] = { generation: metadata.generation };
+  }
 
   return { userId, data };
 }
@@ -116,24 +130,21 @@ export function sessionToDbData(session: Session): {
  * Convert database row to Fastify session data
  */
 export function dbDataToSession(row: {
-  id: string;
-  userId: string;
   data: unknown;
   expiresAt: Date;
-  createdAt: Date;
-  updatedAt: Date;
 }): Session {
-  const data = row.data ?? {};
-  const dataAsRecord =
-    typeof data === "object" && data !== null && !Array.isArray(data)
-      ? (data as Record<string, unknown>)
-      : data === null
-        ? {}
-        : {};
+  const data =
+    typeof row.data === "object" &&
+    row.data !== null &&
+    !Array.isArray(row.data)
+      ? row.data
+      : {};
   const session: Partial<Session> = {
-    ...dataAsRecord,
+    ...data,
     cookie: {
-      originalMaxAge: row.expiresAt.getTime() - Date.now(),
+      // The stored date is the current expiry. Fastify supplies the configured
+      // lifetime from its cookie options when restoring the session.
+      originalMaxAge: null,
       expires: row.expiresAt,
     },
   };

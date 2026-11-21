@@ -2,17 +2,19 @@ import type { SessionStore as FastifySessionStore } from "@fastify/session";
 import type { Session } from "fastify";
 import { retryWithBackoff } from "../session-store.service.js";
 import {
-  setSession,
-  getSession,
+  cleanExpiredSessions,
+  compareAndSetSession,
   destroySession,
+  getSession,
+  setSession,
 } from "./session-operations.js";
-import { cleanExpiredSessions } from "./session-operations.js";
 import {
   createDeadLetterQueue,
   addToDeadLetterQueue,
   getDeadLetterQueue,
   getDeadLetterQueueSize,
   clearDeadLetterQueue,
+  type DeadLetterEntry,
   type DeadLetterQueue,
   type DeadLetterAlertCallback,
 } from "./dead-letter-queue.js";
@@ -70,37 +72,35 @@ export function createSessionStore(
   // Start cleanup interval
   startCleanup(cleanupManager);
 
-  return {
-    set(sessionId: string, session: Session, callback: Callback): void {
-      // @fastify/session with `rolling: true` calls store.set on every request
-      // but does NOT call session.touch() itself. Without this, cookie.expires
-      // (and therefore the DB expiresAt written below) stays at the original
-      // creation time, defeating sliding expiry. touch() must run BEFORE
-      // callback() because @fastify/session snapshots cookie.expires inside
-      // the callback to produce the Set-Cookie response header.
-      // touch() updates cookie.expires to now + cookie.originalMaxAge, which
-      // setSession then writes to the DB.
-      const fastifySession = session as Session & {
-        touch?: () => void;
-      };
-      if (typeof fastifySession.touch === "function") {
-        fastifySession.touch();
-      }
-
-      callback();
-
-      retryWithBackoff(
-        () => setSession(sessionId, session),
-        retryOptions
-      ).catch((err) => {
+  function write(
+    sessionId: string,
+    operation: DeadLetterEntry["operation"],
+    persist: () => Promise<boolean | void>,
+    callback: Callback,
+    sessionData?: Session
+  ): void {
+    retryWithBackoff(persist, retryOptions).then(
+      (result) => {
+        if (result === false) {
+          // A missing or changed generation is an ordinary invalidation.
+          callback(
+            Object.assign(new Error("Session no longer matches"), {
+              code: "ENOENT",
+            })
+          );
+          return;
+        }
+        callback();
+      },
+      (err: Error) => {
         deadLetterQueue = addToDeadLetterQueue(
           deadLetterQueue,
           {
             sessionId,
-            operation: "set",
-            sessionData: session,
+            operation,
+            sessionData,
             timestamp: new Date(),
-            lastError: err.message || String(err),
+            lastError: err.message,
             retryCount: retryOptions.maxRetries,
           },
           1000,
@@ -110,13 +110,51 @@ export function createSessionStore(
         logError(
           LogEventType.SESSION_STORE_ERROR,
           {
-            event: "session_set_failed",
+            event: `session_${operation}_failed`,
             sessionId,
+            operation,
             retryCount: retryOptions.maxRetries,
           },
           err
         );
-      });
+        callback(err);
+      }
+    );
+  }
+
+  function touch(session: Session): void {
+    // Fastify reads the cookie expiry in the write callback.
+    if ("touch" in session && typeof session.touch === "function") {
+      session.touch();
+    }
+  }
+
+  return {
+    set(sessionId: string, session: Session, callback: Callback): void {
+      touch(session);
+      write(
+        sessionId,
+        "set",
+        () => setSession(sessionId, session),
+        callback,
+        session
+      );
+    },
+
+    compareAndSet(
+      sessionId: string,
+      expectedGeneration: string,
+      session: Session,
+      callback: Callback
+    ): void {
+      touch(session);
+      write(
+        sessionId,
+        "compareAndSet",
+        () => compareAndSetSession(sessionId, expectedGeneration, session),
+        callback,
+        session
+      );
     },
 
     get(sessionId: string, callback: CallbackSession): void {
@@ -136,34 +174,7 @@ export function createSessionStore(
     },
 
     destroy(sessionId: string, callback: Callback): void {
-      callback();
-
-      retryWithBackoff(() => destroySession(sessionId), retryOptions).catch(
-        (err) => {
-          deadLetterQueue = addToDeadLetterQueue(
-            deadLetterQueue,
-            {
-              sessionId,
-              operation: "destroy",
-              timestamp: new Date(),
-              lastError: err.message || String(err),
-              retryCount: retryOptions.maxRetries,
-            },
-            1000,
-            options?.onDeadLetterEntry
-          );
-
-          logError(
-            LogEventType.SESSION_STORE_ERROR,
-            {
-              event: "session_destroy_failed",
-              sessionId,
-              retryCount: retryOptions.maxRetries,
-            },
-            err
-          );
-        }
-      );
+      write(sessionId, "destroy", () => destroySession(sessionId), callback);
     },
 
     cleanup(): void {

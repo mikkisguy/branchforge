@@ -41,7 +41,7 @@ async function listStatsHandler(
 ): Promise<void> {
   const { projectId } = request.params;
   const result = await statsService.listStats(projectId, request.user!.id);
-  reply.status(200).send({ stats: result });
+  await reply.status(200).send({ stats: result });
 }
 
 /** POST /projects/:projectId/stats */
@@ -58,7 +58,7 @@ async function createStatHandler(
     request.user!.id,
     request.body
   );
-  reply.status(201).send({ stat });
+  await reply.status(201).send({ stat });
 }
 
 /** PUT /stats/:statId */
@@ -75,7 +75,7 @@ async function updateStatHandler(
     request.user!.id,
     request.body
   );
-  reply.status(200).send({ stat });
+  await reply.status(200).send({ stat });
 }
 
 /** DELETE /stats/:statId */
@@ -85,7 +85,7 @@ async function deleteStatHandler(
 ): Promise<void> {
   const { statId } = request.params;
   await statsService.deleteStat(statId, request.user!.id);
-  reply.status(204).send();
+  await reply.status(204).send();
 }
 
 /** GET /projects/:projectId/stats/progression */
@@ -95,7 +95,7 @@ async function getProgressionHandler(
 ): Promise<void> {
   const { projectId } = request.params;
   const result = await statsService.getProgression(projectId, request.user!.id);
-  reply.status(200).send({ progression: result });
+  await reply.status(200).send({ progression: result });
 }
 
 // ============================================================================

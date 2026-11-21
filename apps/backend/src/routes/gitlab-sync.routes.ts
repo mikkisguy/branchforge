@@ -66,14 +66,17 @@ async function exportHandler(
       branch,
       commitMessage
     );
-    reply.status(202).send(operation);
+    await reply.status(202).send(operation);
   } catch (err) {
-    if (handleKnownRouteErrors(err, reply)) return;
+    if (handleKnownRouteErrors(err, reply)) {
+      await reply;
+      return;
+    }
     request.log.error(
       { err, projectId },
       "exportHandler: Failed to export to GitLab"
     );
-    reply.status(500).send({
+    await reply.status(500).send({
       error: "Failed to export to GitLab",
       message: "An internal error occurred",
     });
@@ -102,14 +105,17 @@ async function importHandler(
       branch,
       conflictResolution
     );
-    reply.status(202).send(operation);
+    await reply.status(202).send(operation);
   } catch (err) {
-    if (handleKnownRouteErrors(err, reply)) return;
+    if (handleKnownRouteErrors(err, reply)) {
+      await reply;
+      return;
+    }
     request.log.error(
       { err, projectId },
       "importHandler: Failed to import from GitLab"
     );
-    reply.status(500).send({
+    await reply.status(500).send({
       error: "Failed to import from GitLab",
       message: "An internal error occurred",
     });
@@ -157,17 +163,17 @@ async function importProjectHandler(
       branch,
       conflictResolution,
     });
-    reply.status(202).send(result);
+    await reply.status(202).send(result);
   } catch (err) {
     if (err instanceof ConflictError) {
-      reply.status(409).send({
+      await reply.status(409).send({
         error: "Repository already linked",
         message: "This repository is already linked to your project.",
       });
       return;
     }
     if (err instanceof NotFoundError) {
-      reply
+      await reply
         .status(404)
         .send({ error: "Not Found", message: "Resource not found" });
       return;
@@ -176,7 +182,7 @@ async function importProjectHandler(
       { err },
       "importProjectHandler: Failed to import project from GitLab"
     );
-    reply.status(500).send({
+    await reply.status(500).send({
       error: "Failed to import project from GitLab",
       message: "An internal error occurred",
     });
@@ -201,20 +207,23 @@ async function getOperationHandler(
     const operation = await getSyncOperation(operationId, userId);
 
     if (!operation) {
-      reply
+      await reply
         .status(404)
         .send({ error: "Not Found", message: "Sync operation not found" });
       return;
     }
 
-    reply.send(operation);
+    await reply.send(operation);
   } catch (err) {
-    if (handleKnownRouteErrors(err, reply)) return;
+    if (handleKnownRouteErrors(err, reply)) {
+      await reply;
+      return;
+    }
     request.log.error(
       { err, operationId },
       "getOperationHandler: Failed to get sync operation"
     );
-    reply.status(500).send({
+    await reply.status(500).send({
       error: "Failed to get sync operation",
       message: "An internal error occurred",
     });
@@ -237,14 +246,17 @@ async function listOperationsHandler(
 
   try {
     const operations = await listSyncOperations(projectId, userId);
-    reply.send(operations);
+    await reply.send(operations);
   } catch (err) {
-    if (handleKnownRouteErrors(err, reply)) return;
+    if (handleKnownRouteErrors(err, reply)) {
+      await reply;
+      return;
+    }
     request.log.error(
       { err, projectId },
       "listOperationsHandler: Failed to list sync operations"
     );
-    reply.status(500).send({
+    await reply.status(500).send({
       error: "Failed to list sync operations",
       message: "An internal error occurred",
     });
@@ -268,14 +280,17 @@ async function detectConflictsHandler(
 
   try {
     const result = await detectConflicts(projectId, userId, branch);
-    reply.send(result);
+    await reply.send(result);
   } catch (err) {
-    if (handleKnownRouteErrors(err, reply)) return;
+    if (handleKnownRouteErrors(err, reply)) {
+      await reply;
+      return;
+    }
     request.log.error(
       { err, projectId, branch },
       "detectConflictsHandler: Failed to detect conflicts"
     );
-    reply.status(500).send({
+    await reply.status(500).send({
       error: "Failed to detect conflicts",
       message: "An internal error occurred",
     });

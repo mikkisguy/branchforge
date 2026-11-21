@@ -75,7 +75,7 @@ async function listVariablesByProjectHandler(
 
   const variables = await listVariables(projectId, user.id);
 
-  reply.status(200).send({ variables } as ListVariablesResponse);
+  await reply.status(200).send({ variables } as ListVariablesResponse);
 }
 
 /**
@@ -97,7 +97,7 @@ async function getVariableHandler(
     throw new NotFoundError("Variable not found");
   }
 
-  reply.status(200).send({ variable } as GetVariableResponse);
+  await reply.status(200).send({ variable } as GetVariableResponse);
 }
 
 /**
@@ -119,7 +119,7 @@ async function createVariableByProjectHandler(
 
   const variable = await createVariable(user.id, projectId, body);
 
-  reply.status(201).send({ variable } as CreateVariableResponse);
+  await reply.status(201).send({ variable } as CreateVariableResponse);
 }
 
 /**
@@ -141,7 +141,7 @@ async function updateVariableHandler(
 
   const variable = await updateVariable(variableId, user.id, body);
 
-  reply.status(200).send({ variable } as UpdateVariableResponse);
+  await reply.status(200).send({ variable } as UpdateVariableResponse);
 }
 
 /**
@@ -159,7 +159,7 @@ async function deleteVariableHandler(
 
   await deleteVariable(variableId, user.id);
 
-  reply.status(204).send();
+  await reply.status(204).send();
 }
 
 // ============================================================================

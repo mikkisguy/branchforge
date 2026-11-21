@@ -137,6 +137,8 @@ The script prints these instructions automatically if the CLI is absent.
 
 ### Backend-Specific Guidelines
 
+**Fastify replies:** In async route handlers and hooks, await or return `reply.send()` so asynchronous response hooks can finish before the handler resolves.
+
 **Validation:** Use Zod schemas from `src/lib/validation.ts`. All routes should use `validateBody()`, `validateQuery()`, or `validateParams()` middleware.
 
 **Error Handling:** Throw custom error classes from `src/middleware/error-handler.middleware.ts`:

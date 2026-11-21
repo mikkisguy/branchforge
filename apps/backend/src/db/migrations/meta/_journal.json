@@ -428,6 +428,13 @@
       "when": 1791306293585,
       "tag": "0060_fluffy_colossus",
       "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "7",
+      "when": 1795282967003,
+      "tag": "0061_allow-session-before-login",
+      "breakpoints": true
     }
   ]
 }

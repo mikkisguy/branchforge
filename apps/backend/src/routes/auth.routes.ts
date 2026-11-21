@@ -63,7 +63,10 @@ interface RateLimitResponse extends ErrorResponse {
  * Handle registration errors with generic messages to prevent information leakage.
  * Specific validation errors are logged but not exposed to clients.
  */
-function handleRegistrationError(error: unknown, reply: FastifyReply): boolean {
+async function handleRegistrationError(
+  error: unknown,
+  reply: FastifyReply
+): Promise<boolean> {
   if (error instanceof Error) {
     // Log specific error for debugging (not exposed to client)
     logSecurityEvent(
@@ -75,7 +78,7 @@ function handleRegistrationError(error: unknown, reply: FastifyReply): boolean {
     );
 
     // Return generic error message to prevent information leakage
-    reply
+    await reply
       .status(400)
       .send({ error: "Invalid registration data" } as ErrorResponse);
     return true;
@@ -108,9 +111,9 @@ async function registerHandler(
       userId: user.id,
       email: user.email,
     });
-    reply.status(201).send(user);
+    await reply.status(201).send(user);
   } catch (error) {
-    if (handleRegistrationError(error, reply)) {
+    if (await handleRegistrationError(error, reply)) {
       return;
     }
     throw error;
@@ -138,7 +141,7 @@ async function loginHandler(
   // Check rate limit
   const rateLimit = checkRateLimit(`login:${clientIp}`);
   if (!rateLimit.allowed) {
-    reply.status(429).send({
+    await reply.status(429).send({
       error: "Too many login attempts. Please try again later.",
       retryAfter: rateLimit.retryAfter,
     } as RateLimitResponse);
@@ -152,7 +155,9 @@ async function loginHandler(
       reason: "missing_credentials",
       clientIp,
     });
-    reply.status(401).send({ error: "Invalid credentials" } as ErrorResponse);
+    await reply
+      .status(401)
+      .send({ error: "Invalid credentials" } as ErrorResponse);
     return;
   }
 
@@ -163,7 +168,9 @@ async function loginHandler(
       reason: "invalid_credentials",
       clientIp,
     });
-    reply.status(401).send({ error: "Invalid credentials" } as ErrorResponse);
+    await reply
+      .status(401)
+      .send({ error: "Invalid credentials" } as ErrorResponse);
     return;
   }
 
@@ -194,7 +201,7 @@ async function loginHandler(
   // Add rate limit headers
   reply.header("X-RateLimit-Remaining", rateLimit.remainingAttempts.toString());
 
-  reply.status(200).send({ user, csrfToken } as SuccessResponse);
+  await reply.status(200).send({ user, csrfToken } as SuccessResponse);
 }
 
 /**
@@ -212,7 +219,7 @@ async function logoutHandler(
   await request.session.destroy();
   logInfo(LogEventType.AUTH_LOGOUT, { userId });
 
-  reply.status(204).send();
+  await reply.status(204).send();
 }
 
 /**
@@ -239,7 +246,7 @@ async function getMeHandler(
     request.session.csrfToken = generateCsrfToken();
   }
 
-  reply
+  await reply
     .status(200)
     .header("Cache-Control", "no-store")
     .send({ user, csrfToken: request.session.csrfToken } as SuccessResponse);
@@ -271,7 +278,7 @@ async function getCsrfTokenHandler(
     request.session.csrfToken = generateCsrfToken();
   }
 
-  reply
+  await reply
     .status(200)
     .header("Cache-Control", "no-store")
     .send({ csrfToken: request.session.csrfToken });

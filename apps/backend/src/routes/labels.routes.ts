@@ -97,10 +97,12 @@ async function listLabelsHandler(
 
   try {
     const labels = await listLabels(projectId, user.id, filters);
-    reply.status(200).send({ labels } as ListLabelsResponse);
+    await reply.status(200).send({ labels } as ListLabelsResponse);
   } catch (error) {
     request.log.error(error);
-    reply.status(500).send({ error: "Internal server error" } as ErrorResponse);
+    await reply
+      .status(500)
+      .send({ error: "Internal server error" } as ErrorResponse);
   }
 }
 
@@ -121,14 +123,18 @@ async function getLabelHandler(
     const label = await getLabel(labelId, user.id);
 
     if (!label) {
-      reply.status(404).send({ error: "Label not found" } as ErrorResponse);
+      await reply
+        .status(404)
+        .send({ error: "Label not found" } as ErrorResponse);
       return;
     }
 
-    reply.status(200).send({ label } as GetLabelResponse);
+    await reply.status(200).send({ label } as GetLabelResponse);
   } catch (error) {
     request.log.error(error);
-    reply.status(500).send({ error: "Internal server error" } as ErrorResponse);
+    await reply
+      .status(500)
+      .send({ error: "Internal server error" } as ErrorResponse);
   }
 }
 
@@ -165,7 +171,7 @@ async function updateLabelDialogueHandler(
     });
 
     if (result.type === "conflict") {
-      reply.status(409).send(result);
+      await reply.status(409).send(result);
       return;
     }
 
@@ -183,7 +189,7 @@ async function updateLabelDialogueHandler(
       );
     }
 
-    reply.send({
+    await reply.send({
       success: true,
       version: result.version,
       contentHash: result.contentHash,
@@ -193,20 +199,24 @@ async function updateLabelDialogueHandler(
   } catch (error) {
     request.log.error(error);
     if (error instanceof NotFoundError) {
-      reply.status(404).send({ error: "Project not found" } as ErrorResponse);
+      await reply
+        .status(404)
+        .send({ error: "Project not found" } as ErrorResponse);
       return;
     }
     if (error instanceof ForbiddenError) {
-      reply.status(403).send({ error: "Forbidden" } as ErrorResponse);
+      await reply.status(403).send({ error: "Forbidden" } as ErrorResponse);
       return;
     }
     if (error instanceof ValidationError) {
-      reply
+      await reply
         .status(400)
         .send({ error: (error as Error).message } as ErrorResponse);
       return;
     }
-    reply.status(500).send({ error: "Internal server error" } as ErrorResponse);
+    await reply
+      .status(500)
+      .send({ error: "Internal server error" } as ErrorResponse);
   }
 }
 
@@ -225,25 +235,29 @@ async function createLabelHandler(
 
   try {
     const label = await createLabel(user.id, request.body);
-    reply.status(201).send({ label });
+    await reply.status(201).send({ label });
   } catch (error) {
     request.log.error(error);
 
     // Handle known error types
     if (error instanceof NotFoundError) {
-      reply.status(404).send({ error: "Project not found" } as ErrorResponse);
+      await reply
+        .status(404)
+        .send({ error: "Project not found" } as ErrorResponse);
       return;
     }
     if (error instanceof ForbiddenError) {
-      reply.status(403).send({ error: "Forbidden" } as ErrorResponse);
+      await reply.status(403).send({ error: "Forbidden" } as ErrorResponse);
       return;
     }
     if (error instanceof ValidationError) {
-      reply.status(400).send({ error: "Bad request" } as ErrorResponse);
+      await reply.status(400).send({ error: "Bad request" } as ErrorResponse);
       return;
     }
 
-    reply.status(500).send({ error: "Internal server error" } as ErrorResponse);
+    await reply
+      .status(500)
+      .send({ error: "Internal server error" } as ErrorResponse);
   }
 }
 
@@ -271,21 +285,25 @@ async function updateLabelHandler(
       request.body,
       request.body.version
     );
-    reply.status(200).send({ label });
+    await reply.status(200).send({ label });
   } catch (error) {
     request.log.error(error);
 
     // Handle known error types
     if (error instanceof NotFoundError) {
-      reply.status(404).send({ error: "Label not found" } as ErrorResponse);
+      await reply
+        .status(404)
+        .send({ error: "Label not found" } as ErrorResponse);
       return;
     }
     if (error instanceof ForbiddenError) {
-      reply.status(403).send({ error: "Forbidden" } as ErrorResponse);
+      await reply.status(403).send({ error: "Forbidden" } as ErrorResponse);
       return;
     }
 
-    reply.status(500).send({ error: "Internal server error" } as ErrorResponse);
+    await reply
+      .status(500)
+      .send({ error: "Internal server error" } as ErrorResponse);
   }
 }
 
@@ -316,21 +334,25 @@ async function deleteLabelHandler(
       );
     }
 
-    reply.status(204).send();
+    await reply.status(204).send();
   } catch (error) {
     request.log.error(error);
 
     // Handle known error types
     if (error instanceof NotFoundError) {
-      reply.status(404).send({ error: "Label not found" } as ErrorResponse);
+      await reply
+        .status(404)
+        .send({ error: "Label not found" } as ErrorResponse);
       return;
     }
     if (error instanceof ForbiddenError) {
-      reply.status(403).send({ error: "Forbidden" } as ErrorResponse);
+      await reply.status(403).send({ error: "Forbidden" } as ErrorResponse);
       return;
     }
 
-    reply.status(500).send({ error: "Internal server error" } as ErrorResponse);
+    await reply
+      .status(500)
+      .send({ error: "Internal server error" } as ErrorResponse);
   }
 }
 
@@ -349,7 +371,7 @@ async function getLabelCharactersHandler(
 
   try {
     const labelCharacters = await getLabelCharacters(labelId, user.id);
-    reply
+    await reply
       .status(200)
       .send({ characters: labelCharacters } as LabelCharactersResponse);
   } catch (error) {
@@ -357,15 +379,19 @@ async function getLabelCharactersHandler(
 
     // Handle known error types
     if (error instanceof NotFoundError) {
-      reply.status(404).send({ error: "Label not found" } as ErrorResponse);
+      await reply
+        .status(404)
+        .send({ error: "Label not found" } as ErrorResponse);
       return;
     }
     if (error instanceof ForbiddenError) {
-      reply.status(403).send({ error: "Forbidden" } as ErrorResponse);
+      await reply.status(403).send({ error: "Forbidden" } as ErrorResponse);
       return;
     }
 
-    reply.status(500).send({ error: "Internal server error" } as ErrorResponse);
+    await reply
+      .status(500)
+      .send({ error: "Internal server error" } as ErrorResponse);
   }
 }
 

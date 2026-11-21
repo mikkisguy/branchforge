@@ -142,10 +142,7 @@ await server.register(session, {
   },
   // Save session on every request to ensure session data is up-to-date
   saveUninitialized: false,
-  // Slide session expiry on activity: with rolling enabled, @fastify/session
-  // calls store.set on each response, and setSession refreshes expiresAt to
-  // now + maxAge — so maxAge acts as an inactivity timeout rather than a
-  // fixed-from-login cap.
+  // Refresh the stored session and its cookie expiry on activity.
   rolling: true,
 });
 

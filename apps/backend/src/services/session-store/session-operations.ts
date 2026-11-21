@@ -1,48 +1,57 @@
 import type { Session } from "fastify";
 import { getDb } from "../../db/index.js";
 import { userSessions } from "../../db/schema/index.js";
-import { eq, lt } from "drizzle-orm";
-import { sessionToDbData, dbDataToSession } from "../session-store.service.js";
+import { and, eq, gt, lt, sql } from "drizzle-orm";
+import {
+  dbDataToSession,
+  SESSION_METADATA_KEY,
+  sessionToDbData,
+} from "../session-store.service.js";
 import { getSessionMaxAge } from "../../lib/config.js";
 
 /**
  * Set a session in the database
  */
+function sessionValues(session: Session) {
+  const maxAge = session.cookie?.maxAge ?? getSessionMaxAge();
+  return {
+    ...sessionToDbData(session),
+    expiresAt: new Date(Date.now() + maxAge),
+  };
+}
+
 export async function setSession(
   sessionId: string,
   session: Session
 ): Promise<void> {
-  const db = getDb();
-  const { userId, data: cleanData } = sessionToDbData(session);
-
-  // Async deferral ensures consistent behavior for sessions without userId
-  // This matches the original session store implementation's pattern
-  // and allows the caller to handle the async operation consistently
-  if (!userId) {
-    await new Promise((resolve) => setImmediate(resolve));
-    return;
-  }
-
-  const maxAge = session.cookie?.maxAge ?? getSessionMaxAge();
-  const expiresAt = new Date(Date.now() + maxAge);
-
-  await db
+  await getDb()
     .insert(userSessions)
     .values({
       id: sessionId,
-      userId,
-      data: cleanData,
-      expiresAt,
-    })
-    .onConflictDoUpdate({
-      target: userSessions.id,
-      set: {
-        userId,
-        data: cleanData,
-        expiresAt,
-        updatedAt: new Date(),
-      },
+      ...sessionValues(session),
     });
+}
+
+/** Replace a live session only if the stored generation still matches. */
+export async function compareAndSetSession(
+  sessionId: string,
+  expectedGeneration: string,
+  session: Session
+): Promise<boolean> {
+  // Fastify treats rows written before generation metadata as generation=id.
+  const generation = sql<string>`coalesce(${userSessions.data} -> ${SESSION_METADATA_KEY}::text ->> 'generation', ${userSessions.id})`;
+  const result = await getDb()
+    .update(userSessions)
+    .set({ ...sessionValues(session), updatedAt: new Date() })
+    .where(
+      and(
+        eq(userSessions.id, sessionId),
+        eq(generation, expectedGeneration),
+        gt(userSessions.expiresAt, new Date())
+      )
+    );
+
+  return result.rowCount === 1;
 }
 
 /**
@@ -56,14 +65,8 @@ export async function getSession(sessionId: string): Promise<Session | null> {
     .where(eq(userSessions.id, sessionId))
     .limit(1);
 
-  if (result.length === 0) {
-    return null;
-  }
-
   const row = result[0];
-
-  if (row.expiresAt < new Date()) {
-    await destroySession(sessionId);
+  if (!row || row.expiresAt <= new Date()) {
     return null;
   }
 

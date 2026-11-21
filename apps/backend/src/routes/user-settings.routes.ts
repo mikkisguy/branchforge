@@ -77,7 +77,7 @@ async function getUserSettingsHandler(
   reply: FastifyReply
 ): Promise<void> {
   const settings = await getUserSettings(request.user!.id);
-  reply.send(settings);
+  await reply.send(settings);
 }
 
 /**
@@ -101,7 +101,7 @@ async function updateUserSettingsHandler(
     dailyWordResetHour,
     timezone,
   });
-  reply.send(settings);
+  await reply.send(settings);
 }
 
 /**
@@ -124,7 +124,7 @@ async function updateUserProfileHandler(
     language,
     theme,
   });
-  reply.send(settings);
+  await reply.send(settings);
 }
 
 /**
@@ -200,7 +200,7 @@ async function uploadUserAvatarHandler(
     data.mimetype
   );
 
-  reply.send(result);
+  await reply.send(result);
 }
 
 /**
@@ -217,7 +217,7 @@ async function deleteUserAvatarHandler(
   reply: FastifyReply
 ): Promise<void> {
   await deleteUserAvatar(request.user!.id);
-  reply.status(204).send();
+  await reply.status(204).send();
 }
 
 /**
@@ -235,7 +235,7 @@ async function resetWritingStatsHandler(
   reply: FastifyReply
 ): Promise<void> {
   await resetWritingStats(request.user!.id);
-  reply.send({ success: true });
+  await reply.send({ success: true });
 }
 
 /**

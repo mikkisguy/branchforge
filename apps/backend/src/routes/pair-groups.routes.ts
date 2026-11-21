@@ -95,7 +95,7 @@ async function listPairGroupsHandler(
   const user = request.user!;
 
   const pgs = await listPairGroups(projectId, user.id);
-  reply.status(200).send({ pairGroups: pgs } as PairGroupsListResponse);
+  await reply.status(200).send({ pairGroups: pgs } as PairGroupsListResponse);
 }
 
 async function createPairGroupHandler(
@@ -111,7 +111,7 @@ async function createPairGroupHandler(
   checkRateLimit(`pairGroupCreate:${request.ip}`);
 
   const pairGroup = await createPairGroup(projectId, user.id, request.body);
-  reply.status(201).send({
+  await reply.status(201).send({
     pairGroup: serializeDateFields(pairGroup),
   });
 }
@@ -129,7 +129,7 @@ async function updatePairGroupHandler(
   checkRateLimit(`pairGroupUpdate:${request.ip}`);
 
   const pairGroup = await updatePairGroup(pairGroupId, user.id, request.body);
-  reply.status(200).send({
+  await reply.status(200).send({
     pairGroup: serializeDateFields(pairGroup),
   });
 }
@@ -146,7 +146,7 @@ async function deletePairGroupHandler(
   checkRateLimit(`pairGroupDelete:${request.ip}`);
 
   await deletePairGroup(pairGroupId, user.id);
-  reply.status(204).send();
+  await reply.status(204).send();
 }
 
 // ============================================================================

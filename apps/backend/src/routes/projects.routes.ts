@@ -97,7 +97,7 @@ async function listProjectsHandler(
 
   const projects = await listProjects(user.id);
 
-  reply.status(200).send({ projects } as ListProjectsResponse);
+  await reply.status(200).send({ projects } as ListProjectsResponse);
 }
 
 /**
@@ -116,11 +116,13 @@ async function getProjectHandler(
   const project = await getProject(projectId, user.id);
 
   if (!project) {
-    reply.status(404).send({ error: "Project not found" } as ErrorResponse);
+    await reply
+      .status(404)
+      .send({ error: "Project not found" } as ErrorResponse);
     return;
   }
 
-  reply.status(200).send({ project } as GetProjectResponse);
+  await reply.status(200).send({ project } as GetProjectResponse);
 }
 
 /**
@@ -153,7 +155,7 @@ async function updateProjectHandler(
   try {
     const project = await updateProject(user.id, projectId, body);
 
-    reply.status(200).send({ project } as UpdateProjectResponse);
+    await reply.status(200).send({ project } as UpdateProjectResponse);
   } catch (error) {
     request.log.error(
       { err: error, projectId },
@@ -163,14 +165,16 @@ async function updateProjectHandler(
     );
 
     if (error instanceof NotFoundError) {
-      reply.status(404).send({ error: "Not found" } as ErrorResponse);
+      await reply.status(404).send({ error: "Not found" } as ErrorResponse);
       return;
     }
     if (error instanceof ForbiddenError) {
-      reply.status(403).send({ error: "Forbidden" } as ErrorResponse);
+      await reply.status(403).send({ error: "Forbidden" } as ErrorResponse);
       return;
     }
-    reply.status(500).send({ error: "Internal server error" } as ErrorResponse);
+    await reply
+      .status(500)
+      .send({ error: "Internal server error" } as ErrorResponse);
   }
 }
 
@@ -190,7 +194,7 @@ async function deleteProjectHandler(
   try {
     await deleteProject(user.id, projectId);
 
-    reply.status(204).send();
+    await reply.status(204).send();
   } catch (error) {
     request.log.error(
       { err: error, projectId },
@@ -200,14 +204,16 @@ async function deleteProjectHandler(
     );
 
     if (error instanceof NotFoundError) {
-      reply.status(404).send({ error: "Not found" } as ErrorResponse);
+      await reply.status(404).send({ error: "Not found" } as ErrorResponse);
       return;
     }
     if (error instanceof ForbiddenError) {
-      reply.status(403).send({ error: "Forbidden" } as ErrorResponse);
+      await reply.status(403).send({ error: "Forbidden" } as ErrorResponse);
       return;
     }
-    reply.status(500).send({ error: "Internal server error" } as ErrorResponse);
+    await reply
+      .status(500)
+      .send({ error: "Internal server error" } as ErrorResponse);
   }
 }
 
@@ -233,14 +239,14 @@ async function getProjectFilesHandler(
 
   try {
     const result = await getProjectFiles(projectId, user.id, source);
-    reply.send(result);
+    await reply.send(result);
   } catch (err) {
     if (err instanceof NotFoundError) {
-      reply.status(404).send({ error: "Project not found" });
+      await reply.status(404).send({ error: "Project not found" });
       return;
     }
     if (err instanceof ForbiddenError) {
-      reply.status(403).send({ error: "Forbidden" });
+      await reply.status(403).send({ error: "Forbidden" });
       return;
     }
     request.log.error(
@@ -249,7 +255,7 @@ async function getProjectFilesHandler(
         err instanceof Error ? err.message : "Unknown error"
       }`
     );
-    reply.status(500).send({ error: "Failed to get project files" });
+    await reply.status(500).send({ error: "Failed to get project files" });
   }
 }
 
@@ -281,22 +287,22 @@ async function createProjectFileHandler(
         updatedAt: file.updatedAt.toISOString(),
       },
     };
-    reply.status(201).send(response);
+    await reply.status(201).send(response);
   } catch (err) {
     if (err instanceof NotFoundError) {
-      reply.status(404).send({ error: "Project not found" });
+      await reply.status(404).send({ error: "Project not found" });
       return;
     }
     if (err instanceof ForbiddenError) {
-      reply.status(403).send({ error: "Forbidden" });
+      await reply.status(403).send({ error: "Forbidden" });
       return;
     }
     if (err instanceof ValidationError) {
-      reply.status(400).send({ error: err.userMessage } as ErrorResponse);
+      await reply.status(400).send({ error: err.userMessage } as ErrorResponse);
       return;
     }
     if (err instanceof ConflictError) {
-      reply.status(409).send({ error: err.userMessage } as ErrorResponse);
+      await reply.status(409).send({ error: err.userMessage } as ErrorResponse);
       return;
     }
     request.log.error(
@@ -305,7 +311,7 @@ async function createProjectFileHandler(
         err instanceof Error ? err.message : "Unknown error"
       }`
     );
-    reply.status(500).send({ error: "Failed to create project file" });
+    await reply.status(500).send({ error: "Failed to create project file" });
   }
 }
 
@@ -337,7 +343,7 @@ async function updateFileContentHandler(
       expectedContentHash
     );
 
-    reply.status(200).send(result);
+    await reply.status(200).send(result);
   } catch (err) {
     request.log.error(
       { err, fileId },
@@ -347,20 +353,20 @@ async function updateFileContentHandler(
     );
 
     if (err instanceof NotFoundError) {
-      reply.status(404).send({ error: err.userMessage } as ErrorResponse);
+      await reply.status(404).send({ error: err.userMessage } as ErrorResponse);
       return;
     }
     if (err instanceof ForbiddenError) {
-      reply.status(403).send({ error: err.userMessage } as ErrorResponse);
+      await reply.status(403).send({ error: err.userMessage } as ErrorResponse);
       return;
     }
     if (err instanceof ValidationError) {
-      reply.status(400).send({ error: err.userMessage } as ErrorResponse);
+      await reply.status(400).send({ error: err.userMessage } as ErrorResponse);
       return;
     }
     if (err instanceof ConflictError) {
       if (err.reason && err.currentContentHash) {
-        reply.status(409).send({
+        await reply.status(409).send({
           success: false,
           conflict: {
             reason: err.reason,
@@ -369,10 +375,12 @@ async function updateFileContentHandler(
         });
         return;
       }
-      reply.status(409).send({ error: err.userMessage } as ErrorResponse);
+      await reply.status(409).send({ error: err.userMessage } as ErrorResponse);
       return;
     }
-    reply.status(500).send({ error: "Internal server error" } as ErrorResponse);
+    await reply
+      .status(500)
+      .send({ error: "Internal server error" } as ErrorResponse);
   }
 }
 
@@ -400,7 +408,7 @@ async function renameProjectFileHandler(
       filePath,
       expectedContentHash
     );
-    reply.status(200).send({
+    await reply.status(200).send({
       file: {
         ...result.file,
         lastSyncedAt: result.file.lastSyncedAt?.toISOString() ?? null,
@@ -418,22 +426,24 @@ async function renameProjectFileHandler(
     );
 
     if (err instanceof NotFoundError) {
-      reply.status(404).send({ error: err.userMessage } as ErrorResponse);
+      await reply.status(404).send({ error: err.userMessage } as ErrorResponse);
       return;
     }
     if (err instanceof ForbiddenError) {
-      reply.status(403).send({ error: err.userMessage } as ErrorResponse);
+      await reply.status(403).send({ error: err.userMessage } as ErrorResponse);
       return;
     }
     if (err instanceof ValidationError) {
-      reply.status(400).send({ error: err.userMessage } as ErrorResponse);
+      await reply.status(400).send({ error: err.userMessage } as ErrorResponse);
       return;
     }
     if (err instanceof ConflictError) {
-      reply.status(409).send({ error: err.userMessage } as ErrorResponse);
+      await reply.status(409).send({ error: err.userMessage } as ErrorResponse);
       return;
     }
-    reply.status(500).send({ error: "Internal server error" } as ErrorResponse);
+    await reply
+      .status(500)
+      .send({ error: "Internal server error" } as ErrorResponse);
   }
 }
 
@@ -451,7 +461,7 @@ async function getDeleteImpactHandler(
 
   try {
     const impact = await getDeleteImpact(fileId, user.id);
-    reply.status(200).send({ impact });
+    await reply.status(200).send({ impact });
   } catch (err) {
     request.log.error(
       { err, fileId },
@@ -461,18 +471,20 @@ async function getDeleteImpactHandler(
     );
 
     if (err instanceof NotFoundError) {
-      reply.status(404).send({ error: err.userMessage } as ErrorResponse);
+      await reply.status(404).send({ error: err.userMessage } as ErrorResponse);
       return;
     }
     if (err instanceof ForbiddenError) {
-      reply.status(403).send({ error: err.userMessage } as ErrorResponse);
+      await reply.status(403).send({ error: err.userMessage } as ErrorResponse);
       return;
     }
     if (err instanceof ConflictError) {
-      reply.status(409).send({ error: err.userMessage } as ErrorResponse);
+      await reply.status(409).send({ error: err.userMessage } as ErrorResponse);
       return;
     }
-    reply.status(500).send({ error: "Internal server error" } as ErrorResponse);
+    await reply
+      .status(500)
+      .send({ error: "Internal server error" } as ErrorResponse);
   }
 }
 
@@ -490,7 +502,7 @@ async function deleteProjectFileHandler(
 
   try {
     const result = await deleteProjectFile(fileId, user.id);
-    reply.status(200).send({
+    await reply.status(200).send({
       file: {
         ...result.file,
         lastSyncedAt: result.file.lastSyncedAt?.toISOString() ?? null,
@@ -509,22 +521,24 @@ async function deleteProjectFileHandler(
     );
 
     if (err instanceof NotFoundError) {
-      reply.status(404).send({ error: err.userMessage } as ErrorResponse);
+      await reply.status(404).send({ error: err.userMessage } as ErrorResponse);
       return;
     }
     if (err instanceof ForbiddenError) {
-      reply.status(403).send({ error: err.userMessage } as ErrorResponse);
+      await reply.status(403).send({ error: err.userMessage } as ErrorResponse);
       return;
     }
     if (err instanceof ValidationError) {
-      reply.status(400).send({ error: err.userMessage } as ErrorResponse);
+      await reply.status(400).send({ error: err.userMessage } as ErrorResponse);
       return;
     }
     if (err instanceof ConflictError) {
-      reply.status(409).send({ error: err.userMessage } as ErrorResponse);
+      await reply.status(409).send({ error: err.userMessage } as ErrorResponse);
       return;
     }
-    reply.status(500).send({ error: "Internal server error" } as ErrorResponse);
+    await reply
+      .status(500)
+      .send({ error: "Internal server error" } as ErrorResponse);
   }
 }
 
@@ -542,7 +556,7 @@ async function getPendingStructuralSummaryHandler(
 
   try {
     const summary = await getPendingStructuralSummary(projectId, user.id);
-    reply.status(200).send(summary);
+    await reply.status(200).send(summary);
   } catch (err) {
     request.log.error(
       { err, projectId },
@@ -552,14 +566,16 @@ async function getPendingStructuralSummaryHandler(
     );
 
     if (err instanceof NotFoundError) {
-      reply.status(404).send({ error: err.userMessage } as ErrorResponse);
+      await reply.status(404).send({ error: err.userMessage } as ErrorResponse);
       return;
     }
     if (err instanceof ForbiddenError) {
-      reply.status(403).send({ error: err.userMessage } as ErrorResponse);
+      await reply.status(403).send({ error: err.userMessage } as ErrorResponse);
       return;
     }
-    reply.status(500).send({ error: "Internal server error" } as ErrorResponse);
+    await reply
+      .status(500)
+      .send({ error: "Internal server error" } as ErrorResponse);
   }
 }
 
@@ -577,7 +593,7 @@ async function reverseOneOperationHandler(
 
   try {
     const result = await reverseOneOperation(fileId, user.id);
-    reply.status(200).send({
+    await reply.status(200).send({
       success: result.reversed,
       reversed: result.reversed,
       operation: result.operation,
@@ -591,14 +607,16 @@ async function reverseOneOperationHandler(
     );
 
     if (err instanceof NotFoundError) {
-      reply.status(404).send({ error: err.userMessage } as ErrorResponse);
+      await reply.status(404).send({ error: err.userMessage } as ErrorResponse);
       return;
     }
     if (err instanceof ForbiddenError) {
-      reply.status(403).send({ error: err.userMessage } as ErrorResponse);
+      await reply.status(403).send({ error: err.userMessage } as ErrorResponse);
       return;
     }
-    reply.status(500).send({ error: "Internal server error" } as ErrorResponse);
+    await reply
+      .status(500)
+      .send({ error: "Internal server error" } as ErrorResponse);
   }
 }
 
@@ -617,7 +635,7 @@ async function discardAllOperationsHandler(
 
   try {
     const result = await discardAllOperations(projectId, user.id);
-    reply.status(200).send({
+    await reply.status(200).send({
       success: result.discarded,
       discarded: result.discarded,
       count: result.count,
@@ -631,14 +649,16 @@ async function discardAllOperationsHandler(
     );
 
     if (err instanceof NotFoundError) {
-      reply.status(404).send({ error: err.userMessage } as ErrorResponse);
+      await reply.status(404).send({ error: err.userMessage } as ErrorResponse);
       return;
     }
     if (err instanceof ForbiddenError) {
-      reply.status(403).send({ error: err.userMessage } as ErrorResponse);
+      await reply.status(403).send({ error: err.userMessage } as ErrorResponse);
       return;
     }
-    reply.status(500).send({ error: "Internal server error" } as ErrorResponse);
+    await reply
+      .status(500)
+      .send({ error: "Internal server error" } as ErrorResponse);
   }
 }
 
