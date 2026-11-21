@@ -1,3 +1,4 @@
+import { MemoryRouter } from "react-router-dom";
 import * as keyboardShortcuts from "@/lib/keyboard-shortcuts";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
@@ -45,7 +46,9 @@ const characters: Character[] = [
 function renderWithQueryClient(ui: ReactElement) {
   const queryClient = createTestQueryClient();
   return render(
-    <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter>{ui}</MemoryRouter>
+    </QueryClientProvider>
   );
 }
 

@@ -31,16 +31,14 @@ describe("useProjectReset", () => {
       }
     );
 
-    await waitFor(() => {
-      expect(triggerSave).toHaveBeenCalledTimes(1);
-      expect(onReset).toHaveBeenCalledTimes(1);
-    });
+    expect(triggerSave).not.toHaveBeenCalled();
+    expect(onReset).not.toHaveBeenCalled();
 
     rerender({ projectId: "project-2" });
 
     await waitFor(() => {
-      expect(triggerSave).toHaveBeenCalledTimes(2);
-      expect(onReset).toHaveBeenCalledTimes(2);
+      expect(triggerSave).toHaveBeenCalledTimes(1);
+      expect(onReset).toHaveBeenCalledTimes(1);
     });
 
     expect(showErrorToast).not.toHaveBeenCalled();
@@ -52,19 +50,24 @@ describe("useProjectReset", () => {
     const showErrorToast = vi.fn();
     const setSkipSave = vi.fn();
 
-    renderHook(() => {
-      const isResettingRef = useRef(false);
+    const { rerender } = renderHook(
+      ({ projectId }) => {
+        const isResettingRef = useRef(false);
 
-      useProjectReset({
-        projectId: "project-1",
-        isResettingRef,
-        hasPendingSave: true,
-        triggerSave,
-        showErrorToast,
-        setSkipSave,
-        onReset,
-      });
-    });
+        useProjectReset({
+          projectId,
+          isResettingRef,
+          hasPendingSave: true,
+          triggerSave,
+          showErrorToast,
+          setSkipSave,
+          onReset,
+        });
+      },
+      { initialProps: { projectId: "project-1" } }
+    );
+
+    rerender({ projectId: "project-2" });
 
     await waitFor(() => {
       expect(showErrorToast).toHaveBeenCalledWith(
@@ -86,19 +89,24 @@ describe("useProjectReset", () => {
     const showErrorToast = vi.fn();
     const setSkipSave = vi.fn();
 
-    renderHook(() => {
-      const isResettingRef = useRef(false);
+    const { rerender } = renderHook(
+      ({ projectId }) => {
+        const isResettingRef = useRef(false);
 
-      useProjectReset({
-        projectId: "project-1",
-        isResettingRef,
-        hasPendingSave: true,
-        triggerSave,
-        showErrorToast,
-        setSkipSave,
-        onReset,
-      });
-    });
+        useProjectReset({
+          projectId,
+          isResettingRef,
+          hasPendingSave: true,
+          triggerSave,
+          showErrorToast,
+          setSkipSave,
+          onReset,
+        });
+      },
+      { initialProps: { projectId: "project-1" } }
+    );
+
+    rerender({ projectId: "project-2" });
 
     await waitFor(() => {
       expect(showErrorToast).toHaveBeenCalledWith(

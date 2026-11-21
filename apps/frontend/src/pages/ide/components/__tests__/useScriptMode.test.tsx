@@ -1,6 +1,11 @@
+import type { RunEditorTransition } from "@/hooks/useGuardedEditorTabClose";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { useEffect, useRef } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const runEditorTransition: RunEditorTransition = (action) => {
+  void action();
+};
 
 const showErrorToast = vi.fn();
 const setActiveLabelId = vi.fn();
@@ -220,7 +225,7 @@ describe("useScriptMode generated preview lifecycle", () => {
 
   it("selects a generated file into read-only preview and blocks undo/redo", async () => {
     const { result } = renderHook(() =>
-      useScriptMode({ projectId: "project-1" })
+      useScriptMode({ runEditorTransition, projectId: "project-1" })
     );
 
     await act(async () => {
@@ -244,7 +249,7 @@ describe("useScriptMode generated preview lifecycle", () => {
     editorState.triggerFileSave.mockResolvedValueOnce(true);
 
     const { result } = renderHook(() =>
-      useScriptMode({ projectId: "project-1" })
+      useScriptMode({ runEditorTransition, projectId: "project-1" })
     );
 
     await act(async () => {
@@ -262,7 +267,7 @@ describe("useScriptMode generated preview lifecycle", () => {
     editorState.triggerFileSave.mockResolvedValueOnce(false);
 
     const { result } = renderHook(() =>
-      useScriptMode({ projectId: "project-1" })
+      useScriptMode({ runEditorTransition, projectId: "project-1" })
     );
 
     await act(async () => {
@@ -280,7 +285,7 @@ describe("useScriptMode generated preview lifecycle", () => {
 
   it("clears generated preview when selecting a real file tab", async () => {
     const { result } = renderHook(() =>
-      useScriptMode({ projectId: "project-1" })
+      useScriptMode({ runEditorTransition, projectId: "project-1" })
     );
 
     await act(async () => {
@@ -300,7 +305,7 @@ describe("useScriptMode generated preview lifecycle", () => {
 
   it("clears generated preview when selecting a label/scene", async () => {
     const { result } = renderHook(() =>
-      useScriptMode({ projectId: "project-1" })
+      useScriptMode({ runEditorTransition, projectId: "project-1" })
     );
 
     await act(async () => {
@@ -320,7 +325,7 @@ describe("useScriptMode generated preview lifecycle", () => {
   it("re-toasts preview errors after recovery", async () => {
     previewState.isError = true;
     const { rerender } = renderHook(() =>
-      useScriptMode({ projectId: "project-1" })
+      useScriptMode({ runEditorTransition, projectId: "project-1" })
     );
 
     await waitFor(() => {
@@ -386,7 +391,7 @@ describe("useScriptMode create file", () => {
 
   it("opens the create file dialog from the sidebar entry point", () => {
     const { result } = renderHook(() =>
-      useScriptMode({ projectId: "project-1" })
+      useScriptMode({ runEditorTransition, projectId: "project-1" })
     );
 
     expect(result.current.showCreateFileDialog).toBe(false);
@@ -401,7 +406,7 @@ describe("useScriptMode create file", () => {
 
   it("closes the create file dialog when the project changes", async () => {
     const { result, rerender } = renderHook(
-      ({ projectId }) => useScriptMode({ projectId }),
+      ({ projectId }) => useScriptMode({ projectId, runEditorTransition }),
       { initialProps: { projectId: "project-1" } }
     );
 
@@ -419,7 +424,7 @@ describe("useScriptMode create file", () => {
 
   it("exits generated preview when the created file becomes selectable", async () => {
     const { result, rerender } = renderHook(() =>
-      useScriptMode({ projectId: "project-1" })
+      useScriptMode({ runEditorTransition, projectId: "project-1" })
     );
 
     await act(async () => {
@@ -458,7 +463,7 @@ describe("useScriptMode create file", () => {
 
   it("creates a file, expands its folder, and selects a tab after the file list updates", async () => {
     const { result, rerender } = renderHook(() =>
-      useScriptMode({ projectId: "project-1" })
+      useScriptMode({ runEditorTransition, projectId: "project-1" })
     );
 
     await act(async () => {
@@ -511,7 +516,7 @@ describe("useScriptMode create file", () => {
     );
 
     const { result, rerender, unmount } = renderHook(() =>
-      useScriptMode({ projectId: "project-1" })
+      useScriptMode({ runEditorTransition, projectId: "project-1" })
     );
 
     await act(async () => {
@@ -562,7 +567,7 @@ describe("useScriptMode create file", () => {
     selectFileTab.mockResolvedValue(false);
 
     const { result, rerender } = renderHook(() =>
-      useScriptMode({ projectId: "project-1" })
+      useScriptMode({ runEditorTransition, projectId: "project-1" })
     );
 
     await act(async () => {

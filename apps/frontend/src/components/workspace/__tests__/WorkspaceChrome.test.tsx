@@ -2,6 +2,7 @@
  * WorkspaceChrome Tests
  */
 
+import { MemoryRouter } from "react-router-dom";
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -76,7 +77,9 @@ function createWrapper() {
   return function Wrapper({ children }: { children: ReactNode }) {
     return (
       <QueryClientProvider client={queryClient}>
-        <ToastProvider>{children}</ToastProvider>
+        <MemoryRouter>
+          <ToastProvider>{children}</ToastProvider>
+        </MemoryRouter>
       </QueryClientProvider>
     );
   };

@@ -1,6 +1,7 @@
 import { QueryClientProvider, type QueryClient } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { MemoryRouter } from "react-router-dom";
 import { useProject } from "../useProject";
 import { projectsApi, type Project } from "@/lib/api/projects";
 import { projectKeys } from "@/lib/query-keys";
@@ -25,10 +26,12 @@ const TEST_PROJECTS: Project[] = [
   },
 ];
 
-function createWrapper(queryClient: QueryClient) {
+function createWrapper(queryClient: QueryClient, path = "/") {
   return function Wrapper({ children }: { children: React.ReactNode }) {
     return (
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={[path]}>{children}</MemoryRouter>
+      </QueryClientProvider>
     );
   };
 }
@@ -95,36 +98,34 @@ describe("useProject", () => {
     expect(localStorage.getItem("branchforge:project:current")).toBeNull();
   });
 
-  it("switches the current project and persists the new id", async () => {
+  it("uses the linked project instead of the last opened project", async () => {
+    localStorage.setItem("branchforge:project:current", "project-1");
     const queryClient = createTestQueryClient();
-
     const { result } = renderHook(() => useProject(), {
-      wrapper: createWrapper(queryClient),
+      wrapper: createWrapper(queryClient, "/?project=project-2&view=write"),
     });
 
-    await waitFor(() => {
-      expect(result.current.currentProject?.id).toBe("project-1");
-    });
-
-    act(() => {
-      result.current.setCurrentProject(result.current.projects[1]!);
-    });
-
-    await waitFor(() => {
-      expect(result.current.currentProject?.id).toBe("project-2");
-    });
-
-    expect(localStorage.getItem("branchforge:project:current")).toBe(
-      "project-2"
+    await waitFor(() =>
+      expect(result.current.currentProject?.id).toBe("project-2")
     );
-
-    expect(queryClient.getQueryState(projectKeys.current())?.fetchStatus).toBe(
-      "idle"
-    );
-
     await queryClient.invalidateQueries({ queryKey: projectKeys.current() });
-
     expect(result.current.currentProject?.id).toBe("project-2");
+  });
+
+  it("does not substitute a different project for an unavailable linked project", async () => {
+    localStorage.setItem("branchforge:project:current", "project-1");
+    const { result } = renderHook(() => useProject(), {
+      wrapper: createWrapper(
+        createTestQueryClient(),
+        "/?project=missing-project"
+      ),
+    });
+
+    await waitFor(() => expect(result.current.projects).toEqual(TEST_PROJECTS));
+    expect(result.current.currentProject).toBeNull();
+    expect(localStorage.getItem("branchforge:project:current")).toBe(
+      "project-1"
+    );
   });
 
   it("refreshProjects returns the refreshed project list after invalidation", async () => {

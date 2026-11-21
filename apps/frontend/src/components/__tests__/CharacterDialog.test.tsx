@@ -4,6 +4,7 @@
  * Tests for the CharacterDialog refactored to use CharacterList + CharacterEditDialog.
  */
 
+import { MemoryRouter } from "react-router-dom";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -150,7 +151,9 @@ describe("CharacterDialog", () => {
   const onOpenChange = vi.fn();
 
   const wrapper = ({ children }: { children: React.ReactNode }) => (
-    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter>{children}</MemoryRouter>
+    </QueryClientProvider>
   );
 
   beforeEach(() => {

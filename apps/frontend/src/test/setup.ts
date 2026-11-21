@@ -163,4 +163,5 @@ afterEach(() => {
   if (typeof localStorage?.clear === "function") {
     localStorage.clear();
   }
+  sessionStorage.clear();
 });

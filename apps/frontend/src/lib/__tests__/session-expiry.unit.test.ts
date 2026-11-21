@@ -63,6 +63,18 @@ describe("session-expiry", () => {
     expect(navigateSpy).not.toHaveBeenCalled();
   });
 
+  it("preserves an editor URL through expiry under the deployed base path", () => {
+    const editorUrl =
+      "/branchforge/?project=project-1&view=script&file=file-1#main-content";
+    window.history.replaceState({}, "", editorUrl);
+    handleSessionExpired(new QueryClient());
+
+    const [[loginPath]] = navigateSpy.mock.calls;
+    const login = new URL(loginPath, window.location.origin);
+    expect(login.pathname).toBe("/branchforge/login");
+    expect(login.searchParams.get("returnTo")).toBe(editorUrl);
+  });
+
   it("navigates to the normalized login path from a protected route", () => {
     const queryClient = new QueryClient();
     queryClient.setQueryData(["cached"], { value: 1 });

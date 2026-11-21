@@ -3,23 +3,37 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useEffect } from "react";
-import { MemoryRouter } from "react-router-dom";
+import {
+  createBrowserRouter,
+  createMemoryRouter,
+  RouterProvider,
+  useLocation,
+} from "react-router-dom";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { ToastProvider } from "@/contexts/ToastContext";
 import { createTestQueryClient } from "@/test/query-client";
+import { SkipToMainContent } from "@/components/SkipToMainContent";
+import {
+  useGuardedEditorTabClose,
+  type RunEditorTransition,
+} from "@/hooks/useGuardedEditorTabClose";
 import { HomePageIDE } from "../index";
 import type { Project } from "@/lib/api/projects";
 
 const {
   mockProject,
   secondProject,
-  storageState,
   flushModeBeforeTransition,
   showErrorToast,
-  setCurrentProject,
   deleteProject,
   logout,
   projectState,
@@ -41,30 +55,22 @@ const {
     name: "Second Project",
   };
 
-  const storageState = {
-    view: "write" as "write" | "script" | "flow",
-    setView: vi.fn((next: "write" | "script" | "flow") => {
-      storageState.view = next;
-    }),
-  };
-
   const projectState = {
-    currentProject: mockProject,
     projects: [mockProject, secondProject],
   };
 
   const writeModeSimulation = {
     editorMounted: true,
     focusModeEnabled: false,
+    save: vi.fn(async () => true),
+    close: vi.fn(),
   };
 
   return {
     mockProject,
     secondProject,
-    storageState,
     flushModeBeforeTransition: vi.fn(async () => true),
     showErrorToast: vi.fn(),
-    setCurrentProject: vi.fn(),
     deleteProject: vi.fn(async () => undefined),
     logout: vi.fn(),
     projectState,
@@ -119,27 +125,32 @@ vi.mock("@/contexts/useTheme", () => ({
 }));
 
 vi.mock("@/hooks/useProject", () => ({
-  useProject: () => ({
-    currentProject: projectState.currentProject,
-    projects: projectState.projects,
-    setCurrentProject,
-    isLoadingProjects: false,
-    updateProject: vi.fn(),
-    deleteProject,
-    refreshProjects: vi.fn(),
-  }),
-}));
-
-vi.mock("@/hooks/useLocalStorage", () => ({
-  useLocalStorage: () => [storageState.view, storageState.setView] as const,
-  useLocalStorageBoolean: () => [false, vi.fn()] as const,
+  useProject: () => {
+    const id = new URLSearchParams(useLocation().search).get("project");
+    return {
+      currentProject: id
+        ? projectState.projects.find((project) => project.id === id)
+        : projectState.projects[0],
+      projects: projectState.projects,
+      isLoadingProjects: false,
+      updateProject: vi.fn(),
+      deleteProject,
+      refreshProjects: vi.fn(),
+    };
+  },
 }));
 
 vi.mock("../WriteMode", () => ({
   WriteMode: ({
     onFocusModeChange,
+    initialDocumentId,
+    onDocumentChange,
+    runEditorTransition,
   }: {
+    initialDocumentId?: string | null;
+    onDocumentChange?: (id: string, initial: boolean) => void;
     onFocusModeChange?: (focused: boolean) => void;
+    runEditorTransition: RunEditorTransition;
   }) => {
     useEffect(() => {
       onFocusModeChange?.(
@@ -148,8 +159,30 @@ vi.mock("../WriteMode", () => ({
       );
     }, [onFocusModeChange]);
 
+    const closeTab = useGuardedEditorTabClose({
+      activeId: "scene-1",
+      hasPendingSave: true,
+      save: writeModeSimulation.save,
+      onClose: writeModeSimulation.close,
+      runEditorTransition,
+      onSaveFailed: () => showErrorToast("Close blocked"),
+    });
+
     return (
       <div data-testid="write-mode">
+        <output>{initialDocumentId}</output>
+        <button type="button" onClick={(event) => closeTab(event, "scene-1")}>
+          Close first scene
+        </button>
+        <button type="button" onClick={(event) => closeTab(event, "scene-2")}>
+          Close second scene
+        </button>
+        <button
+          type="button"
+          onClick={() => onDocumentChange?.("scene-2", false)}
+        >
+          Open second scene
+        </button>
         <button
           type="button"
           onClick={() => {
@@ -185,23 +218,27 @@ vi.mock("../FlowMode", () => ({
   ),
 }));
 
-function renderHomePage() {
+function renderWorkspace(router: ReturnType<typeof createMemoryRouter>) {
   const queryClient = createTestQueryClient();
   return render(
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
-        <MemoryRouter>
-          <HomePageIDE />
-        </MemoryRouter>
+        <RouterProvider router={router} />
       </ToastProvider>
     </QueryClientProvider>
   );
 }
 
+function renderHomePage(initialEntries = ["/"]) {
+  const router = createMemoryRouter([{ path: "/", element: <HomePageIDE /> }], {
+    initialEntries,
+  });
+  renderWorkspace(router);
+  return router;
+}
+
 describe("HomePageIDE", () => {
   beforeEach(() => {
-    storageState.view = "write";
-    projectState.currentProject = mockProject;
     projectState.projects = [mockProject, secondProject];
     writeModeSimulation.editorMounted = true;
     writeModeSimulation.focusModeEnabled = false;
@@ -209,16 +246,32 @@ describe("HomePageIDE", () => {
     flushModeBeforeTransition.mockResolvedValue(true);
   });
 
+  it("opens Write in a fresh tab even when an old browser-wide mode exists", () => {
+    localStorage.setItem("branchforge:ide:mode", "script");
+    const router = renderHomePage();
+
+    expect(router.state.location.search).toBe("?project=proj-1&view=write");
+    expect(screen.getByTestId("write-mode")).toBeVisible();
+  });
+
+  it("restores a tab's own mode when opening a bare workspace URL", () => {
+    sessionStorage.setItem("branchforge:ide:mode", "flow");
+    const router = renderHomePage();
+
+    expect(router.state.location.search).toBe("?project=proj-1&view=flow");
+    expect(screen.getByTestId("flow-mode")).toBeVisible();
+  });
+
   it("switching write to script flushes write then persists script", async () => {
     const user = userEvent.setup();
-    renderHomePage();
+    const router = renderHomePage();
 
     const scriptButtons = screen.getAllByRole("button", { name: "Script" });
     await user.click(scriptButtons[0]!);
 
     await waitFor(() => {
       expect(flushModeBeforeTransition).toHaveBeenCalledWith("write");
-      expect(storageState.setView).toHaveBeenCalledWith("script");
+      expect(router.state.location.search).toBe("?project=proj-1&view=script");
     });
   });
 
@@ -226,7 +279,7 @@ describe("HomePageIDE", () => {
     const user = userEvent.setup();
     flushModeBeforeTransition.mockResolvedValueOnce(false);
 
-    renderHomePage();
+    const router = renderHomePage();
 
     const scriptButtons = screen.getAllByRole("button", { name: "Script" });
     await user.click(scriptButtons[0]!);
@@ -237,40 +290,39 @@ describe("HomePageIDE", () => {
         "Mode switch blocked"
       );
     });
-    expect(storageState.setView).not.toHaveBeenCalled();
+    expect(router.state.location.search).toBe("?project=proj-1&view=write");
     expect(screen.getByTestId("write-mode")).toBeInTheDocument();
   });
 
   it("switching write to flow flushes write then sets flow", async () => {
     const user = userEvent.setup();
-    renderHomePage();
+    const router = renderHomePage();
 
     const flowButtons = screen.getAllByRole("button", { name: "Flow" });
     await user.click(flowButtons[0]!);
 
     await waitFor(() => {
       expect(flushModeBeforeTransition).toHaveBeenCalledWith("write");
-      expect(storageState.setView).toHaveBeenCalledWith("flow");
+      expect(router.state.location.search).toBe("?project=proj-1&view=flow");
     });
   });
 
   it("switching flow to write does not flush", async () => {
-    storageState.view = "flow";
     const user = userEvent.setup();
-    renderHomePage();
+    const router = renderHomePage(["/?project=proj-1&view=flow"]);
 
     const writeButtons = screen.getAllByRole("button", { name: "Write" });
     await user.click(writeButtons[0]!);
 
     await waitFor(() => {
       expect(flushModeBeforeTransition).not.toHaveBeenCalled();
-      expect(storageState.setView).toHaveBeenCalledWith("write");
+      expect(router.state.location.search).toBe("?project=proj-1&view=write");
     });
   });
 
   it("changing project flushes current write view", async () => {
     const user = userEvent.setup();
-    renderHomePage();
+    const router = renderHomePage();
 
     const projectMenus = screen.getAllByRole("button", {
       name: "Project menu",
@@ -282,19 +334,218 @@ describe("HomePageIDE", () => {
 
     await waitFor(() => {
       expect(flushModeBeforeTransition).toHaveBeenCalledWith("write");
-      expect(setCurrentProject).toHaveBeenCalledWith(secondProject);
+      expect(router.state.location.search).toBe("?project=proj-2&view=write");
     });
   });
 
   it("flow view renders FlowMode instead of Flow Graph dialog", () => {
-    storageState.view = "flow";
-    renderHomePage();
+    renderHomePage(["/?project=proj-1&view=flow"]);
 
     expect(screen.getByTestId("flow-mode")).toBeInTheDocument();
     expect(
       screen.queryByRole("dialog", { name: "Flow Graph" })
     ).not.toBeInTheDocument();
   });
+
+  it("restores the URL document with Back and Forward after a successful flush", async () => {
+    const router = renderHomePage([
+      "/?project=proj-1&view=write&label=scene-1",
+    ]);
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: "Open second scene" }));
+    expect(router.state.location.search).toContain("label=scene-2");
+
+    await act(async () => {
+      await router.navigate(-1);
+    });
+    await waitFor(() =>
+      expect(router.state.location.search).toContain("label=scene-1")
+    );
+    expect(flushModeBeforeTransition).toHaveBeenCalledWith("write");
+    expect(screen.getByText("scene-1")).toBeVisible();
+
+    await act(async () => {
+      await router.navigate(1);
+    });
+    await waitFor(() => expect(screen.getByText("scene-2")).toBeVisible());
+  });
+
+  it("disables editing while Back waits for the outgoing save", async () => {
+    const router = renderHomePage([
+      "/?project=proj-2&view=flow",
+      "/?project=proj-1&view=write&label=scene-1",
+    ]);
+    let finishSave!: (saved: boolean) => void;
+    flushModeBeforeTransition.mockReturnValueOnce(
+      new Promise((resolve) => {
+        finishSave = resolve;
+      })
+    );
+
+    await act(async () => {
+      await router.navigate(-1);
+    });
+    expect(screen.getByRole("main")).toHaveAttribute("inert");
+    expect(router.state.location.search).toContain("label=scene-1");
+
+    await act(async () => {
+      finishSave(true);
+    });
+    expect(await screen.findByTestId("flow-mode")).toHaveTextContent("proj-2");
+    expect(screen.getByRole("main")).not.toHaveAttribute("inert");
+  });
+
+  it("keeps the same editor and URL when saving blocks Back", async () => {
+    const router = renderHomePage([
+      "/?project=proj-2&view=flow",
+      "/?project=proj-1&view=write&label=scene-1",
+    ]);
+    flushModeBeforeTransition.mockResolvedValueOnce(false);
+
+    await act(async () => {
+      await router.navigate(-1);
+    });
+    await waitFor(() =>
+      expect(showErrorToast).toHaveBeenCalledWith(
+        expect.stringContaining("Could not save"),
+        "Navigation blocked"
+      )
+    );
+    expect(router.state.location.search).toContain("label=scene-1");
+    expect(screen.getByText("scene-1")).toBeVisible();
+  });
+
+  it("shows an unavailable project link without opening another project", () => {
+    renderHomePage(["/?project=gone&view=write"]);
+    expect(screen.getByText("Project unavailable")).toBeVisible();
+    expect(screen.queryByTestId("write-mode")).not.toBeInTheDocument();
+  });
+
+  it.each([true, false])(
+    "keeps the editor locked during repeated Back and settles once (saved=%s)",
+    async (saved) => {
+      const router = renderHomePage([
+        "/?project=proj-2&view=flow",
+        "/?project=proj-1&view=write&label=scene-1",
+      ]);
+      let finishSave!: (saved: boolean) => void;
+      flushModeBeforeTransition.mockReturnValueOnce(
+        new Promise((resolve) => {
+          finishSave = resolve;
+        })
+      );
+
+      await act(async () => {
+        await router.navigate(-1);
+      });
+      await act(async () => {
+        await router.navigate(-1);
+      });
+      expect(screen.getByRole("main")).toHaveAttribute("inert");
+      expect(flushModeBeforeTransition).toHaveBeenCalledTimes(1);
+
+      await act(async () => finishSave(saved));
+      expect(screen.getByRole("main")).not.toHaveAttribute("inert");
+      if (saved) {
+        expect(screen.getByTestId("flow-mode")).toHaveTextContent("proj-2");
+      } else {
+        expect(screen.getByText("scene-1")).toBeVisible();
+        expect(showErrorToast).toHaveBeenCalledWith(
+          expect.any(String),
+          "Navigation blocked"
+        );
+      }
+    }
+  );
+
+  it("preserves browser history indices when activating the skip link before a blocked Back", async () => {
+    const oldUrl = window.location.href;
+    const oldState = window.history.state;
+    window.history.replaceState(
+      null,
+      "",
+      "/?project=proj-1&view=write&label=scene-1"
+    );
+    const router = createBrowserRouter([
+      {
+        path: "/",
+        element: (
+          <>
+            <SkipToMainContent />
+            <HomePageIDE />
+          </>
+        ),
+      },
+    ]);
+    const { unmount } = renderWorkspace(router);
+    try {
+      const user = userEvent.setup();
+      const historyLength = window.history.length;
+      screen.getByRole("link", { name: "Skip to main content" }).focus();
+      await user.keyboard("{Enter}");
+      expect(screen.getByRole("main")).toHaveFocus();
+      expect(window.location.hash).toBe("");
+      expect(window.history.length).toBe(historyLength);
+
+      await user.click(
+        screen.getByRole("button", { name: "Open second scene" })
+      );
+      expect(window.location.search).toContain("label=scene-2");
+      flushModeBeforeTransition.mockResolvedValueOnce(false);
+      await act(async () => {
+        window.history.back();
+      });
+      await waitFor(() =>
+        expect(showErrorToast).toHaveBeenCalledWith(
+          expect.any(String),
+          "Navigation blocked"
+        )
+      );
+      await waitFor(() =>
+        expect(window.location.search).toContain("label=scene-2")
+      );
+    } finally {
+      unmount();
+      router.dispose();
+      window.history.replaceState(oldState, "", oldUrl);
+    }
+  });
+
+  it.each([true, false])(
+    "locks the workspace and serializes tab closes until the save settles (saved=%s)",
+    async (saved) => {
+      let finishSave!: (saved: boolean) => void;
+      writeModeSimulation.save.mockReturnValueOnce(
+        new Promise((resolve) => {
+          finishSave = resolve;
+        })
+      );
+      renderHomePage(["/?project=proj-1&view=write&label=scene-1"]);
+      fireEvent.click(
+        screen.getByRole("button", { name: "Close first scene" })
+      );
+      expect(screen.getByRole("main")).toHaveAttribute("inert");
+
+      // fireEvent deliberately dispatches an event despite inert to exercise
+      // the synchronous guard as well as the real browser's input lock.
+      fireEvent.click(
+        screen.getByRole("button", { name: "Close second scene" })
+      );
+      expect(writeModeSimulation.close).not.toHaveBeenCalled();
+      await act(async () => finishSave(saved));
+      expect(screen.getByRole("main")).not.toHaveAttribute("inert");
+      if (saved) {
+        expect(writeModeSimulation.close).toHaveBeenCalledExactlyOnceWith(
+          expect.anything(),
+          "scene-1"
+        );
+      } else {
+        expect(writeModeSimulation.close).not.toHaveBeenCalled();
+        expect(showErrorToast).toHaveBeenCalledWith("Close blocked");
+      }
+    }
+  );
 
   it("hides workspace chrome while write focus mode is active", async () => {
     const user = userEvent.setup();
@@ -330,9 +581,11 @@ describe("HomePageIDE", () => {
   async function openProjectsSettingsAndConfirmDelete(projectName: string) {
     const user = userEvent.setup();
 
-    window.dispatchEvent(
-      new CustomEvent("open-settings", { detail: { tab: "projects" } })
-    );
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent("open-settings", { detail: { tab: "projects" } })
+      );
+    });
 
     await user.click(
       await screen.findByRole("button", {
@@ -384,6 +637,78 @@ describe("HomePageIDE", () => {
       );
     });
     expect(deleteProject).not.toHaveBeenCalled();
+  });
+
+  it("unlocks the editor when deleting the current project rejects", async () => {
+    let rejectDelete!: (error: Error) => void;
+    deleteProject.mockReturnValueOnce(
+      new Promise((_, reject) => {
+        rejectDelete = reject;
+      })
+    );
+    const router = renderHomePage();
+
+    await openProjectsSettingsAndConfirmDelete("Test Project");
+    const main = screen.getByRole("main", { hidden: true });
+    expect(main).toHaveAttribute("inert");
+
+    await act(async () => rejectDelete(new Error("Deletion failed")));
+
+    expect(main).not.toHaveAttribute("inert");
+    expect(router.state.location.search).toBe("?project=proj-1&view=write");
+  });
+
+  it("leaves the Back destination alone when a Flow project deletion completes later", async () => {
+    let finishDelete!: () => void;
+    deleteProject.mockReturnValueOnce(
+      new Promise((resolve) => {
+        finishDelete = () => resolve(undefined);
+      })
+    );
+    const router = renderHomePage([
+      "/?project=proj-2&view=write&label=scene-2",
+      "/?project=proj-1&view=flow",
+    ]);
+
+    await openProjectsSettingsAndConfirmDelete("Test Project");
+    expect(deleteProject).toHaveBeenCalledWith("proj-1");
+    await act(async () => {
+      await router.navigate(-1);
+    });
+    await act(async () => finishDelete());
+    expect(router.state.location.search).toBe(
+      "?project=proj-2&view=write&label=scene-2"
+    );
+    expect(screen.getByTestId("write-mode")).toBeInTheDocument();
+  });
+
+  it("saves and closes an editor tab while deleting a different project", async () => {
+    let finishDelete!: () => void;
+    deleteProject.mockReturnValueOnce(
+      new Promise((resolve) => {
+        finishDelete = () => resolve(undefined);
+      })
+    );
+    renderHomePage(["/?project=proj-1&view=write&label=scene-1"]);
+    const closeButton = screen.getByRole("button", {
+      name: "Close first scene",
+    });
+
+    await openProjectsSettingsAndConfirmDelete("Second Project");
+    expect(deleteProject).toHaveBeenCalledWith("proj-2");
+
+    try {
+      await act(async () => {
+        fireEvent.click(closeButton);
+      });
+      expect(writeModeSimulation.save).toHaveBeenCalledTimes(1);
+      expect(writeModeSimulation.close).toHaveBeenCalledWith(
+        expect.anything(),
+        "scene-1"
+      );
+    } finally {
+      await act(async () => finishDelete());
+    }
   });
 
   it("deleting another project does not flush the active editor mode", async () => {

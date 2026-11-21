@@ -1,6 +1,6 @@
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { BASE_URL } from "@/lib/constants";
+import { workspaceLoginPath } from "@/lib/workspace-location";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -20,7 +20,12 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
 
   if (!isAuthenticated) {
     return (
-      <Navigate to={`${BASE_URL}login`} state={{ from: location }} replace />
+      <Navigate
+        to={workspaceLoginPath(
+          location.pathname + location.search + location.hash
+        )}
+        replace
+      />
     );
   }
 

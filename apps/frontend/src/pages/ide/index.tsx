@@ -1,62 +1,46 @@
-import { lazy, Suspense, useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect, useRef, useLayoutEffect } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useTheme } from "@/contexts/useTheme";
 import { useAuth } from "@/hooks/useAuth";
 import { useProject } from "@/hooks/useProject";
-import { useLabels } from "@/hooks/useLabels";
+import {
+  isEditorView,
+  useWorkspaceNavigation,
+} from "@/hooks/useWorkspaceNavigation";
+import type { RunEditorTransition } from "@/hooks/useGuardedEditorTabClose";
+import { useWorkspaceTitle } from "@/hooks/useWorkspaceTitle";
 import { themePalettes, BASE_URL } from "@/lib/constants";
-import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { WriteMode } from "./WriteMode";
-import { FlowMode } from "./FlowMode";
 import { flushModeBeforeTransition } from "@/lib/editor-sync-coordinator";
 import { useToast } from "@/contexts/ToastContext";
-import { useLocalStorage } from "@/hooks/useLocalStorage";
 import type { Tab } from "@/components/ide-shared/settings-types";
 import { SETTINGS_TABS } from "@/components/ide-shared/settings-types";
 import { WorkspaceChrome } from "@/components/workspace/WorkspaceChrome";
 import { ProjectFileTransferProvider } from "@/components/workspace/ProjectFileTransferContext";
-import { EmptyState } from "@/components/ui/empty-state";
-import {
-  WORKSPACE_VIEW_STORAGE_KEY,
-  isWorkspaceView,
-  type WorkspaceView,
-} from "@/lib/workspace-view";
-
-const ScriptMode = lazy(() =>
-  import("./ScriptMode").then((m) => ({ default: m.ScriptMode }))
-);
-
-function isEditorView(view: WorkspaceView): view is "write" | "script" {
-  return view === "write" || view === "script";
-}
+import type { WorkspaceView } from "@/lib/workspace-view";
+import { WorkspaceContent } from "./components/WorkspaceContent";
 
 export function HomePageIDE() {
   const { theme, setTheme, isDarkMode, toggleDarkMode } = useTheme();
   const { logout } = useAuth();
   const navigate = useNavigate();
-  const [view, setView] = useLocalStorage<WorkspaceView>(
-    WORKSPACE_VIEW_STORAGE_KEY,
-    "write",
-    {
-      serializer: (value) => value,
-      deserializer: (value) => value as WorkspaceView,
-      validate: isWorkspaceView,
-    }
-  );
-  const [scriptModeKey, setScriptModeKey] = useState(0);
+  const locationKey = useLocation().key;
+  const locationKeyRef = useRef(locationKey);
+  useLayoutEffect(() => {
+    locationKeyRef.current = locationKey;
+  }, [locationKey]);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [initialSettingsTab, setInitialSettingsTab] = useState<Tab | undefined>(
     undefined
   );
   const [isFocusMode, setIsFocusMode] = useState(false);
-  const isFlushing = useRef(false);
   const isDeletingRef = useRef(false);
-  const previousProjectIdRef = useRef<string | undefined>(undefined);
+  const flushingRef = useRef(false);
+  const [isEditorTransitionPending, setIsEditorTransitionPending] =
+    useState(false);
 
   const {
     currentProject,
     projects,
-    setCurrentProject,
     isLoadingProjects,
     projectsError,
     updateProject,
@@ -64,20 +48,27 @@ export function HomePageIDE() {
     refreshProjects,
   } = useProject();
 
-  const { setActiveLabelId } = useLabels();
   const { error: showErrorToast } = useToast();
+  const {
+    view,
+    linkedProjectId,
+    entry,
+    isResolvingScope,
+    isHistoryTransitionPending,
+    goToWorkspace,
+    reportDocument,
+  } = useWorkspaceNavigation(currentProject?.id, flushingRef, showErrorToast);
+  const editorKey = `${currentProject?.id ?? ""}:${view}:${entry.editorKey}`;
+  const unavailableProject =
+    linkedProjectId !== undefined &&
+    !currentProject &&
+    !isLoadingProjects &&
+    !projectsError;
+  useWorkspaceTitle(view === "flow" ? currentProject?.name : undefined);
 
   useEffect(() => {
-    const previousProjectId = previousProjectIdRef.current;
-    const nextProjectId = currentProject?.id;
-    if (
-      previousProjectId !== undefined &&
-      previousProjectId !== nextProjectId
-    ) {
-      setActiveLabelId(null);
-    }
-    previousProjectIdRef.current = nextProjectId;
-  }, [currentProject?.id, setActiveLabelId]);
+    if (view === "flow" || unavailableProject) setIsFocusMode(false);
+  }, [view, unavailableProject]);
 
   const handleSetIsSettingsOpen = (open: boolean) => {
     setIsSettingsOpen(open);
@@ -102,12 +93,13 @@ export function HomePageIDE() {
         return;
       }
 
-      if (isFlushing.current) {
+      if (flushingRef.current || isDeletingRef.current) {
         return;
       }
 
       if (isEditorView(view)) {
-        isFlushing.current = true;
+        flushingRef.current = true;
+        setIsEditorTransitionPending(true);
 
         try {
           const flushed = await flushModeBeforeTransition(view);
@@ -126,12 +118,13 @@ export function HomePageIDE() {
           console.error("Error in handleSetView:", error);
           return;
         } finally {
-          isFlushing.current = false;
+          flushingRef.current = false;
+          setIsEditorTransitionPending(false);
         }
       }
 
       setIsFocusMode(false);
-      setView(nextView);
+      void goToWorkspace(currentProject?.id, nextView);
     })();
   };
 
@@ -141,12 +134,13 @@ export function HomePageIDE() {
         return;
       }
 
-      if (isFlushing.current) {
+      if (flushingRef.current || isDeletingRef.current) {
         return;
       }
 
       if (isEditorView(view)) {
-        isFlushing.current = true;
+        flushingRef.current = true;
+        setIsEditorTransitionPending(true);
 
         try {
           const flushed = await flushModeBeforeTransition(view);
@@ -165,26 +159,42 @@ export function HomePageIDE() {
           console.error("Error in handleSetProject:", error);
           return;
         } finally {
-          isFlushing.current = false;
+          flushingRef.current = false;
+          setIsEditorTransitionPending(false);
         }
       }
 
-      setCurrentProject(project);
+      if (project) {
+        setIsFocusMode(false);
+        void goToWorkspace(project.id, view);
+      }
     })();
   };
 
+  const runEditorTransition: RunEditorTransition = (action) => {
+    if (flushingRef.current) return;
+    flushingRef.current = true;
+    setIsEditorTransitionPending(true);
+    void action().finally(() => {
+      flushingRef.current = false;
+      setIsEditorTransitionPending(false);
+    });
+  };
+
   const handleDeleteProject = async (projectId: string): Promise<void> => {
-    if (isDeletingRef.current) {
+    if (isDeletingRef.current || flushingRef.current) {
       return;
     }
     isDeletingRef.current = true;
+    const locksEditor = projectId === currentProject?.id && isEditorView(view);
 
     try {
       // Deleting the currently open project must flush the active editor
       // mode first so pending edits are not lost. Deleting another project
       // does not touch the active editor and needs no flush.
-      if (projectId === currentProject?.id && isEditorView(view)) {
-        isFlushing.current = true;
+      if (locksEditor) {
+        flushingRef.current = true;
+        setIsEditorTransitionPending(true);
 
         let flushed: boolean;
         try {
@@ -196,8 +206,6 @@ export function HomePageIDE() {
           );
           console.error("Error flushing before project delete:", error);
           return;
-        } finally {
-          isFlushing.current = false;
         }
 
         if (!flushed) {
@@ -210,13 +218,23 @@ export function HomePageIDE() {
       }
 
       await deleteProject(projectId);
+      if (
+        projectId === currentProject?.id &&
+        locationKeyRef.current === locationKey
+      ) {
+        const nextProjectId = projects.find(
+          (project) => project.id !== projectId
+        )?.id;
+        await goToWorkspace(nextProjectId, view, true);
+      }
     } finally {
       isDeletingRef.current = false;
+      if (locksEditor) {
+        flushingRef.current = false;
+        // react-doctor-disable-next-line react-doctor/no-loading-flag-reset-outside-finally -- this is the finally block for deletion of the current project
+        setIsEditorTransitionPending(false);
+      }
     }
-  };
-
-  const handleScriptModeRetry = () => {
-    setScriptModeKey((prev) => prev + 1);
   };
 
   const handleOpenSettings = () => handleSetIsSettingsOpen(true);
@@ -282,6 +300,7 @@ export function HomePageIDE() {
 
         <main
           id="main-content"
+          inert={isEditorTransitionPending || isHistoryTransitionPending}
           tabIndex={-1}
           className={
             isFocusMode
@@ -289,59 +308,18 @@ export function HomePageIDE() {
               : "h-full overflow-hidden pt-14 max-md:pt-12 max-md:pb-[calc(3.5rem+env(safe-area-inset-bottom,0px))]"
           }
         >
-          {view === "write" ? (
-            <WriteMode
-              projectName={currentProject?.name}
-              onOpenSettings={handleOpenSettings}
-              onFocusModeChange={setIsFocusMode}
-            />
-          ) : view === "script" ? (
-            <ErrorBoundary
-              key={scriptModeKey}
-              onError={() => setIsFocusMode(false)}
-              fallback={
-                <div
-                  className="flex flex-col items-center justify-center h-full gap-3 text-muted-foreground"
-                  role="alert"
-                  aria-live="assertive"
-                  aria-label="Editor failed to load"
-                >
-                  <span aria-hidden="true" className="text-4xl">
-                    ⚠️
-                  </span>
-                  <p>Failed to load editor. Please refresh or retry.</p>
-                  <button
-                    type="button"
-                    onClick={handleScriptModeRetry}
-                    className="px-4 py-2 mt-2 text-sm text-white bg-theme rounded hover:opacity-90 transition-opacity focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-background focus:ring-theme"
-                  >
-                    Retry
-                  </button>
-                </div>
-              }
-            >
-              <Suspense
-                fallback={
-                  <div className="flex items-center justify-center h-full text-muted-foreground">
-                    Loading editor…
-                  </div>
-                }
-              >
-                <ScriptMode
-                  projectId={currentProject?.id}
-                  projectName={currentProject?.name}
-                  onOpenSettings={handleOpenSettings}
-                  onFocusModeChange={setIsFocusMode}
-                />
-              </Suspense>
-            </ErrorBoundary>
-          ) : currentProject?.id ? (
-            <FlowMode projectId={currentProject.id} />
-          ) : (
-            <div className="flex h-full items-center justify-center">
-              <EmptyState title="Select a project to view Flow" />
-            </div>
-          )}
+          <WorkspaceContent
+            editorKey={editorKey}
+            project={currentProject}
+            view={view}
+            unavailableProject={unavailableProject}
+            isResolvingScope={isResolvingScope}
+            initialDocumentId={entry.initialDocumentId}
+            onDocumentChange={reportDocument}
+            runEditorTransition={runEditorTransition}
+            onOpenSettings={handleOpenSettings}
+            onFocusModeChange={setIsFocusMode}
+          />
         </main>
       </div>
     </ProjectFileTransferProvider>

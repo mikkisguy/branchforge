@@ -1,6 +1,11 @@
+import type { RunEditorTransition } from "@/hooks/useGuardedEditorTabClose";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const runEditorTransition: RunEditorTransition = (action) => {
+  void action();
+};
 
 const testState = vi.hoisted(() => ({
   currentProject: {
@@ -151,7 +156,7 @@ describe("WriteMode", () => {
 
   it("shows the labels error state and retries without rendering the empty state", () => {
     testState.labelsError = new Error("load failed");
-    render(<WriteMode />);
+    render(<WriteMode runEditorTransition={runEditorTransition} />);
 
     expect(screen.getByText("Failed to load labels")).toBeInTheDocument();
     expect(
@@ -164,7 +169,7 @@ describe("WriteMode", () => {
 
   it("shows the files error state and retries without rendering the empty state", () => {
     testState.filesError = new Error("load failed");
-    render(<WriteMode />);
+    render(<WriteMode runEditorTransition={runEditorTransition} />);
 
     expect(
       screen.getByText("Failed to load project files")
@@ -179,7 +184,9 @@ describe("WriteMode", () => {
 
   it("clears an open create-file dialog during an owner project switch", async () => {
     const user = userEvent.setup();
-    const { rerender } = render(<WriteMode />);
+    const { rerender } = render(
+      <WriteMode runEditorTransition={runEditorTransition} />
+    );
 
     await user.click(screen.getByRole("button", { name: "+ New File" }));
     await user.type(
@@ -194,7 +201,7 @@ describe("WriteMode", () => {
       id: "project-2",
       visibility: "OWNER",
     };
-    rerender(<WriteMode />);
+    rerender(<WriteMode runEditorTransition={runEditorTransition} />);
 
     await waitFor(() => {
       expect(

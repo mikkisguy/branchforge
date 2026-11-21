@@ -7,12 +7,11 @@ import type {
   SetStateAction,
 } from "react";
 import type { EditorTabBarItem } from "@/components/ide-shared";
+import { getPrefixedStorageKey } from "@/hooks/useLocalStorage";
 import {
-  getPrefixedStorageKey,
-  readLocalStorageItem,
-  removeLocalStorageItem,
-  writeLocalStorageItem,
-} from "@/hooks/useLocalStorage";
+  readWorkspaceSession,
+  writeWorkspaceSession,
+} from "@/lib/workspace-session";
 import type { ProjectFileNode } from "./useProjectFiles";
 
 interface SelectFileOptions {
@@ -23,6 +22,7 @@ interface UseFileTabsProps {
   projectId: string | undefined;
   projectFiles: ProjectFileNode[];
   isLoadingFiles: boolean;
+  initialDocumentId?: string | null;
   isResettingRef?: MutableRefObject<boolean>;
   onFileSelect: (fileId: string) => Promise<boolean> | boolean;
   onFileActivated?: (fileId: string) => void;
@@ -32,6 +32,7 @@ interface UseFileTabsProps {
 interface UseFileTabsReturn {
   openTabs: string[];
   activeFileId: string | null;
+  isHydrated: boolean;
   setActiveFileId: Dispatch<SetStateAction<string | null>>;
   tabItems: EditorTabBarItem[];
   selectFileTab: (
@@ -49,6 +50,7 @@ export function useFileTabs({
   projectId,
   projectFiles,
   isLoadingFiles,
+  initialDocumentId,
   isResettingRef,
   onFileSelect,
   onFileActivated,
@@ -184,7 +186,7 @@ export function useFileTabs({
   useEffect(() => {
     // react-doctor-disable-next-line react-doctor/no-event-handler
     if (tabsStorageKey && hydratedTabsProjectId === projectId) {
-      writeLocalStorageItem(tabsStorageKey, JSON.stringify(validOpenTabs));
+      writeWorkspaceSession(tabsStorageKey, JSON.stringify(validOpenTabs));
     }
   }, [validOpenTabs, projectId, tabsStorageKey, hydratedTabsProjectId]);
 
@@ -194,9 +196,9 @@ export function useFileTabs({
     }
 
     if (activeFileId) {
-      writeLocalStorageItem(activeFileStorageKey, activeFileId);
+      writeWorkspaceSession(activeFileStorageKey, activeFileId);
     } else {
-      removeLocalStorageItem(activeFileStorageKey);
+      writeWorkspaceSession(activeFileStorageKey, null);
     }
   }, [activeFileId, activeFileStorageKey, hydratedTabsProjectId, projectId]);
 
@@ -228,7 +230,7 @@ export function useFileTabs({
 
       const fileIds = new Set(projectFiles.map((file) => file.id));
       const savedTabsRaw = tabsStorageKey
-        ? readLocalStorageItem(tabsStorageKey)
+        ? readWorkspaceSession(tabsStorageKey)
         : null;
 
       let nextOpenTabs: string[] = [];
@@ -246,14 +248,17 @@ export function useFileTabs({
       }
 
       const savedActiveFileId = activeFileStorageKey
-        ? readLocalStorageItem(activeFileStorageKey)
+        ? readWorkspaceSession(activeFileStorageKey)
         : null;
       const resolvedActiveFileId =
-        savedActiveFileId && fileIds.has(savedActiveFileId)
-          ? savedActiveFileId
-          : activeFileIdRef.current && fileIds.has(activeFileIdRef.current)
-            ? activeFileIdRef.current
-            : null;
+        initialDocumentId === null ||
+        (initialDocumentId && fileIds.has(initialDocumentId))
+          ? initialDocumentId
+          : savedActiveFileId && fileIds.has(savedActiveFileId)
+            ? savedActiveFileId
+            : activeFileIdRef.current && fileIds.has(activeFileIdRef.current)
+              ? activeFileIdRef.current
+              : null;
 
       if (
         resolvedActiveFileId &&
@@ -290,6 +295,7 @@ export function useFileTabs({
   }, [
     activeFileStorageKey,
     hydratedTabsProjectId,
+    initialDocumentId,
     isLoadingFiles,
     isResettingRef,
     projectFiles,
@@ -323,6 +329,7 @@ export function useFileTabs({
 
   return {
     openTabs: validOpenTabs,
+    isHydrated: !!projectId && hydratedTabsProjectId === projectId,
     activeFileId,
     setActiveFileId,
     tabItems,

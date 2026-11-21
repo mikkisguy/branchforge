@@ -7,7 +7,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter, Routes, Route } from "react-router-dom";
+import { MemoryRouter, Routes, Route, useLocation } from "react-router-dom";
 import { QueryClientProvider, type QueryClient } from "@tanstack/react-query";
 import { LoginPage } from "../login";
 import { createTestQueryClient } from "@/test/query-client";
@@ -234,32 +234,46 @@ describe("LoginPage", () => {
       });
     });
 
-    it("should redirect after successful login", async () => {
+    it.each([
+      [undefined, "/"],
+      [
+        "/?project=p1&view=script&file=f1#main-content",
+        "/?project=p1&view=script&file=f1#main-content",
+      ],
+      ["//elsewhere.example/path", "/"],
+      ["/\\elsewhere.example/path", "/"],
+      ["/login?returnTo=/", "/"],
+    ])("returns after login from %s to %s", async (returnTo, expected) => {
       const user = userEvent.setup({ delay: null });
       mockLogin.mockResolvedValue(undefined);
+      const entry = returnTo
+        ? `/login?${new URLSearchParams({ returnTo })}`
+        : "/login";
+
+      function Destination() {
+        const { pathname, search, hash } = useLocation();
+        return (
+          <output aria-label="Destination">{pathname + search + hash}</output>
+        );
+      }
 
       render(
         <QueryClientProvider client={queryClient}>
-          <MemoryRouter initialEntries={["/login"]}>
+          <MemoryRouter initialEntries={[entry]}>
             <Routes>
               <Route path="/login" element={<LoginPage />} />
-              <Route path="/" element={<div>Dashboard</div>} />
+              <Route path="*" element={<Destination />} />
             </Routes>
           </MemoryRouter>
         </QueryClientProvider>
       );
 
-      const emailInput = screen.getByLabelText(/email/i);
-      const passwordInput = screen.getByLabelText(/^password$/i);
-      const submitButton = screen.getByRole("button", { name: /sign in/i });
-
-      await user.type(emailInput, "test@example.com");
-      await user.type(passwordInput, "password123");
-      await user.click(submitButton);
-
-      await waitFor(() => {
-        expect(screen.getByText("Dashboard")).toBeInTheDocument();
-      });
+      await user.type(screen.getByLabelText(/email/i), "test@example.com");
+      await user.type(screen.getByLabelText(/^password$/i), "password123");
+      await user.click(screen.getByRole("button", { name: /sign in/i }));
+      expect((await screen.findByLabelText("Destination")).textContent).toBe(
+        expected
+      );
     });
   });
 

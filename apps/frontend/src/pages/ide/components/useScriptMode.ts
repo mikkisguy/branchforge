@@ -1,3 +1,9 @@
+import type { WorkspaceDocumentProps } from "@/hooks/useWorkspaceDocument";
+import {
+  useGuardedEditorTabClose,
+  type RunEditorTransition,
+} from "@/hooks/useGuardedEditorTabClose";
+import { useScriptDocument } from "@/hooks/useScriptDocument";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFileEditor } from "@/hooks/useFileEditor";
 import { useFileTabs } from "@/hooks/useFileTabs";
@@ -18,7 +24,17 @@ function getContainingFolder(filePath: string): string | null {
   return parts.length > 1 ? parts[0] : null;
 }
 
-export function useScriptMode({ projectId }: { projectId?: string }) {
+export function useScriptMode({
+  projectId,
+  projectName,
+  initialDocumentId,
+  onDocumentChange,
+  runEditorTransition,
+}: WorkspaceDocumentProps & {
+  projectId?: string;
+  projectName?: string;
+  runEditorTransition: RunEditorTransition;
+}) {
   const data = useScriptModeData({ projectId });
   const { currentProject } = useProject();
   const canModifyFiles = currentProject?.visibility === "OWNER";
@@ -132,18 +148,33 @@ export function useScriptMode({ projectId }: { projectId?: string }) {
   const {
     openTabs,
     activeFileId,
+    isHydrated,
     tabItems,
     selectFileTab,
-    handleCloseFileTab,
+    handleCloseFileTab: closeFileTab,
     clearTabsState,
   } = useFileTabs({
     projectId,
     projectFiles,
-    isLoadingFiles: data.isLoadingFiles,
+    isLoadingFiles: data.isLoadingFiles || !!data.filesError,
+    initialDocumentId,
     isResettingRef: data.isResettingRef,
     onFileSelect: handleScriptFileSelect,
     onFileActivated: handleFileActivated,
     onNoTabsRemaining: handleNoTabsRemaining,
+  });
+
+  const handleCloseFileTab = useGuardedEditorTabClose({
+    activeId: activeFileId,
+    hasPendingSave,
+    save: triggerFileSave,
+    onClose: closeFileTab,
+    runEditorTransition,
+    onSaveFailed: () =>
+      showErrorToast(
+        "Could not save pending edits. Resolve the save error before closing the file.",
+        "Close blocked"
+      ),
   });
 
   const resetCreateFileError = data.resetCreateFileError;
@@ -246,15 +277,22 @@ export function useScriptMode({ projectId }: { projectId?: string }) {
     [selectFileTab]
   );
 
+  useEffect(() => {
+    if (initialDocumentId !== undefined) setActiveLabelId(null);
+  }, [initialDocumentId, setActiveLabelId]);
+
   useLabelFileSync({
     projectFiles,
-    activeLabelId: data.activeLabelId,
+    activeLabelId:
+      initialDocumentId !== undefined && !isHydrated
+        ? null
+        : data.activeLabelId,
     onFileSelect: handleLabelDrivenFileSelect,
     onSetScrollToLine: setScrollToLine,
   });
 
   const activeProjectFile = useMemo(
-    () => projectFiles.find((file) => file.id === activeFileId) || null,
+    () => projectFiles.find((file) => file.id === activeFileId) ?? null,
     [activeFileId, projectFiles]
   );
 
@@ -292,12 +330,22 @@ export function useScriptMode({ projectId }: { projectId?: string }) {
     };
   }, [activeProjectFile, currentEditFileId, switchToFile, selectFileTab]);
 
-  const editableFileContent =
-    activeProjectFile && currentEditFileId === activeProjectFile.id
-      ? editedFileContent
-      : activeProjectFile?.content || "";
-
-  const isGeneratedPreview = !!generatedPreview;
+  const {
+    editableFileContent,
+    activeFileContent,
+    activeGeneratedFileId,
+    generatedFileName,
+    isGeneratedPreview,
+  } = useScriptDocument({
+    projectName,
+    activeProjectFile,
+    currentEditFileId,
+    editedFileContent,
+    generatedPreview,
+    isFileDirty,
+    isHydrated,
+    onDocumentChange,
+  });
 
   // --- Structural file actions (rename/move, delete) -----------------------
   // Owner-only; flushes the pending autosave before opening a dialog and
@@ -358,10 +406,6 @@ export function useScriptMode({ projectId }: { projectId?: string }) {
         : undefined,
     [canModifyFiles, fileActions]
   );
-
-  const activeFileContent = generatedPreview
-    ? generatedPreview.content
-    : editableFileContent;
 
   const handleUndoRedoChange = useCallback(
     (content: string) => {
@@ -453,9 +497,7 @@ export function useScriptMode({ projectId }: { projectId?: string }) {
   }, [projectFiles, isLinked]);
 
   const saveConflict = activeProjectFile ? hasSaveConflict : undefined;
-  const onSaveRequest: (() => Promise<boolean>) | undefined = activeProjectFile
-    ? retryFileSave
-    : undefined;
+  const onSaveRequest = activeProjectFile ? retryFileSave : undefined;
 
   // Always expose the three generated files so the filetree section is
   // visible even while the preview request is in flight.
@@ -517,9 +559,6 @@ export function useScriptMode({ projectId }: { projectId?: string }) {
     // Allow a later failure to toast again after recovery.
     previewErrorShownRef.current = false;
   }, [previewQuery.isError, showErrorToast]);
-
-  const activeGeneratedFileId = generatedPreview?.fileName ?? null;
-  const generatedFileName = generatedPreview?.fileName;
 
   return {
     isLoadingLabels: data.isLoadingLabels,
