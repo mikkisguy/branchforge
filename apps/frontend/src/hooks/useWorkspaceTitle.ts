@@ -10,7 +10,7 @@ export function useWorkspaceTitle(
     const previous = document.title;
     const name = [documentName, projectName, "BranchForge"]
       .filter(Boolean)
-      .join(" · ");
+      .join(" | ");
     document.title = isDirty ? `* ${name}` : name;
     return () => {
       document.title = previous;

@@ -16,15 +16,15 @@ it("displays the current document and project, marks unsaved edits, and restores
     }
   );
 
-  expect(document.title).toBe("Chapter 1 · First Story · BranchForge");
+  expect(document.title).toBe("Chapter 1 | First Story | BranchForge");
   rerender({ project: "First Story", documentName: "Chapter 1", dirty: true });
-  expect(document.title).toBe("* Chapter 1 · First Story · BranchForge");
+  expect(document.title).toBe("* Chapter 1 | First Story | BranchForge");
   rerender({
     project: "Second Story",
     documentName: "script.rpy",
     dirty: false,
   });
-  expect(document.title).toBe("script.rpy · Second Story · BranchForge");
+  expect(document.title).toBe("script.rpy | Second Story | BranchForge");
   unmount();
   expect(document.title).toBe(originalTitle);
 });
