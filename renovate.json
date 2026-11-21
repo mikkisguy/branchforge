@@ -6,6 +6,7 @@
   "packageRules": [
     {
       "matchUpdateTypes": ["minor", "patch"],
+      "matchPackageNames": ["!@fastify/session"],
       "groupName": "all non-major dependencies",
       "groupSlug": "all-non-major",
       "schedule": ["before 5am on monday"]
