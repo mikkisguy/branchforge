@@ -22,6 +22,8 @@ import {
   beforeAll,
   vi,
 } from "vitest";
+import { FILE_SAVE_REQUEST_MAX_BYTES } from "@branchforge/shared";
+import { globalErrorHandler } from "../../middleware/error-handler.middleware.js";
 import Fastify, { type FastifyReply, type FastifyRequest } from "fastify";
 import cookie from "@fastify/cookie";
 import session from "@fastify/session";
@@ -194,7 +196,8 @@ describe("ProjectsRoutes (Integration)", () => {
     await setupTestData();
 
     // Create a fresh Fastify instance for each test
-    fastify = Fastify();
+    fastify = Fastify({ bodyLimit: 5 * 1024 * 1024 });
+    fastify.setErrorHandler(globalErrorHandler);
 
     // Register required plugins with memory store for testing
     await fastify.register(cookie);
@@ -360,7 +363,8 @@ describe("ProjectsRoutes (Integration)", () => {
 
       expect(response.statusCode).toBe(400);
       expect(response.json()).toMatchObject({
-        message: "Invalid URL parameters",
+        error: "ValidationError",
+        message: "Invalid request data",
       });
     });
 
@@ -419,6 +423,35 @@ describe("ProjectsRoutes (Integration)", () => {
   });
 
   describe("PUT /projects/files/:fileId", () => {
+    it("uses the file-save byte limit for serialized JSON", async () => {
+      const auth = await createAuthenticatedRequest(testUserId);
+      const options = {
+        method: "PUT" as const,
+        url: `/projects/files/${testUuid("13000000", 999)}`,
+        headers: { "content-type": "application/json" },
+        cookies: { [SESSION_COOKIE_NAME]: auth.sessionId },
+      };
+      const prefix = '日本語"\n';
+      const overhead = Buffer.byteLength(JSON.stringify({ content: prefix }));
+      const content =
+        prefix + "a".repeat(FILE_SAVE_REQUEST_MAX_BYTES - overhead);
+
+      const allowed = await fastify.inject({
+        ...options,
+        payload: JSON.stringify({ content }),
+      });
+      // The file does not exist. A 404 from the handler proves parsing succeeded.
+      expect(allowed.statusCode).toBe(404);
+      expect(allowed.json()).toMatchObject({ error: "File not found" });
+
+      const oversized = await fastify.inject({
+        ...options,
+        payload: JSON.stringify({ content: content + "a" }),
+      });
+      expect(oversized.statusCode).toBe(413);
+      expect(oversized.json()).toMatchObject({ error: "PayloadTooLarge" });
+    });
+
     it("syncs speakerId from Ren'Py tag on STORY file updates", async () => {
       const auth = await createAuthenticatedRequest(testUserId);
       const fileId = testUuid("13000000", 1);

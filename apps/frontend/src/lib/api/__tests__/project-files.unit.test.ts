@@ -3,6 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
+import { FILE_SAVE_REQUEST_MAX_BYTES } from "@branchforge/shared";
 import { projectFilesApi } from "../project-files";
 
 const mockFetch = vi.fn();
@@ -36,6 +37,17 @@ describe("projectFilesApi", () => {
         content: "content",
         expectedContentHash: undefined,
       });
+    });
+
+    it("checks the byte size of serialized UTF-8 including escapes before sending", async () => {
+      const content = '日本語"\n'.repeat(
+        Math.floor(FILE_SAVE_REQUEST_MAX_BYTES / 12)
+      );
+
+      await expect(
+        projectFilesApi.updateFile("file-1", content)
+      ).rejects.toThrow("The file save request exceeds 10 MiB.");
+      expect(mockFetch).not.toHaveBeenCalled();
     });
 
     it("passes through 409 conflict responses instead of throwing", async () => {

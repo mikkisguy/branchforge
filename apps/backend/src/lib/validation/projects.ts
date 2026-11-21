@@ -11,7 +11,6 @@ import {
   nonEmptyStringSchema,
   optionalString,
   expectedContentHashSchema,
-  FILE_CONTENT_MAX_SIZE,
 } from "./common.js";
 import { sourceOriginSchema } from "./enums.js";
 
@@ -135,9 +134,7 @@ export type FileIdParams = z.infer<typeof fileIdParamsSchema>;
  */
 export const updateFileContentSchema = z
   .object({
-    content: z
-      .string()
-      .max(FILE_CONTENT_MAX_SIZE, "File content too large (max 10MB)"),
+    content: z.string(),
     expectedContentHash: expectedContentHashSchema,
   })
   .strict();

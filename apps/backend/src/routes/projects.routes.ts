@@ -20,6 +20,7 @@ import type {
   PublicProject,
   SourceOrigin,
 } from "@branchforge/shared";
+import { FILE_SAVE_REQUEST_MAX_BYTES } from "@branchforge/shared";
 import { authenticate } from "../middleware/auth.middleware.js";
 import {
   validateParams,
@@ -710,6 +711,7 @@ export async function projectsRoutes(fastify: FastifyInstance): Promise<void> {
   }>(
     "/projects/files/:fileId",
     {
+      bodyLimit: FILE_SAVE_REQUEST_MAX_BYTES,
       onRequest: authenticate,
       preValidation: validateRequest({
         params: fileIdParamsSchema,
