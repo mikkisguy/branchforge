@@ -1123,6 +1123,16 @@ export type CharacterSourceDefinition = z.infer<
   typeof characterSourceDefinitionSchema
 >;
 
+/** UTF-8 byte limit for the serialized file-save request body. */
+export const FILE_SAVE_REQUEST_MAX_MIB = 10;
+export const FILE_SAVE_REQUEST_MAX_BYTES =
+  FILE_SAVE_REQUEST_MAX_MIB * 1024 * 1024;
+export const GITLAB_COMMIT_MESSAGE_MAX_LENGTH = 500;
+export const CHARACTER_TAG_MAX_LENGTH = 50;
+export const LABEL_IDENTIFIER_MAX_LENGTH = 50;
+export const WORLD_ELEMENT_TAG_MAX_LENGTH = 100;
+export const WORLD_ELEMENT_MAX_TAGS = 20;
+
 // ============================================================================
 // File Upload Configuration
 // ============================================================================
