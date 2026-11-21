@@ -40,7 +40,8 @@ export const colorHexSchema = z
  */
 export const createCharacterSchema = z
   .object({
-    projectId: uuidSchema,
+    // Accept the legacy body field. The route uses the URL parameter.
+    projectId: uuidSchema.optional(),
     name: requiredString(200, "Name is too long"),
     displayName: requiredString(200, "Display name is too long"),
     renpyTag: renpyTagSchema,

@@ -1191,7 +1191,6 @@ describe("Character Schemas", () => {
   describe("createCharacterSchema", () => {
     it("should accept valid minimal character payload", () => {
       const validData = {
-        projectId: "550e8400-e29b-41d4-a716-446655440000",
         name: "Character Name",
         displayName: "Character Display Name",
         renpyTag: "char_name",
@@ -1272,18 +1271,6 @@ describe("Character Schemas", () => {
         color: "#FF5733",
         routeAffiliation: "EILEEN",
         conditionalPrefix: "jane_",
-      };
-
-      const result = createCharacterSchema.safeParse(invalidData);
-      expect(result.success).toBe(false);
-    });
-
-    it("should reject missing required field: projectId", () => {
-      const invalidData = {
-        name: "Character Name",
-        displayName: "Display Name",
-        renpyTag: "char",
-        color: "#FF5733",
       };
 
       const result = createCharacterSchema.safeParse(invalidData);
