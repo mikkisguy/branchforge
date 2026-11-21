@@ -11,10 +11,7 @@ import {
   useNavigate,
   useNavigationType,
 } from "react-router-dom";
-import {
-  getPrefixedStorageKey,
-  readLocalStorageItem,
-} from "@/hooks/useLocalStorage";
+import { getPrefixedStorageKey } from "@/hooks/useLocalStorage";
 import { flushModeBeforeTransition } from "@/lib/editor-sync-coordinator";
 import {
   readWorkspaceLocation,
@@ -46,8 +43,7 @@ export function useWorkspaceNavigation(
   const navigationType = useNavigationType();
   const linked = readWorkspaceLocation(location.search);
   const [defaultView] = useState<WorkspaceView>(() => {
-    const saved =
-      readWorkspaceSession(MODE_KEY) ?? readLocalStorageItem(MODE_KEY);
+    const saved = readWorkspaceSession(MODE_KEY);
     return isWorkspaceView(saved) ? saved : "write";
   });
   const view = linked.view ?? defaultView;

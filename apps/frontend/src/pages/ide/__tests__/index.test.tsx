@@ -211,6 +211,22 @@ describe("HomePageIDE", () => {
     flushModeBeforeTransition.mockResolvedValue(true);
   });
 
+  it("opens Write in a fresh tab even when an old browser-wide mode exists", () => {
+    localStorage.setItem("branchforge:ide:mode", "script");
+    const router = renderHomePage();
+
+    expect(router.state.location.search).toBe("?project=proj-1&view=write");
+    expect(screen.getByTestId("write-mode")).toBeVisible();
+  });
+
+  it("restores a tab's own mode when opening a bare workspace URL", () => {
+    sessionStorage.setItem("branchforge:ide:mode", "flow");
+    const router = renderHomePage();
+
+    expect(router.state.location.search).toBe("?project=proj-1&view=flow");
+    expect(screen.getByTestId("flow-mode")).toBeVisible();
+  });
+
   it("switching write to script flushes write then persists script", async () => {
     const user = userEvent.setup();
     const router = renderHomePage();
