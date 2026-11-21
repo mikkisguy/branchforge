@@ -172,7 +172,7 @@ export function HomePageIDE() {
   };
 
   const runEditorTransition: RunEditorTransition = (action) => {
-    if (flushingRef.current || isDeletingRef.current) return;
+    if (flushingRef.current) return;
     flushingRef.current = true;
     setIsEditorTransitionPending(true);
     void action().finally(() => {

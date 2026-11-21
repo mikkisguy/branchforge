@@ -581,9 +581,11 @@ describe("HomePageIDE", () => {
   async function openProjectsSettingsAndConfirmDelete(projectName: string) {
     const user = userEvent.setup();
 
-    window.dispatchEvent(
-      new CustomEvent("open-settings", { detail: { tab: "projects" } })
-    );
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent("open-settings", { detail: { tab: "projects" } })
+      );
+    });
 
     await user.click(
       await screen.findByRole("button", {
@@ -678,6 +680,35 @@ describe("HomePageIDE", () => {
       "?project=proj-2&view=write&label=scene-2"
     );
     expect(screen.getByTestId("write-mode")).toBeInTheDocument();
+  });
+
+  it("saves and closes an editor tab while deleting a different project", async () => {
+    let finishDelete!: () => void;
+    deleteProject.mockReturnValueOnce(
+      new Promise((resolve) => {
+        finishDelete = () => resolve(undefined);
+      })
+    );
+    renderHomePage(["/?project=proj-1&view=write&label=scene-1"]);
+    const closeButton = screen.getByRole("button", {
+      name: "Close first scene",
+    });
+
+    await openProjectsSettingsAndConfirmDelete("Second Project");
+    expect(deleteProject).toHaveBeenCalledWith("proj-2");
+
+    try {
+      await act(async () => {
+        fireEvent.click(closeButton);
+      });
+      expect(writeModeSimulation.save).toHaveBeenCalledTimes(1);
+      expect(writeModeSimulation.close).toHaveBeenCalledWith(
+        expect.anything(),
+        "scene-1"
+      );
+    } finally {
+      await act(async () => finishDelete());
+    }
   });
 
   it("deleting another project does not flush the active editor mode", async () => {
