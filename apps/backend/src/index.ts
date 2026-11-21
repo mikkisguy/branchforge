@@ -3,7 +3,6 @@ import cors from "@fastify/cors";
 import cookie from "@fastify/cookie";
 import session from "@fastify/session";
 import multipart from "@fastify/multipart";
-import fastifyStatic from "@fastify/static";
 import { healthRoutes } from "./routes/health.js";
 import { authRoutes } from "./routes/auth.routes.js";
 import { adminSettingsRoutes } from "./routes/admin-settings.routes.js";
@@ -38,9 +37,9 @@ import { getBasePath, getSessionMaxAge, getTrustProxy } from "./lib/config.js";
 import {
   ensureAvatarDir,
   ensureProjectImageDir,
-  UPLOADS_DIR,
   getUploadsDirPath,
 } from "./lib/storage.js";
+import { registerUploadStatic } from "./lib/upload-static.js";
 
 // Fastify instance with explicit body limit for JSON/text bodies.
 // Note: multipart plugin has its own `fileSize` limit that overrides per-part.
@@ -78,21 +77,7 @@ const basePath = getBasePath();
 await ensureAvatarDir();
 await ensureProjectImageDir();
 
-// Register static file serving for uploads (under base path for consistency)
-await server.register(fastifyStatic, {
-  root: getUploadsDirPath(),
-  prefix: `${basePath}${UPLOADS_DIR}/`,
-  decorateReply: false,
-  // Security headers for user-uploaded content
-  setHeaders: (res) => {
-    // Prevent MIME-sniffing attacks
-    res.setHeader("X-Content-Type-Options", "nosniff");
-    // Restrict cross-origin access to uploaded files
-    res.setHeader("Cross-Origin-Resource-Policy", "same-origin");
-    // Cache images for 1 hour (avatars don't change frequently)
-    res.setHeader("Cache-Control", "public, max-age=3600");
-  },
-});
+await registerUploadStatic(server, basePath, getUploadsDirPath());
 
 // Create persistent session store
 const sessionStore = createDrizzleSessionStore({
