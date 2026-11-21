@@ -4,6 +4,11 @@ All notable changes to BranchForge will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v1.0.0-beta.21 - 2026-11-21
+
+- Fixed several bugs due to mismatches.
+- Fixed two denial-of-service vulnerabilities.
+
 ## v1.0.0-beta.20 - 2026-10-20
 
 - Fixed GitLab imports failing when restoring labels with deleted duplicates.
