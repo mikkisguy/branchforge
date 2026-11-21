@@ -642,6 +642,33 @@ label start:
       expect(result.characters[0].color).toBe("#fff");
     });
 
+    it("extracts single-line characters with whitespace and optional options", () => {
+      const content = [
+        'define a = Character (  "Alice" \t,\t color = "#123" \t)  ',
+        'define b = Character("Bea" \t,\t )',
+        'define c = Character("Cam" \t)',
+      ].join("\n");
+
+      expect(parseRPYContent(content).characters).toEqual([
+        { tag: "a", name: "Alice", color: "#123" },
+        { tag: "b", name: "Bea", color: undefined },
+        { tag: "c", name: "Cam", color: undefined },
+      ]);
+    });
+
+    it("uses multiline character parsing when options contain a close", () => {
+      const content = [
+        'define a = Character("Alice", image=choose_image(), condition=(True)',
+        '    , color="#123"',
+        ")",
+        'define b = Character("Bea", color="#456"   ',
+      ].join("\n");
+
+      expect(parseRPYContent(content).characters).toEqual([
+        { tag: "a", name: "Alice", color: "#123" },
+      ]);
+    });
+
     it("should parse labels with their dialogue", () => {
       const result = parseRPYFileWithLabels(storyRPY);
 
