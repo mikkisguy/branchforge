@@ -528,12 +528,14 @@ export function extractCharacters(
 
       if (name !== undefined && nameResult) {
         const afterName = afterPrefix.slice(nameResult.endIndex).trimStart();
-        // Match closing paren and optional options
-        const closingMatch = afterName.match(/^\s*\)$/);
-        const optionsMatch = afterName.match(/^\s*,\s*([^)]*)\s*\)$/);
-
-        if (closingMatch || optionsMatch) {
-          const options = optionsMatch ? optionsMatch[1] : undefined;
+        // A close inside the options leaves the definition to the fallback.
+        const closeIndex = afterName.indexOf(")");
+        if (
+          closeIndex !== -1 &&
+          closeIndex === afterName.length - 1 &&
+          (closeIndex === 0 || afterName.startsWith(","))
+        ) {
+          const options = afterName.slice(1, closeIndex).trimStart();
 
           let color: string | undefined = undefined;
           if (options) {
