@@ -477,6 +477,25 @@ describe("HomePageIDE", () => {
     expect(deleteProject).not.toHaveBeenCalled();
   });
 
+  it("unlocks the editor when deleting the current project rejects", async () => {
+    let rejectDelete!: (error: Error) => void;
+    deleteProject.mockReturnValueOnce(
+      new Promise((_, reject) => {
+        rejectDelete = reject;
+      })
+    );
+    const router = renderHomePage();
+
+    await openProjectsSettingsAndConfirmDelete("Test Project");
+    const main = screen.getByRole("main", { hidden: true });
+    expect(main).toHaveAttribute("inert");
+
+    await act(async () => rejectDelete(new Error("Deletion failed")));
+
+    expect(main).not.toHaveAttribute("inert");
+    expect(router.state.location.search).toBe("?project=proj-1&view=write");
+  });
+
   it("deleting another project does not flush the active editor mode", async () => {
     renderHomePage();
 

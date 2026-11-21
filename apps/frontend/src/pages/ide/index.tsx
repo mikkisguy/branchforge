@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "@/contexts/useTheme";
 import { useAuth } from "@/hooks/useAuth";
@@ -9,27 +9,19 @@ import {
 } from "@/hooks/useWorkspaceNavigation";
 import { useWorkspaceTitle } from "@/hooks/useWorkspaceTitle";
 import { themePalettes, BASE_URL } from "@/lib/constants";
-import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { WriteMode } from "./WriteMode";
-import { FlowMode } from "./FlowMode";
 import { flushModeBeforeTransition } from "@/lib/editor-sync-coordinator";
 import { useToast } from "@/contexts/ToastContext";
 import type { Tab } from "@/components/ide-shared/settings-types";
 import { SETTINGS_TABS } from "@/components/ide-shared/settings-types";
 import { WorkspaceChrome } from "@/components/workspace/WorkspaceChrome";
 import { ProjectFileTransferProvider } from "@/components/workspace/ProjectFileTransferContext";
-import { EmptyState } from "@/components/ui/empty-state";
 import type { WorkspaceView } from "@/lib/workspace-view";
-
-const ScriptMode = lazy(() =>
-  import("./ScriptMode").then((m) => ({ default: m.ScriptMode }))
-);
+import { WorkspaceContent } from "./components/WorkspaceContent";
 
 export function HomePageIDE() {
   const { theme, setTheme, isDarkMode, toggleDarkMode } = useTheme();
   const { logout } = useAuth();
   const navigate = useNavigate();
-  const [scriptModeKey, setScriptModeKey] = useState(0);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [initialSettingsTab, setInitialSettingsTab] = useState<Tab | undefined>(
     undefined
@@ -219,13 +211,10 @@ export function HomePageIDE() {
       isDeletingRef.current = false;
       if (projectId === currentProject?.id) {
         flushingRef.current = false;
+        // react-doctor-disable-next-line react-doctor/no-loading-flag-reset-outside-finally -- this is the finally block for deletion of the current project
         setIsEditorTransitionPending(false);
       }
     }
-  };
-
-  const handleScriptModeRetry = () => {
-    setScriptModeKey((prev) => prev + 1);
   };
 
   const handleOpenSettings = () => handleSetIsSettingsOpen(true);
@@ -299,75 +288,17 @@ export function HomePageIDE() {
               : "h-full overflow-hidden pt-14 max-md:pt-12 max-md:pb-[calc(3.5rem+env(safe-area-inset-bottom,0px))]"
           }
         >
-          {unavailableProject ? (
-            <div className="flex h-full items-center justify-center">
-              <EmptyState
-                title="Project unavailable"
-                description="Choose an available project from the project menu."
-              />
-            </div>
-          ) : isResolvingScope ? (
-            <div className="flex h-full items-center justify-center text-muted-foreground">
-              Loading workspace…
-            </div>
-          ) : view === "write" ? (
-            <WriteMode
-              key={editorKey}
-              initialDocumentId={entry.initialDocumentId}
-              onDocumentChange={reportDocument}
-              projectName={currentProject?.name}
-              onOpenSettings={handleOpenSettings}
-              onFocusModeChange={setIsFocusMode}
-            />
-          ) : view === "script" ? (
-            <ErrorBoundary
-              key={`${editorKey}:${scriptModeKey}`}
-              onError={() => setIsFocusMode(false)}
-              fallback={
-                <div
-                  className="flex flex-col items-center justify-center h-full gap-3 text-muted-foreground"
-                  role="alert"
-                  aria-live="assertive"
-                  aria-label="Editor failed to load"
-                >
-                  <span aria-hidden="true" className="text-4xl">
-                    ⚠️
-                  </span>
-                  <p>Failed to load editor. Please refresh or retry.</p>
-                  <button
-                    type="button"
-                    onClick={handleScriptModeRetry}
-                    className="px-4 py-2 mt-2 text-sm text-white bg-theme rounded hover:opacity-90 transition-opacity focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-background focus:ring-theme"
-                  >
-                    Retry
-                  </button>
-                </div>
-              }
-            >
-              <Suspense
-                fallback={
-                  <div className="flex items-center justify-center h-full text-muted-foreground">
-                    Loading editor…
-                  </div>
-                }
-              >
-                <ScriptMode
-                  initialDocumentId={entry.initialDocumentId}
-                  onDocumentChange={reportDocument}
-                  projectId={currentProject?.id}
-                  projectName={currentProject?.name}
-                  onOpenSettings={handleOpenSettings}
-                  onFocusModeChange={setIsFocusMode}
-                />
-              </Suspense>
-            </ErrorBoundary>
-          ) : currentProject?.id ? (
-            <FlowMode projectId={currentProject.id} />
-          ) : (
-            <div className="flex h-full items-center justify-center">
-              <EmptyState title="Select a project to view Flow" />
-            </div>
-          )}
+          <WorkspaceContent
+            editorKey={editorKey}
+            project={currentProject}
+            view={view}
+            unavailableProject={unavailableProject}
+            isResolvingScope={isResolvingScope}
+            initialDocumentId={entry.initialDocumentId}
+            onDocumentChange={reportDocument}
+            onOpenSettings={handleOpenSettings}
+            onFocusModeChange={setIsFocusMode}
+          />
         </main>
       </div>
     </ProjectFileTransferProvider>

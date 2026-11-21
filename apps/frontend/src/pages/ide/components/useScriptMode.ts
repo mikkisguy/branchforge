@@ -1,8 +1,5 @@
-import {
-  useWorkspaceDocument,
-  type WorkspaceDocumentProps,
-} from "@/hooks/useWorkspaceDocument";
-import { useWorkspaceTitle } from "@/hooks/useWorkspaceTitle";
+import type { WorkspaceDocumentProps } from "@/hooks/useWorkspaceDocument";
+import { useScriptDocument } from "@/hooks/useScriptDocument";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFileEditor } from "@/hooks/useFileEditor";
 import { useFileTabs } from "@/hooks/useFileTabs";
@@ -291,7 +288,7 @@ export function useScriptMode({
   });
 
   const activeProjectFile = useMemo(
-    () => projectFiles.find((file) => file.id === activeFileId) || null,
+    () => projectFiles.find((file) => file.id === activeFileId) ?? null,
     [activeFileId, projectFiles]
   );
 
@@ -329,23 +326,22 @@ export function useScriptMode({
     };
   }, [activeProjectFile, currentEditFileId, switchToFile, selectFileTab]);
 
-  useWorkspaceDocument(
-    onDocumentChange,
-    activeProjectFile?.id ?? null,
-    isHydrated
-  );
-  useWorkspaceTitle(
+  const {
+    editableFileContent,
+    activeFileContent,
+    activeGeneratedFileId,
+    generatedFileName,
+    isGeneratedPreview,
+  } = useScriptDocument({
     projectName,
-    generatedPreview?.fileName ?? activeProjectFile?.filePath.split("/").pop(),
-    isFileDirty
-  );
-
-  const editableFileContent =
-    activeProjectFile && currentEditFileId === activeProjectFile.id
-      ? editedFileContent
-      : activeProjectFile?.content || "";
-
-  const isGeneratedPreview = !!generatedPreview;
+    activeProjectFile,
+    currentEditFileId,
+    editedFileContent,
+    generatedPreview,
+    isFileDirty,
+    isHydrated,
+    onDocumentChange,
+  });
 
   // --- Structural file actions (rename/move, delete) -----------------------
   // Owner-only; flushes the pending autosave before opening a dialog and
@@ -406,10 +402,6 @@ export function useScriptMode({
         : undefined,
     [canModifyFiles, fileActions]
   );
-
-  const activeFileContent = generatedPreview
-    ? generatedPreview.content
-    : editableFileContent;
 
   const handleUndoRedoChange = useCallback(
     (content: string) => {
@@ -501,9 +493,7 @@ export function useScriptMode({
   }, [projectFiles, isLinked]);
 
   const saveConflict = activeProjectFile ? hasSaveConflict : undefined;
-  const onSaveRequest: (() => Promise<boolean>) | undefined = activeProjectFile
-    ? retryFileSave
-    : undefined;
+  const onSaveRequest = activeProjectFile ? retryFileSave : undefined;
 
   // Always expose the three generated files so the filetree section is
   // visible even while the preview request is in flight.
@@ -565,9 +555,6 @@ export function useScriptMode({
     // Allow a later failure to toast again after recovery.
     previewErrorShownRef.current = false;
   }, [previewQuery.isError, showErrorToast]);
-
-  const activeGeneratedFileId = generatedPreview?.fileName ?? null;
-  const generatedFileName = generatedPreview?.fileName;
 
   return {
     isLoadingLabels: data.isLoadingLabels,
