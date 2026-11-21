@@ -22,10 +22,12 @@ import {
 import { useProject } from "@/hooks/useProject";
 import {
   getPrefixedStorageKey,
-  readLocalStorageItem,
   removeLocalStorageItem,
-  writeLocalStorageItem,
 } from "@/hooks/useLocalStorage";
+import {
+  readWorkspaceSession,
+  writeWorkspaceSession,
+} from "@/lib/workspace-session";
 import type { PublicLabel, LabelDetail } from "@branchforge/shared";
 
 function clearHistoryCursor(labelId: string): void {
@@ -132,7 +134,7 @@ export function useLabels(): UseLabelsReturn {
         return null;
       }
 
-      return readLocalStorageItem(getActiveLabelStorageKey(projectKey));
+      return readWorkspaceSession(getActiveLabelStorageKey(projectKey));
     },
     initialData: () => {
       const cachedActiveLabelId = queryClient.getQueryData<string | null>(
@@ -146,18 +148,21 @@ export function useLabels(): UseLabelsReturn {
         return null;
       }
 
-      return readLocalStorageItem(getActiveLabelStorageKey(projectKey));
+      return readWorkspaceSession(getActiveLabelStorageKey(projectKey));
     },
     staleTime: Infinity,
     gcTime: Infinity,
-    enabled: true,
+    enabled: false,
   });
 
   // Query for active label detail
   const { data: activeLabel, isLoading: isLoadingLabel } = useQuery({
     queryKey: labelKeys.detail(currentProject?.id ?? "", activeLabelId ?? ""),
     queryFn: () => labelsApi.getLabel(activeLabelId!),
-    enabled: !!activeLabelId && !!currentProject?.id,
+    enabled:
+      !!activeLabelId &&
+      !!currentProject?.id &&
+      labels.some((label) => label.id === activeLabelId),
     staleTime: 5 * 60 * 1000,
     refetchOnMount: true,
   });
@@ -346,13 +351,7 @@ export function useLabels(): UseLabelsReturn {
       return;
     }
 
-    const storageKey = getActiveLabelStorageKey(projectKey);
-    if (activeLabelId) {
-      writeLocalStorageItem(storageKey, activeLabelId);
-      return;
-    }
-
-    removeLocalStorageItem(storageKey);
+    writeWorkspaceSession(getActiveLabelStorageKey(projectKey), activeLabelId);
   }, [activeLabelId, projectKey]);
 
   // Invalidate labels method

@@ -2,12 +2,11 @@ import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
 import type { KeyboardEvent, MouseEvent } from "react";
 import type { PublicLabel } from "@branchforge/shared";
 import type { EditorTabBarItem } from "@/components/ide-shared";
+import { getPrefixedStorageKey } from "@/hooks/useLocalStorage";
 import {
-  getPrefixedStorageKey,
-  readLocalStorageItem,
-  removeLocalStorageItem,
-  writeLocalStorageItem,
-} from "@/hooks/useLocalStorage";
+  readWorkspaceSession,
+  writeWorkspaceSession,
+} from "@/lib/workspace-session";
 
 interface WriteTabsState {
   openTabs: string[];
@@ -95,10 +94,12 @@ interface UseWriteTabsProps {
   activeLabelId: string | null;
   setActiveLabelId: (id: string | null) => void;
   isLoadingLabels: boolean;
+  initialDocumentId?: string | null;
 }
 
 interface UseWriteTabsReturn {
   openTabs: string[];
+  isHydrated: boolean;
   tabItems: EditorTabBarItem[];
   selectLabelTab: (labelId: string) => void;
   handleCloseTab: (event: MouseEvent | KeyboardEvent, labelId: string) => void;
@@ -110,6 +111,7 @@ export function useWriteTabs({
   activeLabelId,
   setActiveLabelId,
   isLoadingLabels,
+  initialDocumentId,
 }: UseWriteTabsProps): UseWriteTabsReturn {
   const [tabsState, dispatch] = useReducer(writeTabsReducer, {
     // react-doctor-disable-next-line react-doctor/no-event-handler
@@ -192,7 +194,7 @@ export function useWriteTabs({
       return;
     }
 
-    writeLocalStorageItem(tabsStorageKey, JSON.stringify(openTabs));
+    writeWorkspaceSession(tabsStorageKey, JSON.stringify(openTabs));
   }, [hydratedTabsProjectId, openTabs, projectId, tabsStorageKey]);
 
   useEffect(() => {
@@ -206,11 +208,11 @@ export function useWriteTabs({
 
     // react-doctor-disable-next-line react-doctor/no-event-handler
     if (activeLabelId && labelIdSet.has(activeLabelId)) {
-      writeLocalStorageItem(activeTabStorageKey, activeLabelId);
+      writeWorkspaceSession(activeTabStorageKey, activeLabelId);
       return;
     }
 
-    removeLocalStorageItem(activeTabStorageKey);
+    writeWorkspaceSession(activeTabStorageKey, null);
   }, [
     activeLabelId,
     activeTabStorageKey,
@@ -225,10 +227,10 @@ export function useWriteTabs({
     }
 
     const savedTabsRaw = tabsStorageKey
-      ? readLocalStorageItem(tabsStorageKey)
+      ? readWorkspaceSession(tabsStorageKey)
       : null;
     const savedActiveTabId = activeTabStorageKey
-      ? readLocalStorageItem(activeTabStorageKey)
+      ? readWorkspaceSession(activeTabStorageKey)
       : null;
 
     let nextOpenTabs: string[] = [];
@@ -247,7 +249,12 @@ export function useWriteTabs({
 
     let nextActiveLabelId: string | null;
 
-    if (activeLabelId && labelIdSet.has(activeLabelId)) {
+    if (
+      initialDocumentId === null ||
+      (initialDocumentId && labelIdSet.has(initialDocumentId))
+    ) {
+      nextActiveLabelId = initialDocumentId;
+    } else if (activeLabelId && labelIdSet.has(activeLabelId)) {
       nextActiveLabelId = activeLabelId;
     } else if (savedActiveTabId && labelIdSet.has(savedActiveTabId)) {
       nextActiveLabelId = savedActiveTabId;
@@ -274,6 +281,7 @@ export function useWriteTabs({
     activeLabelId,
     activeTabStorageKey,
     hydratedTabsProjectId,
+    initialDocumentId,
     isLoadingLabels,
     labelIdSet,
     projectId,
@@ -283,7 +291,7 @@ export function useWriteTabs({
   ]);
 
   useEffect(() => {
-    if (!activeLabelId) {
+    if (!activeLabelId || hydratedTabsProjectId !== projectId) {
       return;
     }
 
@@ -293,7 +301,7 @@ export function useWriteTabs({
     }
 
     dispatch({ type: "ADD_TAB", labelId: activeLabelId });
-  }, [activeLabelId, labels]);
+  }, [activeLabelId, hydratedTabsProjectId, labels, projectId]);
 
   useEffect(() => {
     const nextTabs = openTabs.filter((tabId) => labelIdSet.has(tabId));
@@ -327,6 +335,7 @@ export function useWriteTabs({
 
   return {
     openTabs,
+    isHydrated: !!projectId && hydratedTabsProjectId === projectId,
     tabItems,
     selectLabelTab,
     handleCloseTab,

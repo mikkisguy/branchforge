@@ -30,7 +30,7 @@ describe("useFileTabs", () => {
   ];
 
   beforeEach(() => {
-    localStorage.clear();
+    sessionStorage.clear();
   });
 
   it("selects files and tracks active/open tabs", async () => {
@@ -95,12 +95,44 @@ describe("useFileTabs", () => {
     expect(result.current.openTabs).toEqual([]);
   });
 
-  it("hydrates persisted tabs and active file from localStorage", async () => {
-    localStorage.setItem(
+  it("opens a linked file ahead of the saved active file and keeps the saved tabs", async () => {
+    sessionStorage.setItem(
+      "branchforge:script:active-file:project-1",
+      "file-1"
+    );
+    sessionStorage.setItem(
+      "branchforge:script:open-tabs:project-1",
+      '["file-1"]'
+    );
+    const onFileSelect = vi.fn().mockResolvedValue(true);
+    const { result } = renderHook(() =>
+      useFileTabs({
+        projectId: "project-1",
+        projectFiles,
+        isLoadingFiles: false,
+        initialDocumentId: "file-2",
+        onFileSelect,
+      })
+    );
+
+    await waitFor(() => expect(result.current.isHydrated).toBe(true));
+    expect(result.current.activeFileId).toBe("file-2");
+    expect(result.current.openTabs).toEqual(["file-1", "file-2"]);
+    expect(onFileSelect.mock.calls).toEqual([["file-2"]]);
+    expect(
+      localStorage.getItem("branchforge:script:active-file:project-1")
+    ).toBeNull();
+  });
+
+  it("hydrates persisted tabs and active file from sessionStorage", async () => {
+    sessionStorage.setItem(
       "branchforge:script:open-tabs:project-1",
       JSON.stringify(["file-1", "missing-file"])
     );
-    localStorage.setItem("branchforge:script:active-file:project-1", "file-1");
+    sessionStorage.setItem(
+      "branchforge:script:active-file:project-1",
+      "file-1"
+    );
 
     const onFileSelect = vi.fn().mockResolvedValue(true);
 

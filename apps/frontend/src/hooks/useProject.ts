@@ -4,13 +4,14 @@
  * Provides project state and operations using TanStack Query.
  * Replaces the ProjectContext with a more efficient query-based approach.
  *
- * Current project ID is stored in both localStorage and the query cache:
- * - localStorage for persistence across page reloads
- * - Query cache for reactive updates
+ * Explicit workspace links select a project. The cached last project is only
+ * a default when opening the app without a project link.
  */
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
+import { useLocation } from "react-router-dom";
+import { readWorkspaceLocation } from "@/lib/workspace-location";
 import {
   projectsApi,
   type Project,
@@ -74,7 +75,6 @@ export interface UseProjectReturn {
 
   // Methods
   refreshProjects: () => Promise<Project[]>;
-  setCurrentProject: (project: Project | null) => void;
   updateProject: (
     projectId: string,
     body: UpdateProjectBody
@@ -88,6 +88,9 @@ export interface UseProjectReturn {
 
 export function useProject(): UseProjectReturn {
   const queryClient = useQueryClient();
+  const { projectId: linkedProjectId } = readWorkspaceLocation(
+    useLocation().search
+  );
 
   // Query for all projects
   const {
@@ -114,43 +117,35 @@ export function useProject(): UseProjectReturn {
         : cachedProjectId;
     },
     // This key is client state, not server state. Keeping the observer disabled
-    // prevents invalidations or remounts from starting a storage read that can
-    // race with setCurrentProject(). setQueryData still updates every observer.
+    // prevents invalidations from rereading defaults written by other tabs.
     enabled: false,
     staleTime: Infinity,
     gcTime: Infinity,
   });
 
-  // Derive current project from projects list using the cached ID
+  // A linked project is authoritative. Only a bare workspace may fall back
+  // to the last project or the first available one.
   const currentProject =
-    projects.find((p) => p.id === currentProjectId) ?? null;
+    linkedProjectId === undefined
+      ? (projects.find((p) => p.id === currentProjectId) ?? projects[0] ?? null)
+      : (projects.find((p) => p.id === linkedProjectId) ?? null);
 
-  // Auto-select a valid project once the list is available.
   useEffect(() => {
-    if (isLoadingProjects) {
+    if (isLoadingProjects || projectsError) return;
+    const selectedId = currentProject?.id ?? null;
+    if (
+      selectedId === currentProjectId ||
+      (!selectedId && linkedProjectId !== undefined)
+    )
       return;
-    }
-
-    if (projects.length === 0) {
-      if (currentProjectId !== null) {
-        persistCurrentProjectId(null);
-        queryClient.setQueryData(projectKeys.current(), null);
-      }
-      return;
-    }
-
-    if (currentProject) {
-      return;
-    }
-
-    const fallbackProjectId = projects[0]?.id ?? null;
-    persistCurrentProjectId(fallbackProjectId);
-    queryClient.setQueryData(projectKeys.current(), fallbackProjectId);
+    persistCurrentProjectId(selectedId);
+    queryClient.setQueryData(projectKeys.current(), selectedId);
   }, [
     currentProject,
     currentProjectId,
     isLoadingProjects,
-    projects,
+    linkedProjectId,
+    projectsError,
     queryClient,
   ]);
 
@@ -158,13 +153,6 @@ export function useProject(): UseProjectReturn {
   const refreshProjects = async (): Promise<Project[]> => {
     await queryClient.invalidateQueries({ queryKey: projectKeys.lists() });
     return queryClient.getQueryData<Project[]>(projectKeys.lists()) ?? [];
-  };
-
-  // Set current project method - persists to both localStorage and query cache
-  const setCurrentProject = (project: Project | null) => {
-    const projectId = project?.id ?? null;
-    persistCurrentProjectId(projectId);
-    queryClient.setQueryData(projectKeys.current(), projectId);
   };
 
   // Update project mutation
@@ -245,7 +233,6 @@ export function useProject(): UseProjectReturn {
     isLoadingProjects,
     projectsError: projectsError as Error | null,
     refreshProjects,
-    setCurrentProject,
     updateProject,
     deleteProject,
   };

@@ -1,3 +1,8 @@
+import {
+  useWorkspaceDocument,
+  type WorkspaceDocumentProps,
+} from "@/hooks/useWorkspaceDocument";
+import { useWorkspaceTitle } from "@/hooks/useWorkspaceTitle";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFileEditor } from "@/hooks/useFileEditor";
 import { useFileTabs } from "@/hooks/useFileTabs";
@@ -18,7 +23,12 @@ function getContainingFolder(filePath: string): string | null {
   return parts.length > 1 ? parts[0] : null;
 }
 
-export function useScriptMode({ projectId }: { projectId?: string }) {
+export function useScriptMode({
+  projectId,
+  projectName,
+  initialDocumentId,
+  onDocumentChange,
+}: WorkspaceDocumentProps & { projectId?: string; projectName?: string }) {
   const data = useScriptModeData({ projectId });
   const { currentProject } = useProject();
   const canModifyFiles = currentProject?.visibility === "OWNER";
@@ -132,19 +142,39 @@ export function useScriptMode({ projectId }: { projectId?: string }) {
   const {
     openTabs,
     activeFileId,
+    isHydrated,
     tabItems,
     selectFileTab,
-    handleCloseFileTab,
+    handleCloseFileTab: closeFileTab,
     clearTabsState,
   } = useFileTabs({
     projectId,
     projectFiles,
-    isLoadingFiles: data.isLoadingFiles,
+    isLoadingFiles: data.isLoadingFiles || !!data.filesError,
+    initialDocumentId,
     isResettingRef: data.isResettingRef,
     onFileSelect: handleScriptFileSelect,
     onFileActivated: handleFileActivated,
     onNoTabsRemaining: handleNoTabsRemaining,
   });
+
+  const handleCloseFileTab: typeof closeFileTab = (event, fileId) => {
+    event.stopPropagation();
+    void (async () => {
+      if (
+        fileId === activeFileId &&
+        hasPendingSave &&
+        !(await triggerFileSave())
+      ) {
+        showErrorToast(
+          "Could not save pending edits. Resolve the save error before closing the file.",
+          "Close blocked"
+        );
+        return;
+      }
+      closeFileTab(event, fileId);
+    })();
+  };
 
   const resetCreateFileError = data.resetCreateFileError;
   const handleOpenCreateFileDialog = useCallback(() => {
@@ -246,9 +276,16 @@ export function useScriptMode({ projectId }: { projectId?: string }) {
     [selectFileTab]
   );
 
+  useEffect(() => {
+    if (initialDocumentId !== undefined) setActiveLabelId(null);
+  }, [initialDocumentId, setActiveLabelId]);
+
   useLabelFileSync({
     projectFiles,
-    activeLabelId: data.activeLabelId,
+    activeLabelId:
+      initialDocumentId !== undefined && !isHydrated
+        ? null
+        : data.activeLabelId,
     onFileSelect: handleLabelDrivenFileSelect,
     onSetScrollToLine: setScrollToLine,
   });
@@ -291,6 +328,17 @@ export function useScriptMode({ projectId }: { projectId?: string }) {
       cancelled = true;
     };
   }, [activeProjectFile, currentEditFileId, switchToFile, selectFileTab]);
+
+  useWorkspaceDocument(
+    onDocumentChange,
+    activeProjectFile?.id ?? null,
+    isHydrated
+  );
+  useWorkspaceTitle(
+    projectName,
+    generatedPreview?.fileName ?? activeProjectFile?.filePath.split("/").pop(),
+    isFileDirty
+  );
 
   const editableFileContent =
     activeProjectFile && currentEditFileId === activeProjectFile.id

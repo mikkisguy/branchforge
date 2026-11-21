@@ -71,7 +71,7 @@ describe("useLabels", () => {
   beforeEach(() => {
     queryClient = createTestQueryClient();
     vi.clearAllMocks();
-    localStorage.clear();
+    sessionStorage.clear();
   });
 
   afterEach(() => {
@@ -180,8 +180,8 @@ describe("useLabels", () => {
       });
     });
 
-    it("hydrates active label ID from localStorage on mount", async () => {
-      localStorage.setItem(
+    it("hydrates active label ID from sessionStorage on mount", async () => {
+      sessionStorage.setItem(
         "branchforge:write:active-label:project-1",
         "label-1"
       );

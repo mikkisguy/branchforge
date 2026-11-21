@@ -21,6 +21,7 @@ export function useProjectReset({
   onReset,
 }: UseProjectResetProps): void {
   const currentResetIdRef = useRef(0);
+  const previousProjectIdRef = useRef(projectId);
 
   const triggerSaveRef = useRef(triggerSave);
   const hasPendingSaveRef = useRef(hasPendingSave);
@@ -37,6 +38,11 @@ export function useProjectReset({
   }, [triggerSave, hasPendingSave, showErrorToast, setSkipSave, onReset]);
 
   useEffect(() => {
+    // A newly mounted editor has no outgoing project state. Resetting it here
+    // would race against restoration of its file selection.
+    if (previousProjectIdRef.current === projectId) return;
+    previousProjectIdRef.current = projectId;
+
     const resetId = ++currentResetIdRef.current;
     let cancelled = false;
 

@@ -2,6 +2,7 @@ import type { QueryClient } from "@tanstack/react-query";
 import { ApiRequestError } from "./api/client";
 import { clearCsrfToken } from "./api/csrf";
 import { BASE_URL } from "./constants";
+import { workspaceLoginPath } from "./workspace-location";
 
 let handlingSessionExpiry = false;
 
@@ -34,9 +35,7 @@ export function buildRegisterPath(): string {
 }
 
 export function isAuthRoute(pathname = window.location.pathname): boolean {
-  return (
-    pathname === buildLoginPath() || pathname === buildRegisterPath()
-  );
+  return pathname === buildLoginPath() || pathname === buildRegisterPath();
 }
 
 export function handleSessionExpired(_queryClient: QueryClient): void {
@@ -61,7 +60,8 @@ export function handleSessionExpired(_queryClient: QueryClient): void {
 
   const loginPath = buildLoginPath();
   if (window.location.pathname !== loginPath) {
-    navigateToLogin(loginPath);
+    const { pathname, search, hash } = window.location;
+    navigateToLogin(workspaceLoginPath(pathname + search + hash));
   }
 }
 

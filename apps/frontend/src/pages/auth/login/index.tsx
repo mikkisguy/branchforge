@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,12 +17,14 @@ import {
   type AnnouncementHandle,
 } from "@/components/ui/announcement";
 import { AmbientBackdrop } from "@/components/ui/AmbientBackdrop";
+import { workspaceReturnTo } from "@/lib/workspace-location";
 import { BASE_URL } from "@/lib/constants";
 import { APP_NAME } from "../../../lib/version";
 import { AuthErrorAlert } from "../AuthErrorAlert";
 
 export function LoginPage() {
   const navigate = useNavigate();
+  const [params] = useSearchParams();
   const { login } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -36,7 +38,9 @@ export function LoginPage() {
 
     try {
       await login(email, password);
-      navigate(`${BASE_URL}`);
+      navigate(workspaceReturnTo(params.get("returnTo")) ?? BASE_URL, {
+        replace: true,
+      });
     } catch (err) {
       const message = err instanceof Error ? err.message : "Login failed";
       announceRef.current?.announce(message);

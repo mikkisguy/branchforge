@@ -38,15 +38,15 @@ describe("useWriteTabs", () => {
   ];
 
   beforeEach(() => {
-    localStorage.clear();
+    sessionStorage.clear();
   });
 
-  it("hydrates tabs and active tab from localStorage", async () => {
-    localStorage.setItem(
+  it("hydrates tabs and active tab from sessionStorage", async () => {
+    sessionStorage.setItem(
       "branchforge:write:open-tabs:project-1",
       JSON.stringify(["label-1", "missing-label"])
     );
-    localStorage.setItem("branchforge:write:active-tab:project-1", "label-2");
+    sessionStorage.setItem("branchforge:write:active-tab:project-1", "label-2");
 
     const { result } = renderHook(() => {
       const [activeLabelId, setActiveLabelId] = useState<string | null>(null);
@@ -84,6 +84,39 @@ describe("useWriteTabs", () => {
       },
     ]);
   });
+
+  it.each([
+    ["label-2", "label-2"],
+    ["other-project-label", "label-1"],
+    [null, null],
+  ])(
+    "restores the link selection %s against the current project's labels",
+    async (initialDocumentId, expectedId) => {
+      sessionStorage.setItem(
+        "branchforge:write:active-tab:project-1",
+        "label-1"
+      );
+      const { result } = renderHook(() => {
+        const [activeLabelId, setActiveLabelId] = useState<string | null>(
+          "label-1"
+        );
+        const tabs = useWriteTabs({
+          projectId: "project-1",
+          labels,
+          activeLabelId,
+          setActiveLabelId,
+          isLoadingLabels: false,
+          initialDocumentId,
+        });
+        return { ...tabs, activeLabelId };
+      });
+      await waitFor(() => expect(result.current.isHydrated).toBe(true));
+      expect(result.current.activeLabelId).toBe(expectedId);
+      expect(
+        localStorage.getItem("branchforge:write:active-tab:project-1")
+      ).toBeNull();
+    }
+  );
 
   it("selects and closes tabs with fallback selection", async () => {
     const { result } = renderHook(() => {
@@ -149,10 +182,10 @@ describe("useWriteTabs", () => {
 
     await waitFor(() => {
       expect(
-        localStorage.getItem("branchforge:write:open-tabs:project-1")
+        sessionStorage.getItem("branchforge:write:open-tabs:project-1")
       ).toBe(JSON.stringify(["label-1", "label-2"]));
       expect(
-        localStorage.getItem("branchforge:write:active-tab:project-1")
+        sessionStorage.getItem("branchforge:write:active-tab:project-1")
       ).toBe("label-2");
     });
   });

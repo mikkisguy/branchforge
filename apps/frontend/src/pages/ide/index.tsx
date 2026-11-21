@@ -3,60 +3,46 @@ import { useNavigate } from "react-router-dom";
 import { useTheme } from "@/contexts/useTheme";
 import { useAuth } from "@/hooks/useAuth";
 import { useProject } from "@/hooks/useProject";
-import { useLabels } from "@/hooks/useLabels";
+import {
+  isEditorView,
+  useWorkspaceNavigation,
+} from "@/hooks/useWorkspaceNavigation";
+import { useWorkspaceTitle } from "@/hooks/useWorkspaceTitle";
 import { themePalettes, BASE_URL } from "@/lib/constants";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { WriteMode } from "./WriteMode";
 import { FlowMode } from "./FlowMode";
 import { flushModeBeforeTransition } from "@/lib/editor-sync-coordinator";
 import { useToast } from "@/contexts/ToastContext";
-import { useLocalStorage } from "@/hooks/useLocalStorage";
 import type { Tab } from "@/components/ide-shared/settings-types";
 import { SETTINGS_TABS } from "@/components/ide-shared/settings-types";
 import { WorkspaceChrome } from "@/components/workspace/WorkspaceChrome";
 import { ProjectFileTransferProvider } from "@/components/workspace/ProjectFileTransferContext";
 import { EmptyState } from "@/components/ui/empty-state";
-import {
-  WORKSPACE_VIEW_STORAGE_KEY,
-  isWorkspaceView,
-  type WorkspaceView,
-} from "@/lib/workspace-view";
+import type { WorkspaceView } from "@/lib/workspace-view";
 
 const ScriptMode = lazy(() =>
   import("./ScriptMode").then((m) => ({ default: m.ScriptMode }))
 );
 
-function isEditorView(view: WorkspaceView): view is "write" | "script" {
-  return view === "write" || view === "script";
-}
-
 export function HomePageIDE() {
   const { theme, setTheme, isDarkMode, toggleDarkMode } = useTheme();
   const { logout } = useAuth();
   const navigate = useNavigate();
-  const [view, setView] = useLocalStorage<WorkspaceView>(
-    WORKSPACE_VIEW_STORAGE_KEY,
-    "write",
-    {
-      serializer: (value) => value,
-      deserializer: (value) => value as WorkspaceView,
-      validate: isWorkspaceView,
-    }
-  );
   const [scriptModeKey, setScriptModeKey] = useState(0);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [initialSettingsTab, setInitialSettingsTab] = useState<Tab | undefined>(
     undefined
   );
   const [isFocusMode, setIsFocusMode] = useState(false);
-  const isFlushing = useRef(false);
   const isDeletingRef = useRef(false);
-  const previousProjectIdRef = useRef<string | undefined>(undefined);
+  const flushingRef = useRef(false);
+  const [isEditorTransitionPending, setIsEditorTransitionPending] =
+    useState(false);
 
   const {
     currentProject,
     projects,
-    setCurrentProject,
     isLoadingProjects,
     projectsError,
     updateProject,
@@ -64,20 +50,27 @@ export function HomePageIDE() {
     refreshProjects,
   } = useProject();
 
-  const { setActiveLabelId } = useLabels();
   const { error: showErrorToast } = useToast();
+  const {
+    view,
+    linkedProjectId,
+    entry,
+    isResolvingScope,
+    isHistoryTransitionPending,
+    goToWorkspace,
+    reportDocument,
+  } = useWorkspaceNavigation(currentProject?.id, flushingRef, showErrorToast);
+  const editorKey = `${currentProject?.id ?? ""}:${view}:${entry.editorKey}`;
+  const unavailableProject =
+    linkedProjectId !== undefined &&
+    !currentProject &&
+    !isLoadingProjects &&
+    !projectsError;
+  useWorkspaceTitle(view === "flow" ? currentProject?.name : undefined);
 
   useEffect(() => {
-    const previousProjectId = previousProjectIdRef.current;
-    const nextProjectId = currentProject?.id;
-    if (
-      previousProjectId !== undefined &&
-      previousProjectId !== nextProjectId
-    ) {
-      setActiveLabelId(null);
-    }
-    previousProjectIdRef.current = nextProjectId;
-  }, [currentProject?.id, setActiveLabelId]);
+    if (view === "flow" || unavailableProject) setIsFocusMode(false);
+  }, [view, unavailableProject]);
 
   const handleSetIsSettingsOpen = (open: boolean) => {
     setIsSettingsOpen(open);
@@ -102,12 +95,13 @@ export function HomePageIDE() {
         return;
       }
 
-      if (isFlushing.current) {
+      if (flushingRef.current || isDeletingRef.current) {
         return;
       }
 
       if (isEditorView(view)) {
-        isFlushing.current = true;
+        flushingRef.current = true;
+        setIsEditorTransitionPending(true);
 
         try {
           const flushed = await flushModeBeforeTransition(view);
@@ -126,12 +120,13 @@ export function HomePageIDE() {
           console.error("Error in handleSetView:", error);
           return;
         } finally {
-          isFlushing.current = false;
+          flushingRef.current = false;
+          setIsEditorTransitionPending(false);
         }
       }
 
       setIsFocusMode(false);
-      setView(nextView);
+      void goToWorkspace(currentProject?.id, nextView);
     })();
   };
 
@@ -141,12 +136,13 @@ export function HomePageIDE() {
         return;
       }
 
-      if (isFlushing.current) {
+      if (flushingRef.current || isDeletingRef.current) {
         return;
       }
 
       if (isEditorView(view)) {
-        isFlushing.current = true;
+        flushingRef.current = true;
+        setIsEditorTransitionPending(true);
 
         try {
           const flushed = await flushModeBeforeTransition(view);
@@ -165,16 +161,20 @@ export function HomePageIDE() {
           console.error("Error in handleSetProject:", error);
           return;
         } finally {
-          isFlushing.current = false;
+          flushingRef.current = false;
+          setIsEditorTransitionPending(false);
         }
       }
 
-      setCurrentProject(project);
+      if (project) {
+        setIsFocusMode(false);
+        void goToWorkspace(project.id, view);
+      }
     })();
   };
 
   const handleDeleteProject = async (projectId: string): Promise<void> => {
-    if (isDeletingRef.current) {
+    if (isDeletingRef.current || flushingRef.current) {
       return;
     }
     isDeletingRef.current = true;
@@ -184,7 +184,8 @@ export function HomePageIDE() {
       // mode first so pending edits are not lost. Deleting another project
       // does not touch the active editor and needs no flush.
       if (projectId === currentProject?.id && isEditorView(view)) {
-        isFlushing.current = true;
+        flushingRef.current = true;
+        setIsEditorTransitionPending(true);
 
         let flushed: boolean;
         try {
@@ -196,8 +197,6 @@ export function HomePageIDE() {
           );
           console.error("Error flushing before project delete:", error);
           return;
-        } finally {
-          isFlushing.current = false;
         }
 
         if (!flushed) {
@@ -210,8 +209,18 @@ export function HomePageIDE() {
       }
 
       await deleteProject(projectId);
+      if (projectId === currentProject?.id) {
+        const nextProjectId = projects.find(
+          (project) => project.id !== projectId
+        )?.id;
+        await goToWorkspace(nextProjectId, view, true);
+      }
     } finally {
       isDeletingRef.current = false;
+      if (projectId === currentProject?.id) {
+        flushingRef.current = false;
+        setIsEditorTransitionPending(false);
+      }
     }
   };
 
@@ -282,6 +291,7 @@ export function HomePageIDE() {
 
         <main
           id="main-content"
+          inert={isEditorTransitionPending || isHistoryTransitionPending}
           tabIndex={-1}
           className={
             isFocusMode
@@ -289,15 +299,29 @@ export function HomePageIDE() {
               : "h-full overflow-hidden pt-14 max-md:pt-12 max-md:pb-[calc(3.5rem+env(safe-area-inset-bottom,0px))]"
           }
         >
-          {view === "write" ? (
+          {unavailableProject ? (
+            <div className="flex h-full items-center justify-center">
+              <EmptyState
+                title="Project unavailable"
+                description="Choose an available project from the project menu."
+              />
+            </div>
+          ) : isResolvingScope ? (
+            <div className="flex h-full items-center justify-center text-muted-foreground">
+              Loading workspace…
+            </div>
+          ) : view === "write" ? (
             <WriteMode
+              key={editorKey}
+              initialDocumentId={entry.initialDocumentId}
+              onDocumentChange={reportDocument}
               projectName={currentProject?.name}
               onOpenSettings={handleOpenSettings}
               onFocusModeChange={setIsFocusMode}
             />
           ) : view === "script" ? (
             <ErrorBoundary
-              key={scriptModeKey}
+              key={`${editorKey}:${scriptModeKey}`}
               onError={() => setIsFocusMode(false)}
               fallback={
                 <div
@@ -328,6 +352,8 @@ export function HomePageIDE() {
                 }
               >
                 <ScriptMode
+                  initialDocumentId={entry.initialDocumentId}
+                  onDocumentChange={reportDocument}
                   projectId={currentProject?.id}
                   projectName={currentProject?.name}
                   onOpenSettings={handleOpenSettings}

@@ -1,3 +1,4 @@
+import type { WorkspaceDocumentProps } from "@/hooks/useWorkspaceDocument";
 import { ScriptModeEditorLayout } from "./components/ScriptModeEditorLayout";
 import { WorkspaceFocusReporter } from "@/components/workspace/WorkspaceFocusReporter";
 import { ScriptModeEmptyState } from "./components/ScriptModeEmptyState";
@@ -9,7 +10,7 @@ import { RenameFileDialog } from "@/components/ide-shared/RenameFileDialog";
 import { DeleteFileDialog } from "@/components/ide-shared/DeleteFileDialog";
 import { useProject } from "@/hooks/useProject";
 
-interface ScriptModeProps {
+interface ScriptModeProps extends WorkspaceDocumentProps {
   projectId?: string;
   projectName?: string;
   onOpenSettings?: () => void;
@@ -19,6 +20,8 @@ interface ScriptModeProps {
 export function ScriptMode({
   projectId,
   projectName,
+  initialDocumentId,
+  onDocumentChange,
   onOpenSettings,
   onFocusModeChange,
 }: ScriptModeProps) {
@@ -77,7 +80,12 @@ export function ScriptMode({
     foldersToExpand,
     fileActions,
     fileRowActions,
-  } = useScriptMode({ projectId });
+  } = useScriptMode({
+    projectId,
+    projectName,
+    initialDocumentId,
+    onDocumentChange,
+  });
 
   const createFileDialog =
     projectId && canCreateFile ? (
