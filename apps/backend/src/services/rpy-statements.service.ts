@@ -409,12 +409,17 @@ function extractRpySymbols(
     // statement-level (not just paren) tracking.
     const defaultMatch =
       (excludedTags === undefined || globalLines.has(i)) &&
-      trimmed.match(
-        /^default\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*(.+?)\s*(?:#.*)?$/
-      );
+      trimmed.match(/^default\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=/);
     if (defaultMatch) {
       const key = defaultMatch[1];
-      const rawValue = defaultMatch[2];
+      const valueStart = defaultMatch[0].length;
+      const commentStart = trimmed.indexOf("#", valueStart);
+      // Only bare booleans and numbers can be managed, so a hash inside
+      // a quoted string or other expression cannot change its classification.
+      const rawValue = trimmed.slice(
+        valueStart,
+        commentStart === -1 ? undefined : commentStart
+      );
       const detected = classifyDefaultStatement(key, rawValue);
       // Only `variable` (True/False) and `stat` (numeric) are
       // promoted into the database. `unknown` defaults — quoted
@@ -424,7 +429,12 @@ function extractRpySymbols(
       // store, and on the next export the user's file would be
       // missing a line it had before. The strip is conservative:
       // when in doubt, preserve.
-      if (detected.kind === "unknown") {
+      // The trailing comment must fit on a single line as well.
+      if (
+        detected.kind === "unknown" ||
+        (commentStart !== -1 &&
+          /[\n\r\u2028\u2029]/.test(trimmed.slice(commentStart + 1)))
+      ) {
         output.push(line);
         i += 1;
         continue;

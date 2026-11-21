@@ -321,7 +321,8 @@ describe("rpy-statements.service", () => {
 
     it("strips comments after default values and still captures the value", () => {
       const content = [
-        "default met_alex = False  # a flag",
+        "default\tmet_alex \t=\t False  # a flag",
+        "default points =  -2.5# a stat # another hash",
         "",
         "label start:",
         "    return",
@@ -331,7 +332,25 @@ describe("rpy-statements.service", () => {
       expect(result.variables).toEqual([
         { key: "met_alex", value: "False", kind: "variable" },
       ]);
-      expect(result.cleanedContent).not.toContain("default met_alex");
+      expect(result.stats).toEqual([
+        { key: "points", value: "-2.5", kind: "stat" },
+      ]);
+      expect(result.cleanedContent).not.toContain("default\tmet_alex");
+      expect(result.cleanedContent).not.toContain("default points");
+    });
+
+    it("preserves hash-containing expressions and incomplete defaults verbatim", () => {
+      const content = [
+        'default text = "A # B"  # description',
+        "default empty =  ",
+        "default comment_only = \t# no value",
+        "default malformed = True # comment\rcontinued",
+      ].join("\n");
+
+      const result = extractAndStripRpySymbols(content);
+      expect(result.variables).toEqual([]);
+      expect(result.stats).toEqual([]);
+      expect(result.cleanedContent).toBe(content);
     });
 
     it("preserves leading comments and blank lines around stripped statements", () => {
