@@ -57,6 +57,7 @@ import { extractAndStripRpySymbols } from "../rpy-statements.service.js";
 import { updateFileContent } from "../projects.service.js";
 import { parseRPYFileWithLabels as parseRealRPY } from "../rpy/parser.js";
 import { generateVariablesFile } from "../rpy-generator.service.js";
+import { getExportPreview } from "../export.service.js";
 
 describe("GitLabSyncService (Integration)", () => {
   let db: ReturnType<typeof getDb>;
@@ -2483,6 +2484,142 @@ describe("GitLabSyncService (Integration)", () => {
   });
 
   describe("importFromGitlab", () => {
+    it("round-trips authored defaults and applies only accepted remote values", async () => {
+      const declarations = [
+        "default both_mode = True",
+        "default other_mode = False",
+        "default text_speed = 0.5",
+        "default route_offset = -3",
+        "default starting_points = 120",
+        "default ordinary = 42",
+        "default whole_float = 1.0",
+        "default padded_float = 00.50",
+      ];
+      const sourceOnly =
+        "default expression = 1e2\ndefault chapter = -01\ndefault persistent.visited = True";
+      const protectedSource = "default protected_flag = True";
+      const path = testGitlabFile.filePath;
+      const remote = new Map([
+        [
+          path,
+          [...declarations, sourceOnly, testGitlabFile.content].join("\n"),
+        ],
+        ["game/screens.rpy", protectedSource],
+      ]);
+      vi.spyOn(gitlabRepoService, "listRpyFiles").mockImplementation(async () =>
+        [...remote.keys()].map((filePath) => ({
+          name: filePath.split("/").pop()!,
+          path: filePath,
+        }))
+      );
+      vi.spyOn(
+        gitlabRepoService,
+        "getFileContentWithMetadata"
+      ).mockImplementation(async (_projectId, _userId, filePath) => ({
+        content: remote.get(filePath) ?? null,
+        lastCommitId: "defaults-remote-rev",
+        contentSha256: null,
+        blobId: null,
+      }));
+      vi.spyOn(rpyParserService, "parseRPYFileWithLabels").mockImplementation(
+        parseRealRPY
+      );
+      vi.spyOn(gitlabFileService, "batchCommitFiles").mockImplementation(
+        async (_projectId, _userId, _branch, _message, actions) => {
+          for (const action of actions) {
+            if (action.content !== undefined)
+              remote.set(action.filePath, action.content);
+          }
+          return "defaults-push";
+        }
+      );
+      await db.insert(stats).values({
+        projectId: testProjectId,
+        key: "expression",
+        name: "Expression",
+      });
+      await db
+        .insert(variables)
+        .values({ projectId: testProjectId, key: "protected_flag" });
+
+      const pull = (policy: ConflictResolution) =>
+        importFromGitlab(testProjectId, testUserId, testBranch, policy);
+      const assertPush = async () => {
+        const preview = await getExportPreview(testProjectId, testUserId);
+        expect(
+          await exportToGitlab(testProjectId, testUserId, testBranch)
+        ).toMatchObject({
+          status: "COMPLETED",
+        });
+        const lines = [...remote.values()].flatMap((source) =>
+          source.split("\n")
+        );
+        for (const declaration of [
+          ...declarations,
+          ...sourceOnly.split("\n"),
+          protectedSource,
+        ]) {
+          const key = declaration.split(" = ")[0];
+          expect(lines.filter((line) => line.startsWith(`${key} = `))).toEqual([
+            declaration,
+          ]);
+        }
+        for (const entry of preview.files.filter(
+          (item) => item.kind !== "definitions"
+        )) {
+          expect(remote.get(`game/${entry.fileName}`)).toBe(entry.content);
+        }
+        expect(remote.get(path)).toContain(sourceOnly);
+        expect(remote.get("game/screens.rpy")).toBe(protectedSource);
+      };
+      expect(await pull("gitlab_wins")).toMatchObject({ status: "COMPLETED" });
+      await assertPush();
+
+      const [file] = await db
+        .select()
+        .from(projectFiles)
+        .where(eq(projectFiles.id, testGitlabFileId));
+      const saved = await updateFileContent(
+        file.id,
+        testUserId,
+        file.content.replace('"Content"', '"Edited dialogue"'),
+        file.contentHash
+      );
+      expect(saved.generatedFilesChanged).toBe(false);
+      await assertPush();
+      expect(remote.get(path)).toContain('"Edited dialogue"');
+
+      const [pushedFile] = await db
+        .select()
+        .from(projectFiles)
+        .where(eq(projectFiles.id, testGitlabFileId));
+      await updateFileContent(
+        file.id,
+        testUserId,
+        pushedFile.content.replace('"Edited dialogue"', '"Unpushed edit"'),
+        pushedFile.contentHash
+      );
+      const remoteEdit = `default both_mode = False\ndefault starting_points = 121\n${remote.get(path)}`;
+      remote.set(path, remoteEdit);
+      expect(await pull("manual_review")).toMatchObject({
+        status: "COMPLETED",
+        conflictCount: 1,
+      });
+      const rejected = await getExportPreview(testProjectId, testUserId);
+      expect(
+        rejected.files.find((item) => item.kind === "variables")?.content
+      ).toContain("default both_mode = True");
+      expect(
+        rejected.files.find((item) => item.kind === "stats")?.content
+      ).toContain("default starting_points = 120");
+
+      remote.set(path, remoteEdit + "\n# New remote revision");
+      expect(await pull("gitlab_wins")).toMatchObject({ status: "COMPLETED" });
+      declarations[0] = "default both_mode = False";
+      declarations[4] = "default starting_points = 121";
+      await assertPush();
+    });
+
     describe.each([
       "branchforge_wins",
       "gitlab_wins",

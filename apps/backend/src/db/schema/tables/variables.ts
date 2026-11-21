@@ -6,6 +6,7 @@
 
 import {
   pgTable,
+  boolean,
   uuid,
   text,
   timestamp,
@@ -22,6 +23,7 @@ export const variables = pgTable(
       .notNull()
       .references(() => projects.id, { onDelete: "cascade" }),
     key: text("key").notNull(),
+    authoredDefault: boolean("authored_default"),
     description: text("description"),
     category: text("category"),
     createdAt: timestamp("created_at").defaultNow().notNull(),

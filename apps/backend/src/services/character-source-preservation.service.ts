@@ -1,7 +1,10 @@
 import { and, asc, eq, isNull } from "drizzle-orm";
 import type { CharacterSourceDefinition } from "@branchforge/shared";
 import { getDb } from "../db/index.js";
-import { promoteManagedDefaults } from "./managed-defaults.service.js";
+import {
+  collectManagedDefaults,
+  promoteManagedDefaults,
+} from "./managed-defaults.service.js";
 import {
   characters,
   projectFiles,
@@ -166,12 +169,30 @@ export function recoverLegacyCharacterSource(
       file.filePath,
       excludedTags
     ).cleanedContent;
+    const previousSeparateNotices = extractLegacyRpySymbols(
+      raw,
+      file.filePath,
+      excludedTags,
+      "separate"
+    ).cleanedContent;
     if (
-      ![legacy, oldNotice, previousModern, modern, raw].includes(file.content)
+      ![
+        legacy,
+        oldNotice,
+        previousModern,
+        previousSeparateNotices,
+        modern,
+        raw,
+      ].includes(file.content)
     )
       continue;
     return {
-      content: modern,
+      // Avoid introducing an invalid integer from an archived snapshot
+      // whose default had already been stripped by an older import.
+      content:
+        file.content === raw || file.content === modern
+          ? modern
+          : previousSeparateNotices,
       definitions: isSourceOwnedRpyFile(file.filePath)
         ? {}
         : characterDefinitionSnapshot(raw),
@@ -186,11 +207,14 @@ export async function ensureCharacterSourcePreservation(
 ): Promise<void> {
   const db = getDb();
   const [state] = await db
-    .select({ version: projectSettings.characterSourcePreservationVersion })
+    .select({
+      version: projectSettings.characterSourcePreservationVersion,
+      defaultsRecovered: projectSettings.managedDefaultsRecovered,
+    })
     .from(projectSettings)
     .where(eq(projectSettings.projectId, projectId))
     .limit(1);
-  if (state?.version === 1) return;
+  if (state?.version === 1 && state.defaultsRecovered) return;
   await db.transaction(async (tx) => {
     await lockProject(tx, projectId);
     const [settings] = await tx
@@ -198,7 +222,11 @@ export async function ensureCharacterSourcePreservation(
       .from(projectSettings)
       .where(eq(projectSettings.projectId, projectId))
       .limit(1);
-    if (settings?.characterSourcePreservationVersion === 1) return;
+    if (
+      settings?.characterSourcePreservationVersion === 1 &&
+      settings.managedDefaultsRecovered
+    )
+      return;
     const excludedTags = new Set(
       settings?.excludedCharacterTags ?? DEFAULT_EXCLUDED_RENPY_TAGS
     );
@@ -213,7 +241,46 @@ export async function ensureCharacterSourcePreservation(
       );
     // Any entry point can trigger recovery. Preserve current defaults in
     // this transaction before recovery removes declarations from content.
-    await promoteManagedDefaults(tx, projectId, files);
+    await promoteManagedDefaults(
+      tx,
+      projectId,
+      collectManagedDefaults(files),
+      "current"
+    );
+    if (!settings?.managedDefaultsRecovered) {
+      const candidates = files.flatMap((file) => {
+        // ZIP's original is immutable, so a later accepted file revision
+        // makes its stripped values ambiguous. For GitLab, require the
+        // explicit local baseline in addition to the recovery match.
+        const raw =
+          file.source === "GITLAB"
+            ? file.lastPushedContentHash && file.remoteContent
+            : file.createdAt.getTime() === file.updatedAt.getTime() &&
+              file.originalContent;
+        if (!raw || !recoverLegacyCharacterSource(file, excludedTags))
+          return [];
+        return collectManagedDefaults([
+          { filePath: file.filePath, content: raw },
+        ]);
+      });
+      const counts = new Map<string, number>();
+      for (const candidate of candidates) {
+        counts.set(candidate.key, (counts.get(candidate.key) ?? 0) + 1);
+      }
+      await promoteManagedDefaults(
+        tx,
+        projectId,
+        candidates.filter((item) => counts.get(item.key) === 1),
+        "legacy"
+      );
+    }
+    if (settings?.characterSourcePreservationVersion === 1) {
+      await tx
+        .update(projectSettings)
+        .set({ managedDefaultsRecovered: true })
+        .where(eq(projectSettings.projectId, projectId));
+      return;
+    }
     const templates = new Map<string, CharacterSourceDefinition[]>();
     const legacyBaselines = new Map<
       string,
@@ -294,10 +361,14 @@ export async function ensureCharacterSourcePreservation(
         projectId,
         excludedCharacterTags: [...excludedTags],
         characterSourcePreservationVersion: 1,
+        managedDefaultsRecovered: true,
       })
       .onConflictDoUpdate({
         target: projectSettings.projectId,
-        set: { characterSourcePreservationVersion: 1 },
+        set: {
+          characterSourcePreservationVersion: 1,
+          managedDefaultsRecovered: true,
+        },
       });
   });
 }

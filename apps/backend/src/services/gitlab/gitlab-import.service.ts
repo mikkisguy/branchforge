@@ -14,8 +14,6 @@ import {
   labels,
   labelLines,
   characters,
-  stats,
-  variables,
   projectSettings,
 } from "../../db/schema/index.js";
 import { eq, and, isNull, sql, desc, asc } from "drizzle-orm";
@@ -62,6 +60,7 @@ import {
 import { createProject, deleteProject } from "../projects.service.js";
 import { assertNoPendingStructuralOperations } from "../project-files-operations.service.js";
 import { lockProject } from "../project-files-operations.service.js";
+import { promoteManagedDefaults } from "../managed-defaults.service.js";
 import { hasUnpushedLocalContent } from "../project-file-baseline.js";
 import {
   NotFoundError,
@@ -476,11 +475,7 @@ export async function importFromGitlab(
         existingRows.map((row) => [row.filePath, row])
       );
 
-      const extractedVariablesByKey = new Map<
-        string,
-        DetectedDefaultStatement
-      >();
-      const extractedStatsByKey = new Map<string, DetectedDefaultStatement>();
+      const defaultsByKey = new Map<string, DetectedDefaultStatement>();
 
       const filesForLabels: Array<{
         prepared: PreparedFile;
@@ -606,15 +601,11 @@ export async function importFromGitlab(
 
         acceptedForCharacterReview.push(prepared);
 
-        for (const v of prepared.symbols.variables) {
-          if (!extractedVariablesByKey.has(v.key)) {
-            extractedVariablesByKey.set(v.key, v);
-          }
-        }
-        for (const s of prepared.symbols.stats) {
-          if (!extractedStatsByKey.has(s.key)) {
-            extractedStatsByKey.set(s.key, s);
-          }
+        for (const item of [
+          ...prepared.symbols.variables,
+          ...prepared.symbols.stats,
+        ]) {
+          if (!defaultsByKey.has(item.key)) defaultsByKey.set(item.key, item);
         }
       }
 
@@ -681,36 +672,12 @@ export async function importFromGitlab(
           });
       }
 
-      const dedupedVariables = Array.from(extractedVariablesByKey.values());
-      const dedupedStats = Array.from(extractedStatsByKey.values());
-
-      for (const v of dedupedVariables) {
-        await tx
-          .insert(variables)
-          .values({
-            projectId,
-            key: v.key,
-          })
-          .onConflictDoNothing({
-            target: [variables.projectId, variables.key],
-          });
-      }
-      for (const s of dedupedStats) {
-        const minValue = Math.round(Number.parseFloat(s.value)) || 0;
-        await tx
-          .insert(stats)
-          .values({
-            projectId,
-            key: s.key,
-            name: s.key,
-            minValue,
-            maxValue: 100,
-            updatedAt: new Date(),
-          })
-          .onConflictDoNothing({
-            target: [stats.projectId, stats.key],
-          });
-      }
+      await promoteManagedDefaults(
+        tx,
+        projectId,
+        [...defaultsByKey.values()],
+        "accepted"
+      );
 
       // Speaker linking must see symbols promoted in this same transaction.
       const charactersByTag = await fetchCharactersByTag(tx, projectId);

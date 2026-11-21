@@ -106,6 +106,28 @@ describe("legacy character recovery evidence", () => {
     ).toBeNull();
   });
 
+  it("keeps an invalid integer that was stripped by an older import out of recovered source", () => {
+    const raw = original + "\ndefault flag = True\ndefault chapter = 01";
+    const tags = new Set(["narrator"]);
+    const previousContent = extractLegacyRpySymbols(
+      raw,
+      file.filePath,
+      tags,
+      "separate"
+    ).cleanedContent;
+    const recovery = recoverLegacyCharacterSource(
+      {
+        ...file,
+        originalContent: raw,
+        content: previousContent,
+        contentHash: calculateContentHash(previousContent),
+      },
+      tags
+    );
+    expect(recovery?.content).toBe(previousContent);
+    expect(recovery?.definitions.e.declaration).toContain('Character("E"');
+  });
+
   it("removes deleted visible declarations but retains stripped managed snapshots", () => {
     const snapshot = characterDefinitionSnapshot(original);
     const before = original.split("\n")[0] + "\nlabel start:\n    return";

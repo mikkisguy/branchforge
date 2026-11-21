@@ -37,6 +37,7 @@ import {
   extractAndStripRpySymbols,
   isSourceOwnedRpyFile,
   collectSourceOwnedRpySymbolKeys,
+  filterGeneratedDefaults,
   DEFAULT_EXCLUDED_RENPY_TAGS,
 } from "./rpy-statements.service.js";
 import { ensureCharacterSourcePreservation } from "./character-source-preservation.service.js";
@@ -100,6 +101,7 @@ async function fetchSupportingFileSources(projectId: string) {
       db
         .select({
           key: variables.key,
+          authoredDefault: variables.authoredDefault,
           description: variables.description,
           category: variables.category,
         })
@@ -108,6 +110,7 @@ async function fetchSupportingFileSources(projectId: string) {
       db
         .select({
           key: stats.key,
+          authoredDefault: stats.authoredDefault,
           name: stats.name,
           minValue: stats.minValue,
           maxValue: stats.maxValue,
@@ -145,9 +148,14 @@ function excludeSourceOwnedSymbols(
   excludedTags: ReadonlySet<string>
 ) {
   const owned = collectSourceOwnedRpySymbolKeys(files, excludedTags);
+  const defaults = filterGeneratedDefaults(
+    sources.projectVariables,
+    sources.projectStats,
+    owned
+  );
   return {
-    projectVariables: sources.projectVariables.filter((v) => !owned.has(v.key)),
-    projectStats: sources.projectStats.filter((s) => !owned.has(s.key)),
+    projectVariables: defaults.variables,
+    projectStats: defaults.stats,
     projectCharacters: sources.projectCharacters.filter(
       (c) => !owned.has(c.renpyTag) && !excludedTags.has(c.renpyTag)
     ),

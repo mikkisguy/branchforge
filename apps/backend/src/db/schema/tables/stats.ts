@@ -32,6 +32,8 @@ export const stats = pgTable(
     name: text("name").notNull(),
     minValue: integer("min_value").default(0).notNull(),
     maxValue: integer("max_value").default(100).notNull(),
+    // Keep the Ren'Py literal so integers and floats retain their Python types.
+    authoredDefault: text("authored_default"),
     description: text("description"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),

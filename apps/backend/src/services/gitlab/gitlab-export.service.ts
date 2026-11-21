@@ -54,6 +54,7 @@ import {
   extractAndStripRpySymbols,
   isSourceOwnedRpyFile,
   collectSourceOwnedRpySymbolKeys,
+  filterGeneratedDefaults,
   DEFAULT_EXCLUDED_RENPY_TAGS,
 } from "../rpy-statements.service.js";
 import { ensureCharacterSourcePreservation } from "../character-source-preservation.service.js";
@@ -206,6 +207,7 @@ function buildPlannedActions(
 interface GeneratedExportData {
   variables: Array<{
     key: string;
+    authoredDefault: boolean | null;
     description: string | null;
     category: string | null;
   }>;
@@ -214,6 +216,7 @@ interface GeneratedExportData {
     name: string;
     minValue: number;
     maxValue: number;
+    authoredDefault: string | null;
     description: string | null;
   }>;
   characters: Array<{
@@ -254,12 +257,12 @@ async function buildGeneratedActions(
   // is still pushed (overwriting a stale remote copy that may otherwise
   // collide with the protected declarations). Only a category with no DB
   // rows at all produces no action.
-  const filteredVariables = generated.variables.filter(
-    (variable) => !sourceOwnedKeys.has(variable.key)
-  );
-  const filteredStats = generated.stats.filter(
-    (stat) => !sourceOwnedKeys.has(stat.key)
-  );
+  const { variables: filteredVariables, stats: filteredStats } =
+    filterGeneratedDefaults(
+      generated.variables,
+      generated.stats,
+      sourceOwnedKeys
+    );
   const filteredCharacters = generated.characters.filter(
     (character) =>
       !sourceOwnedKeys.has(character.renpyTag) &&
@@ -932,6 +935,7 @@ export async function exportToGitlab(
         db
           .select({
             key: variables.key,
+            authoredDefault: variables.authoredDefault,
             description: variables.description,
             category: variables.category,
           })
@@ -940,6 +944,7 @@ export async function exportToGitlab(
         db
           .select({
             key: stats.key,
+            authoredDefault: stats.authoredDefault,
             name: stats.name,
             minValue: stats.minValue,
             maxValue: stats.maxValue,

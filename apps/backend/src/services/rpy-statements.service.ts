@@ -189,6 +189,40 @@ export function collectSourceOwnedRpySymbolKeys(
   return names;
 }
 
+/** Select one generated default per store key after active source takes precedence. */
+export function filterGeneratedDefaults<
+  Variable extends { key: string; authoredDefault?: boolean | null },
+  Stat extends { key: string; authoredDefault?: string | null },
+>(
+  variables: readonly Variable[],
+  stats: readonly Stat[],
+  sourceOwnedKeys: ReadonlySet<string>
+): { variables: Variable[]; stats: Stat[] } {
+  const authoredBooleans = new Set(
+    variables
+      .filter((item) => item.authoredDefault != null)
+      .map((item) => item.key)
+  );
+  const byKey = (a: { key: string }, b: { key: string }) =>
+    a.key < b.key ? -1 : a.key > b.key ? 1 : 0;
+  const filteredStats = stats
+    .filter(
+      (stat) =>
+        !sourceOwnedKeys.has(stat.key) &&
+        (stat.authoredDefault != null || !authoredBooleans.has(stat.key))
+    )
+    .sort(byKey);
+  const statKeys = new Set(filteredStats.map((item) => item.key));
+  return {
+    variables: variables
+      .filter(
+        (item) => !sourceOwnedKeys.has(item.key) && !statKeys.has(item.key)
+      )
+      .sort(byKey),
+    stats: filteredStats,
+  };
+}
+
 // ============================================================================
 // Public API
 // ============================================================================
@@ -277,17 +311,19 @@ export function extractAndStripRpySymbols(
 export function extractLegacyRpySymbols(
   content: string,
   filePath?: string,
-  excludedTags?: ReadonlySet<string>
+  excludedTags?: ReadonlySet<string>,
+  notices: "combined" | "separate" = "combined"
 ): RpySymbolExtraction {
-  return extractRpySymbols(content, filePath, excludedTags, true);
+  return extractRpySymbols(content, filePath, excludedTags, notices);
 }
 
 function extractRpySymbols(
   content: string,
   filePath: string | undefined,
   excludedTags: ReadonlySet<string> | undefined,
-  useLegacyNotices = false
+  legacyNotices?: "combined" | "separate"
 ): RpySymbolExtraction {
+  const useLegacyNotices = legacyNotices === "combined";
   if (filePath && isSourceOwnedRpyFile(filePath)) {
     return {
       cleanedContent: content,
@@ -420,7 +456,11 @@ function extractRpySymbols(
         valueStart,
         commentStart === -1 ? undefined : commentStart
       );
-      const detected = classifyDefaultStatement(key, rawValue);
+      const detected = classifyDefaultStatement(
+        key,
+        rawValue,
+        legacyNotices !== undefined
+      );
       // Only `variable` (True/False) and `stat` (numeric) are
       // promoted into the database. `unknown` defaults — quoted
       // strings, identifiers, function calls — are left in the
@@ -627,15 +667,23 @@ function extractColorFromOptions(options: string): string {
  */
 function classifyDefaultStatement(
   key: string,
-  rawValue: string
+  rawValue: string,
+  legacy: boolean
 ): DetectedDefaultStatement {
   const value = rawValue.trim();
   if (value === "True" || value === "False") {
     return { key, value, kind: "variable" };
   }
-  // Match ints and floats; Ren'Py users freely mix them.
-  if (/^-?\d+(?:\.\d+)?$/.test(value)) {
+  // Older imports stripped leading-zero integers before rounding them.
+  if (
+    legacy ? /^-?\d+(?:\.\d+)?$/.test(value) : isManagedNumericLiteral(value)
+  ) {
     return { key, value, kind: "stat" };
   }
   return { key, value, kind: "unknown" };
+}
+
+export function isManagedNumericLiteral(value: string): boolean {
+  // Python allows padding on decimals and all-zero integers.
+  return value === value.trim() && /^-?(?:\d+\.\d+|0+|[1-9]\d*)$/.test(value);
 }
