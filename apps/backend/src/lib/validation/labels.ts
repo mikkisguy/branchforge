@@ -5,6 +5,7 @@
  */
 
 import { z } from "zod";
+import { LABEL_IDENTIFIER_MAX_LENGTH } from "@branchforge/shared";
 import {
   uuidSchema,
   optionalString,
@@ -67,7 +68,7 @@ export const updateLabelSchema = z
       .string()
       .trim()
       .min(1)
-      .max(50)
+      .max(LABEL_IDENTIFIER_MAX_LENGTH)
       .regex(
         /^[a-zA-Z_][a-zA-Z0-9_]*$/,
         "Label name must start with a letter or underscore and contain only letters, numbers, and underscores"

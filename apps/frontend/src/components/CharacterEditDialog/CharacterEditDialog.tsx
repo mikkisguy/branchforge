@@ -109,6 +109,9 @@ export function CharacterEditDialog({
   const [initialSnapshot, setInitialSnapshot] = useState<CharacterSnapshot>(
     () => buildSnapshot(INITIAL_EMPTY)
   );
+  const [savedNotes, setSavedNotes] = useState<{ value: string | null }>({
+    value: null,
+  });
   // Track preview URL for cleanup
   const previewUrlRef = useRef<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -128,7 +131,13 @@ export function CharacterEditDialog({
     isDeletingAvatar;
 
   const currentSnapshot = buildSnapshot(form);
-  const { isDirty } = useDirtyForm(initialSnapshot, currentSnapshot);
+  const { isDirty: hasFormChanges } = useDirtyForm(
+    initialSnapshot,
+    currentSnapshot
+  );
+  const notes = form.notes.trim() || null;
+  const notesChanged = !!characterId && notes !== savedNotes.value;
+  const isDirty = hasFormChanges || notesChanged;
   const {
     handleOpenChange,
     confirmDiscard,
@@ -149,6 +158,7 @@ export function CharacterEditDialog({
       hasInitializedRef.current = false;
       createdCharIdRef.current = null;
       setInitialSnapshot(buildSnapshot(INITIAL_EMPTY));
+      setSavedNotes({ value: null });
     } else if (!isLoadingCharacters) {
       if (characterId && characterId !== initializedForCharacterIdRef.current) {
         hasInitializedRef.current = false;
@@ -161,6 +171,7 @@ export function CharacterEditDialog({
           hasInitializedRef.current = true;
           dispatch({ type: "RESET_EXISTING", char });
           setInitialSnapshot(buildSnapshotFromChar(char));
+          setSavedNotes({ value: char.notes?.trim() || null });
         }
       }
     }
@@ -227,7 +238,7 @@ export function CharacterEditDialog({
 
   const handleSave = async () => {
     // Validate
-    const { valid, errors } = validateForm(form);
+    const { valid, errors } = validateForm(form, !!characterId);
     if (!valid) {
       if (errors.name) dispatch({ type: "SET_NAME_ERROR", value: errors.name });
       if (errors.displayName)
@@ -249,7 +260,7 @@ export function CharacterEditDialog({
         color: form.color,
         isLoveInterest: form.isLoveInterest,
         isNarrator: form.isNarrator,
-        notes: form.notes.trim() || undefined,
+        notes: notes ?? undefined,
       };
 
       let targetCharId = characterId ?? createdCharIdRef.current;
@@ -261,8 +272,14 @@ export function CharacterEditDialog({
           color: payload.color,
           isLoveInterest: payload.isLoveInterest,
           isNarrator: payload.isNarrator,
-          notes: payload.notes,
+          notes: notesChanged ? notes : undefined,
         });
+        if (notesChanged) {
+          // Metadata can save even if the following avatar operation fails.
+          setSavedNotes((current) =>
+            current === savedNotes ? { value: notes } : current
+          );
+        }
       } else {
         const created = await createCharacter(payload);
         targetCharId = created.id;

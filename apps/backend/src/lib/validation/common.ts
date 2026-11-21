@@ -11,9 +11,6 @@ import { ValidationError } from "../../middleware/error-handler.middleware.js";
 // Constants
 // ============================================================================
 
-/** Maximum file content size in bytes (10 MB) */
-export const FILE_CONTENT_MAX_SIZE = 10_000_000;
-
 // ============================================================================
 // Primitive Schemas
 // ============================================================================

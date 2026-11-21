@@ -457,11 +457,10 @@ describe("CharactersRoutes (Integration)", () => {
       });
     });
 
-    it("should create character with valid data", async () => {
+    it("should create a character using the project ID in the URL", async () => {
       const auth = await createAuthenticatedRequest(testUserId);
 
       const requestBody = {
-        projectId: testProject.id,
         name: "New Character",
         displayName: "New Char",
         renpyTag: "new_char",
@@ -499,6 +498,7 @@ describe("CharactersRoutes (Integration)", () => {
         .limit(1);
       expect(dbCharacter).toBeDefined();
       expect(dbCharacter.name).toBe("New Character");
+      expect(dbCharacter.projectId).toBe(testProject.id);
     });
 
     it("should return 409 for duplicate renpyTag", async () => {
@@ -556,11 +556,11 @@ describe("CharactersRoutes (Integration)", () => {
       });
     });
 
-    it("should allow creating character with minimal required fields", async () => {
+    it("should use the URL project when a legacy body specifies a different project", async () => {
       const auth = await createAuthenticatedRequest(testUserId);
 
       const requestBody = {
-        projectId: testProject.id,
+        projectId: otherProject.id,
         name: "Minimal Character",
         displayName: "Minimal",
         renpyTag: "minimal",
@@ -586,6 +586,12 @@ describe("CharactersRoutes (Integration)", () => {
         isLoveInterest: false,
         notes: null,
       });
+
+      const [dbCharacter] = await db
+        .select({ projectId: characters.projectId })
+        .from(characters)
+        .where(eq(characters.id, json.character.id));
+      expect(dbCharacter?.projectId).toBe(testProject.id);
     });
   });
 
@@ -679,6 +685,28 @@ describe("CharactersRoutes (Integration)", () => {
         isLoveInterest: false,
         notes: "casual notes", // Unchanged
       });
+    });
+
+    it("clears notes when the request explicitly sends null", async () => {
+      const [character] = await db
+        .insert(characters)
+        .values(testCharacter1)
+        .returning();
+      const auth = await createAuthenticatedRequest(testUserId);
+
+      const response = await fastify.inject({
+        method: "PUT",
+        url: `/characters/${character.id}`,
+        payload: { notes: null },
+        cookies: { [SESSION_COOKIE_NAME]: auth.sessionId },
+      });
+
+      expect(response.statusCode).toBe(200);
+      const [stored] = await db
+        .select()
+        .from(characters)
+        .where(eq(characters.id, character.id));
+      expect(stored).toMatchObject({ name: testCharacter1.name, notes: null });
     });
 
     it("should allow partial updates", async () => {

@@ -6,7 +6,7 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { charactersApi } from "@/lib/api/characters";
+import { charactersApi, type UpdateCharacterBody } from "@/lib/api/characters";
 import { characterKeys, flowKeys } from "@/lib/query-keys";
 import { useToast } from "@/contexts/ToastContext";
 import type { Character, CharacterNameType } from "@branchforge/shared";
@@ -31,16 +31,6 @@ interface CreateCharacterInput {
   nameType?: CharacterNameType;
 }
 
-interface UpdateCharacterInput {
-  name?: string;
-  displayName?: string;
-  color?: string;
-  isLoveInterest?: boolean;
-  isNarrator?: boolean;
-  notes?: string;
-  nameType?: CharacterNameType;
-}
-
 export interface UseCharactersReturn {
   // State
   characters: Character[];
@@ -59,7 +49,7 @@ export interface UseCharactersReturn {
   createCharacter: (input: CreateCharacterInput) => Promise<Character>;
   updateCharacter: (
     characterId: string,
-    input: UpdateCharacterInput
+    input: UpdateCharacterBody
   ) => Promise<Character>;
   deleteCharacter: (characterId: string) => Promise<void>;
   uploadAvatar: (
@@ -127,7 +117,7 @@ export function useCharacters(
       input,
     }: {
       characterId: string;
-      input: UpdateCharacterInput;
+      input: UpdateCharacterBody;
     }) => {
       return charactersApi.updateCharacter(characterId, input);
     },
@@ -234,7 +224,7 @@ export function useCharacters(
   // Update character method
   const updateCharacter = async (
     characterId: string,
-    input: UpdateCharacterInput
+    input: UpdateCharacterBody
   ): Promise<Character> => {
     return updateCharacterMutation.mutateAsync({ characterId, input });
   };

@@ -5,6 +5,10 @@
  */
 
 import { z } from "zod";
+import {
+  WORLD_ELEMENT_TAG_MAX_LENGTH,
+  WORLD_ELEMENT_MAX_TAGS,
+} from "@branchforge/shared";
 import { uuidSchema, requiredString } from "./common.js";
 import { elementTypeSchema } from "./enums.js";
 
@@ -22,8 +26,11 @@ export const createWorldElementSchema = z
       .nullable()
       .optional(),
     tags: z
-      .array(z.string().trim().min(1).max(100))
-      .max(20, "Maximum 20 tags per element")
+      .array(z.string().trim().min(1).max(WORLD_ELEMENT_TAG_MAX_LENGTH))
+      .max(
+        WORLD_ELEMENT_MAX_TAGS,
+        `Maximum ${WORLD_ELEMENT_MAX_TAGS} tags per element`
+      )
       .default([]),
   })
   .strict();
@@ -44,8 +51,11 @@ export const updateWorldElementSchema = z
       .nullable()
       .optional(),
     tags: z
-      .array(z.string().trim().min(1).max(100))
-      .max(20, "Maximum 20 tags per element")
+      .array(z.string().trim().min(1).max(WORLD_ELEMENT_TAG_MAX_LENGTH))
+      .max(
+        WORLD_ELEMENT_MAX_TAGS,
+        `Maximum ${WORLD_ELEMENT_MAX_TAGS} tags per element`
+      )
       .optional(),
   })
   .strict()

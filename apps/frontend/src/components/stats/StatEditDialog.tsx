@@ -4,7 +4,7 @@
  * Modal for creating or editing a single stat.
  */
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import {
   Dialog,
@@ -85,7 +85,11 @@ interface StatFormContentProps {
   statId: string | undefined;
   stats: Stat[];
   isSaving: boolean;
-  onSave: (statId: string | undefined, form: StatFormState) => Promise<void>;
+  onSave: (
+    statId: string | undefined,
+    form: StatFormState,
+    initial: StatFormState
+  ) => Promise<void>;
 }
 
 function StatFormContent({
@@ -96,7 +100,7 @@ function StatFormContent({
   isSaving,
   onSave,
 }: StatFormContentProps) {
-  const [form, setForm] = useState<StatFormState>(() => {
+  const [initialSnapshot] = useState<StatFormState>(() => {
     if (!statId) return initialForm;
     const stat = stats.find((item: Stat) => item.id === statId);
     if (!stat) return initialForm;
@@ -108,20 +112,8 @@ function StatFormContent({
       description: stat.description ?? "",
     };
   });
+  const [form, setForm] = useState(initialSnapshot);
   const [errors, setErrors] = useState<StatFormErrors>({});
-
-  const initialSnapshot = useMemo(() => {
-    if (!statId) return initialForm;
-    const stat = stats.find((item: Stat) => item.id === statId);
-    if (!stat) return initialForm;
-    return {
-      key: stat.key,
-      name: stat.name,
-      minValue: stat.minValue,
-      maxValue: stat.maxValue,
-      description: stat.description ?? "",
-    };
-  }, [statId, stats]);
 
   const { isDirty } = useDirtyForm(initialSnapshot, form);
   const {
@@ -176,7 +168,7 @@ function StatFormContent({
       return;
     }
     try {
-      await onSave(statId, form);
+      await onSave(statId, form, initialSnapshot);
       onOpenChange(false);
     } catch {
       // Error handled by hook toast
@@ -351,13 +343,20 @@ export function StatEditDialog({
   const isSaving = isCreatingStat || isUpdatingStat;
   const isEditMode = !!statId;
 
-  const handleSave = async (id: string | undefined, form: StatFormState) => {
+  const handleSave = async (
+    id: string | undefined,
+    form: StatFormState,
+    initial: StatFormState
+  ) => {
     if (id) {
       await updateStat(id, {
         name: form.name.trim(),
         minValue: form.minValue,
         maxValue: form.maxValue,
-        description: form.description.trim() || undefined,
+        description:
+          form.description.trim() === initial.description.trim()
+            ? undefined
+            : form.description.trim() || null,
       });
     } else {
       await createStat({

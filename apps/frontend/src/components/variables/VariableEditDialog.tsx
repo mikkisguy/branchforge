@@ -4,7 +4,7 @@
  * Modal for creating or editing a single variable.
  */
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import {
   Dialog,
@@ -79,7 +79,8 @@ interface VariableFormContentProps {
   isSaving: boolean;
   onSave: (
     variableId: string | undefined,
-    form: VariableFormState
+    form: VariableFormState,
+    initial: VariableFormState
   ) => Promise<void>;
 }
 
@@ -91,7 +92,7 @@ function VariableFormContent({
   isSaving,
   onSave,
 }: VariableFormContentProps) {
-  const initialSnapshot: VariableFormState = useMemo(() => {
+  const [initialSnapshot] = useState<VariableFormState>(() => {
     if (!variableId) return initialForm;
     const variable = variables.find((v) => v.id === variableId);
     if (!variable) return initialForm;
@@ -100,7 +101,7 @@ function VariableFormContent({
       description: variable.description ?? "",
       category: variable.category ?? "",
     };
-  }, [variableId, variables]);
+  });
   const [form, setForm] = useState<VariableFormState>(initialSnapshot);
   const { isDirty } = useDirtyForm(initialSnapshot, form);
   const {
@@ -138,7 +139,7 @@ function VariableFormContent({
     }
 
     try {
-      await onSave(variableId, form);
+      await onSave(variableId, form, initialSnapshot);
       onOpenChange(false);
     } catch {
       // Error handled by hook toast
@@ -294,13 +295,23 @@ export function VariableEditDialog({
 
   const handleSave = async (
     id: string | undefined,
-    form: VariableFormState
+    form: VariableFormState,
+    initial: VariableFormState
   ) => {
     if (id) {
-      await updateVariable(id, {
-        description: form.description.trim() || undefined,
-        category: form.category.trim() || undefined,
-      });
+      const description = form.description.trim();
+      const category = form.category.trim();
+      const patch = {
+        description:
+          description === initial.description.trim()
+            ? undefined
+            : description || null,
+        category:
+          category === initial.category.trim() ? undefined : category || null,
+      };
+      if (patch.description !== undefined || patch.category !== undefined) {
+        await updateVariable(id, patch);
+      }
     } else {
       await createVariable({
         key: form.key.trim(),

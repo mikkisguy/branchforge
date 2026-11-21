@@ -49,7 +49,7 @@ export const updateStatSchema = z
     characterId: uuidSchema.nullable(),
     minValue: z.number().int(),
     maxValue: z.number().int(),
-    description: optionalString(500, "Description is too long"),
+    description: optionalString(500, "Description is too long").nullable(),
   })
   .strict()
   .partial()

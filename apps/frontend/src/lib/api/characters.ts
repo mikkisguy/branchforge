@@ -81,7 +81,7 @@ export interface UpdateCharacterBody {
   color?: string;
   isLoveInterest?: boolean;
   isNarrator?: boolean;
-  notes?: string;
+  notes?: string | null;
   nameType?: CharacterNameType;
 }
 

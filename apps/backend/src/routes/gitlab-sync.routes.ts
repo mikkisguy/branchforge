@@ -48,7 +48,7 @@ import {
  * Export to GitLab
  *
  * POST /api/gitlab/export
- * Body: { projectId: string, branch?: string, commitMessage: string }
+ * Body: { projectId: string, branch?: string, commitMessage?: string }
  *
  * Exports BranchForge scenes to GitLab as RPY files.
  */

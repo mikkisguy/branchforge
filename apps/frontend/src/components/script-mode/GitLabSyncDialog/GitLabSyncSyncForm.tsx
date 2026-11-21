@@ -5,6 +5,7 @@
  * branch input, commit message, conflict resolution options.
  */
 
+import { GITLAB_COMMIT_MESSAGE_MAX_LENGTH } from "@branchforge/shared";
 import { ArrowLeft, Plus } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -207,7 +208,8 @@ export function GitLabSyncSyncForm({
           <Input
             id="commit-message"
             type="text"
-            placeholder="Update scenes from BranchForge"
+            placeholder="Leave blank to generate a commit message"
+            maxLength={GITLAB_COMMIT_MESSAGE_MAX_LENGTH}
             value={commitMessage}
             onChange={(e) => onCommitMessageChange(e.target.value)}
             disabled={isProcessing}

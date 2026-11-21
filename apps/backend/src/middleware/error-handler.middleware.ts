@@ -305,6 +305,14 @@ export function globalErrorHandler(
     return;
   }
 
+  if (error.code === "FST_ERR_CTP_BODY_TOO_LARGE") {
+    reply.status(413).send({
+      error: "PayloadTooLarge",
+      message: "The request is too large.",
+    });
+    return;
+  }
+
   // Handle multipart plugin file size limit errors (from busboy)
   if (error.code === "LIMIT_FILE_SIZE") {
     logHttpError(route, error);

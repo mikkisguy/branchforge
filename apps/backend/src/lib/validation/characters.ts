@@ -6,6 +6,7 @@
  */
 
 import { z } from "zod";
+import { CHARACTER_TAG_MAX_LENGTH } from "@branchforge/shared";
 import { uuidSchema, requiredString, optionalString } from "./common.js";
 
 /**
@@ -15,7 +16,7 @@ import { uuidSchema, requiredString, optionalString } from "./common.js";
 export const renpyTagSchema = z
   .string()
   .min(1, "Character tag is required")
-  .max(50, "Character tag is too long")
+  .max(CHARACTER_TAG_MAX_LENGTH, "Character tag is too long")
   .regex(
     /^[a-zA-Z_][a-zA-Z0-9_]*$/,
     "Character tag must start with letter/underscore and contain only letters, numbers, and underscores"
@@ -40,7 +41,8 @@ export const colorHexSchema = z
  */
 export const createCharacterSchema = z
   .object({
-    projectId: uuidSchema,
+    // Accept the legacy body field. The route uses the URL parameter.
+    projectId: uuidSchema.optional(),
     name: requiredString(200, "Name is too long"),
     displayName: requiredString(200, "Display name is too long"),
     renpyTag: renpyTagSchema,
@@ -85,7 +87,7 @@ export const updateCharacterSchema = z
         "unknown",
       ])
       .optional(),
-    notes: optionalString(10000),
+    notes: optionalString(10000).nullable(),
   })
   .strict()
   .partial();

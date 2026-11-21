@@ -19,7 +19,11 @@ import type {
   SourceOrigin,
   ProjectFileDeleteImpact as SharedDeleteFileImpact,
 } from "@branchforge/shared";
-import { isValidSourceOrigin } from "@branchforge/shared";
+import {
+  FILE_SAVE_REQUEST_MAX_BYTES,
+  FILE_SAVE_REQUEST_MAX_MIB,
+  isValidSourceOrigin,
+} from "@branchforge/shared";
 
 // ============================================================================
 // Types
@@ -165,28 +169,6 @@ export const projectFilesApi = {
   },
 
   /**
-   * Get a specific file by path and source
-   */
-  async getFile(
-    projectId: string,
-    filePath: string,
-    source: SourceOrigin
-  ): Promise<ProjectFile> {
-    validateRequired(projectId, "Project ID");
-    validateRequired(filePath, "File path");
-
-    if (!isValidSourceOrigin(source)) {
-      throw new Error(VALIDATION_ERRORS.INVALID_SOURCE);
-    }
-
-    return request<ProjectFile>(
-      `/projects/${projectId}/files/file?path=${encodeURIComponent(
-        filePath
-      )}&source=${source}`
-    );
-  },
-
-  /**
    * Update file content
    */
   async updateFile(
@@ -196,15 +178,19 @@ export const projectFilesApi = {
   ): Promise<UpdateFileResponse> {
     validateRequired(fileId, "File ID");
 
+    const body = JSON.stringify({
+      content,
+      expectedContentHash: options?.expectedContentHash,
+    });
+    if (new Blob([body]).size > FILE_SAVE_REQUEST_MAX_BYTES) {
+      throw new Error(
+        `The file save request exceeds ${FILE_SAVE_REQUEST_MAX_MIB} MiB.`
+      );
+    }
+
     return request<UpdateFileResponse>(
       `/projects/files/${fileId}`,
-      {
-        method: "PUT",
-        body: JSON.stringify({
-          content,
-          expectedContentHash: options?.expectedContentHash,
-        }),
-      },
+      { method: "PUT", body },
       true // allow 409 Conflict responses (STALE_CONTENT_HASH) to be returned instead of thrown
     );
   },

@@ -15,7 +15,7 @@ export interface UpdateStatBody {
   characterId?: string | null;
   minValue?: number;
   maxValue?: number;
-  description?: string;
+  description?: string | null;
 }
 
 export interface ListStatsResponse {

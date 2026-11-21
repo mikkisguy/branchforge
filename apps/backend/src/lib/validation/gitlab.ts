@@ -6,7 +6,10 @@
  */
 
 import { z } from "zod";
-import { hasInvalidBranchComponent } from "@branchforge/shared";
+import {
+  GITLAB_COMMIT_MESSAGE_MAX_LENGTH,
+  hasInvalidBranchComponent,
+} from "@branchforge/shared";
 import {
   uuidSchema,
   nonEmptyStringSchema,
@@ -131,10 +134,10 @@ export const exportToGitlabSchema = z
   .object({
     projectId: uuidSchema,
     branch: gitBranchNameSchema.optional(),
-    commitMessage: z
-      .string()
-      .min(1, "Commit message is required")
-      .max(500, "Commit message is too long"),
+    commitMessage: optionalString(
+      GITLAB_COMMIT_MESSAGE_MAX_LENGTH,
+      "Commit message is too long"
+    ).transform((message) => message || undefined),
   })
   .strict();
 

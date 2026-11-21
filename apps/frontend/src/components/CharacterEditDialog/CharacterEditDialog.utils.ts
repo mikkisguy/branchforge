@@ -2,7 +2,7 @@
  * Character Edit Dialog — shared types, reducer, and validation.
  */
 
-import type { Character } from "@branchforge/shared";
+import { CHARACTER_TAG_MAX_LENGTH, type Character } from "@branchforge/shared";
 
 export interface CharacterFormState {
   name: string;
@@ -107,7 +107,10 @@ export function formReducer(
   }
 }
 
-export function validateForm(state: CharacterFormState): {
+export function validateForm(
+  state: CharacterFormState,
+  isEditing = false
+): {
   valid: boolean;
   errors: Record<string, string>;
 } {
@@ -119,11 +122,16 @@ export function validateForm(state: CharacterFormState): {
   if (!state.displayName.trim()) {
     errors.displayName = "Display name is required";
   }
-  if (!state.renpyTag.trim()) {
-    errors.renpyTag = "Tag is required";
-  } else if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(state.renpyTag)) {
-    errors.renpyTag =
-      "Tag must start with letter/underscore and contain only letters, numbers, and underscores";
+  if (!isEditing) {
+    const tag = state.renpyTag.trim();
+    if (!tag) {
+      errors.renpyTag = "Tag is required";
+    } else if (tag.length > CHARACTER_TAG_MAX_LENGTH) {
+      errors.renpyTag = `Tag must be at most ${CHARACTER_TAG_MAX_LENGTH} characters`;
+    } else if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(tag)) {
+      errors.renpyTag =
+        "Tag must start with letter/underscore and contain only letters, numbers, and underscores";
+    }
   }
   if (!/^#[0-9A-Fa-f]{6}$/.test(state.color)) {
     errors.color = "Color must be valid hex (#RRGGBB)";

@@ -489,34 +489,49 @@ describe("GitLab Routes (Integration)", () => {
   });
 
   describe("POST /api/gitlab/export", () => {
-    it("should export scenes to GitLab", async () => {
-      vi.spyOn(gitlabSyncService, "exportToGitlab").mockResolvedValue({
-        id: testOperationId,
-        projectId: testProjectId,
-        operation: "EXPORT",
-        status: "PENDING",
-        branch: testBranch,
-        conflictCount: 0,
-        startedAt: new Date(),
-      } as any);
-
-      const response = await fastify.inject({
-        method: "POST",
-        url: "/api/gitlab/export",
-        payload: {
+    it.each([
+      ["omitted", undefined, undefined],
+      ["blank", "   ", undefined],
+      ["custom", " Export from BranchForge ", "Export from BranchForge"],
+    ])(
+      "should export with a %s commit message",
+      async (_label, supplied, expected) => {
+        vi.spyOn(gitlabSyncService, "exportToGitlab").mockResolvedValue({
+          id: testOperationId,
           projectId: testProjectId,
+          operation: "EXPORT",
+          status: "PENDING",
           branch: testBranch,
-          commitMessage: "Export from BranchForge",
-        },
-      });
+          conflictCount: 0,
+          errorMessage: null,
+          startedAt: new Date(),
+          completedAt: null,
+        });
 
-      expect(response.statusCode).toBe(202);
-      expect(response.json()).toMatchObject({
-        id: testOperationId,
-        operation: "EXPORT",
-        status: "PENDING",
-      });
-    });
+        const response = await fastify.inject({
+          method: "POST",
+          url: "/api/gitlab/export",
+          payload: {
+            projectId: testProjectId,
+            branch: testBranch,
+            commitMessage: supplied,
+          },
+        });
+
+        expect(response.statusCode).toBe(202);
+        expect(gitlabSyncService.exportToGitlab).toHaveBeenCalledWith(
+          testProjectId,
+          expect.any(String),
+          testBranch,
+          expected
+        );
+        expect(response.json()).toMatchObject({
+          id: testOperationId,
+          operation: "EXPORT",
+          status: "PENDING",
+        });
+      }
+    );
 
     it("should return 400 if projectId is missing", async () => {
       const response = await fastify.inject({

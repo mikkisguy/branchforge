@@ -6,7 +6,7 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { variablesApi } from "@/lib/api/variables";
+import { variablesApi, type UpdateVariableBody } from "@/lib/api/variables";
 import { variableKeys } from "@/lib/query-keys";
 import { useToast } from "@/contexts/ToastContext";
 import type { Variable } from "@branchforge/shared";
@@ -17,11 +17,6 @@ import type { Variable } from "@branchforge/shared";
 
 interface CreateVariableInput {
   key: string;
-  description?: string;
-  category?: string;
-}
-
-interface UpdateVariableInput {
   description?: string;
   category?: string;
 }
@@ -42,7 +37,7 @@ export interface UseVariablesReturn {
   createVariable: (input: CreateVariableInput) => Promise<Variable>;
   updateVariable: (
     variableId: string,
-    input: UpdateVariableInput
+    input: UpdateVariableBody
   ) => Promise<Variable>;
   deleteVariable: (variableId: string) => Promise<void>;
 }
@@ -94,7 +89,7 @@ export function useVariables(projectId: string): UseVariablesReturn {
       input,
     }: {
       variableId: string;
-      input: UpdateVariableInput;
+      input: UpdateVariableBody;
     }) => {
       return variablesApi.updateVariable(variableId, input);
     },
@@ -137,7 +132,7 @@ export function useVariables(projectId: string): UseVariablesReturn {
   // Update variable method
   const updateVariable = async (
     variableId: string,
-    input: UpdateVariableInput
+    input: UpdateVariableBody
   ): Promise<Variable> => {
     return updateVariableMutation.mutateAsync({ variableId, input });
   };
