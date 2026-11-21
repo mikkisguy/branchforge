@@ -12,6 +12,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import { LABEL_IDENTIFIER_MAX_LENGTH } from "@branchforge/shared";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useDirtyForm } from "@/hooks/useDirtyForm";
 import { useDirtyDialogWarning } from "@/hooks/useDirtyDialogWarning";
@@ -164,6 +165,7 @@ export function LabelEditDialog({
     dispatch({ type: "SET_TITLE_ERROR", value: "" });
 
     const trimmedLabelName = form.labelName.trim();
+    const labelNameChanged = trimmedLabelName !== (currentLabelName ?? "");
 
     if (!trimmedLabelName && currentLabelName !== null) {
       dispatch({
@@ -174,6 +176,7 @@ export function LabelEditDialog({
     }
 
     if (
+      labelNameChanged &&
       trimmedLabelName &&
       !/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(trimmedLabelName)
     ) {
@@ -181,6 +184,17 @@ export function LabelEditDialog({
         type: "SET_LABEL_NAME_ERROR",
         value:
           "Label name must start with a letter or underscore and contain only letters, numbers, and underscores",
+      });
+      return;
+    }
+
+    if (
+      labelNameChanged &&
+      trimmedLabelName.length > LABEL_IDENTIFIER_MAX_LENGTH
+    ) {
+      dispatch({
+        type: "SET_LABEL_NAME_ERROR",
+        value: `Label name must be at most ${LABEL_IDENTIFIER_MAX_LENGTH} characters`,
       });
       return;
     }
@@ -200,7 +214,7 @@ export function LabelEditDialog({
       changes.title = form.title.trim();
     }
 
-    if (trimmedLabelName && trimmedLabelName !== (currentLabelName ?? "")) {
+    if (trimmedLabelName && labelNameChanged) {
       changes.labelName = trimmedLabelName;
     }
 

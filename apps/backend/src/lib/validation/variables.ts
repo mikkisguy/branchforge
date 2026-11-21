@@ -38,8 +38,8 @@ export type CreateVariableInput = z.infer<typeof createVariableSchema>;
  */
 export const updateVariableSchema = z
   .object({
-    description: optionalString(500, "Description is too long"),
-    category: optionalString(50, "Category is too long"),
+    description: optionalString(500, "Description is too long").nullable(),
+    category: optionalString(50, "Category is too long").nullable(),
   })
   .strict();
 

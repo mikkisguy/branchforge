@@ -687,6 +687,28 @@ describe("CharactersRoutes (Integration)", () => {
       });
     });
 
+    it("clears notes when the request explicitly sends null", async () => {
+      const [character] = await db
+        .insert(characters)
+        .values(testCharacter1)
+        .returning();
+      const auth = await createAuthenticatedRequest(testUserId);
+
+      const response = await fastify.inject({
+        method: "PUT",
+        url: `/characters/${character.id}`,
+        payload: { notes: null },
+        cookies: { [SESSION_COOKIE_NAME]: auth.sessionId },
+      });
+
+      expect(response.statusCode).toBe(200);
+      const [stored] = await db
+        .select()
+        .from(characters)
+        .where(eq(characters.id, character.id));
+      expect(stored).toMatchObject({ name: testCharacter1.name, notes: null });
+    });
+
     it("should allow partial updates", async () => {
       const [char] = await db
         .insert(characters)

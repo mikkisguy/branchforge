@@ -227,7 +227,7 @@ export function CharacterEditDialog({
 
   const handleSave = async () => {
     // Validate
-    const { valid, errors } = validateForm(form);
+    const { valid, errors } = validateForm(form, !!characterId);
     if (!valid) {
       if (errors.name) dispatch({ type: "SET_NAME_ERROR", value: errors.name });
       if (errors.displayName)
@@ -261,7 +261,10 @@ export function CharacterEditDialog({
           color: payload.color,
           isLoveInterest: payload.isLoveInterest,
           isNarrator: payload.isNarrator,
-          notes: payload.notes,
+          notes:
+            form.notes.trim() === initialSnapshot.notes.trim()
+              ? undefined
+              : (payload.notes ?? null),
         });
       } else {
         const created = await createCharacter(payload);

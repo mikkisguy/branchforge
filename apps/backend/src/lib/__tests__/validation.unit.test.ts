@@ -23,6 +23,8 @@ import {
   createLabelSchema,
   createCharacterSchema,
   updateCharacterSchema,
+  updateStatSchema,
+  updateVariableSchema,
   characterIdParamsSchema,
   renpyTagSchema,
   colorHexSchema,
@@ -1071,6 +1073,23 @@ describe("Update Label Dialogue Schema", () => {
       };
       const result = updateLabelDialogueBodySchema.safeParse(data);
       expect(result.success).toBe(false);
+    });
+  });
+});
+
+describe("Nullable text updates", () => {
+  it("allows clearing a stat description while preserving omitted fields", () => {
+    expect(updateStatSchema.parse({ description: null })).toEqual({
+      description: null,
+    });
+  });
+
+  it("allows clearing either variable field independently", () => {
+    expect(updateVariableSchema.parse({ description: null })).toEqual({
+      description: null,
+    });
+    expect(updateVariableSchema.parse({ category: null })).toEqual({
+      category: null,
     });
   });
 });

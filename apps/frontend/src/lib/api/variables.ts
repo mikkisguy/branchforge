@@ -19,8 +19,8 @@ export interface CreateVariableBody {
 }
 
 export interface UpdateVariableBody {
-  description?: string;
-  category?: string;
+  description?: string | null;
+  category?: string | null;
 }
 
 export interface ListVariablesResponse {

@@ -23,7 +23,12 @@ import { useWorldElements } from "@/hooks/useWorldElements";
 import { useDirtyForm } from "@/hooks/useDirtyForm";
 import { useDirtyDialogWarning } from "@/hooks/useDirtyDialogWarning";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import type { WorldElement, WorldElementType } from "@branchforge/shared";
+import {
+  WORLD_ELEMENT_MAX_TAGS,
+  WORLD_ELEMENT_TAG_MAX_LENGTH,
+  type WorldElement,
+  type WorldElementType,
+} from "@branchforge/shared";
 
 interface WorldElementEditDialogProps {
   open: boolean;
@@ -43,6 +48,7 @@ interface ElementFormErrors {
   name?: string;
   type?: string;
   description?: string;
+  tags?: string;
 }
 
 const TYPE_OPTIONS: SelectOption<WorldElementType>[] = [
@@ -87,7 +93,8 @@ interface ElementFormContentProps {
   isSaving: boolean;
   onSave: (
     elementId: string | undefined,
-    form: ElementFormState
+    form: ElementFormState,
+    tagsChanged: boolean
   ) => Promise<void>;
 }
 function ElementFormContent({
@@ -149,7 +156,18 @@ function ElementFormContent({
 
   const handleAddTag = () => {
     const trimmed = newTag.trim();
-    if (trimmed && !form.tags.includes(trimmed) && form.tags.length < 20) {
+    if (trimmed.length > WORLD_ELEMENT_TAG_MAX_LENGTH) {
+      setErrors((current) => ({
+        ...current,
+        tags: `Tag must be at most ${WORLD_ELEMENT_TAG_MAX_LENGTH} characters`,
+      }));
+      return;
+    }
+    if (
+      trimmed &&
+      !form.tags.includes(trimmed) &&
+      form.tags.length < WORLD_ELEMENT_MAX_TAGS
+    ) {
       handleChange("tags", [...form.tags, trimmed]);
       setNewTag("");
     }
@@ -170,7 +188,9 @@ function ElementFormContent({
     }
 
     try {
-      await onSave(elementId, form);
+      const tagsChanged =
+        JSON.stringify(form.tags) !== JSON.stringify(initialSnapshot.tags);
+      await onSave(elementId, form, tagsChanged);
       onOpenChange(false);
     } catch {
       // Error handled by hook toast
@@ -266,13 +286,24 @@ function ElementFormContent({
             </div>
 
             <div className="space-y-1">
-              <Label className="text-xs">Tags</Label>
+              <Label htmlFor="world-element-tag" className="text-xs">
+                Tags
+              </Label>
               <div className="flex gap-2">
                 <Input
                   type="text"
+                  id="world-element-tag"
                   placeholder="Add a tag..."
                   value={newTag}
-                  onChange={(event) => setNewTag(event.target.value)}
+                  aria-invalid={!!errors.tags}
+                  aria-describedby={
+                    errors.tags ? "world-element-tag-error" : undefined
+                  }
+                  onChange={(event) => {
+                    setNewTag(event.target.value);
+                    if (errors.tags)
+                      setErrors((current) => ({ ...current, tags: undefined }));
+                  }}
                   onKeyDown={(event) => {
                     if (event.key === "Enter") {
                       event.preventDefault();
@@ -288,12 +319,18 @@ function ElementFormContent({
                   size="sm"
                   onClick={handleAddTag}
                   disabled={
-                    isSaving || !newTag.trim() || form.tags.length >= 20
+                    isSaving ||
+                    !newTag.trim() ||
+                    form.tags.length >= WORLD_ELEMENT_MAX_TAGS
                   }
                 >
                   <Plus className="size-4" />
                 </Button>
               </div>
+              <FormErrorMessage
+                id="world-element-tag-error"
+                message={errors.tags}
+              />
               {form.tags.length > 0 && (
                 <div className="flex flex-wrap gap-1 mt-2">
                   {form.tags.map((tag) => (
@@ -316,7 +353,8 @@ function ElementFormContent({
                 </div>
               )}
               <p className="text-xs text-muted-foreground">
-                {form.tags.length}/20 tags. Press Enter to add.
+                {form.tags.length}/{WORLD_ELEMENT_MAX_TAGS} tags. Press Enter to
+                add.
               </p>
             </div>
 
@@ -372,13 +410,17 @@ export function WorldElementEditDialog({
   const isSaving = isCreatingElement || isUpdatingElement;
   const isEditMode = !!elementId;
 
-  const handleSave = async (id: string | undefined, form: ElementFormState) => {
+  const handleSave = async (
+    id: string | undefined,
+    form: ElementFormState,
+    tagsChanged: boolean
+  ) => {
     if (id) {
       await updateElement(id, {
         name: form.name.trim(),
         type: form.type as WorldElementType,
         description: form.description.trim() || null,
-        tags: form.tags,
+        tags: tagsChanged ? form.tags : undefined,
       });
     } else {
       await createElement({
