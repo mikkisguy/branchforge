@@ -44,7 +44,7 @@ async function validateTokenHandler(
       { ip: clientIp, retryAfter: rateLimit.retryAfter },
       "validateTokenHandler: Rate limit exceeded"
     );
-    reply.status(429).send({
+    await reply.status(429).send({
       error: "Too many validation attempts. Please try again later.",
       retryAfter: rateLimit.retryAfter,
     });
@@ -57,17 +57,17 @@ async function validateTokenHandler(
     const username = await validateGitlabPAT(token, gitlabUrl);
 
     if (!username) {
-      reply.status(400).send({ error: "Invalid GitLab token" });
+      await reply.status(400).send({ error: "Invalid GitLab token" });
       return;
     }
 
-    reply.send({ valid: true, username });
+    await reply.send({ valid: true, username });
   } catch (err) {
     request.log.error(
       { err },
       "validateTokenHandler: Failed to validate GitLab token"
     );
-    reply.status(500).send({
+    await reply.status(500).send({
       error: "Failed to validate token",
       message: "An internal error occurred",
     });
@@ -95,7 +95,7 @@ async function storeIntegrationHandler(
       { ip: clientIp, retryAfter: rateLimit.retryAfter },
       "storeIntegrationHandler: Rate limit exceeded"
     );
-    reply.status(429).send({
+    await reply.status(429).send({
       error: "Too many requests. Please try again later.",
       retryAfter: rateLimit.retryAfter,
     });
@@ -107,17 +107,17 @@ async function storeIntegrationHandler(
 
   try {
     await storeGitlabIntegration(userId, token, gitlabUrl);
-    reply.status(201).send();
+    await reply.status(201).send();
   } catch (err) {
     if (err instanceof ValidationError) {
-      reply.status(400).send({ error: "Invalid GitLab token" });
+      await reply.status(400).send({ error: "Invalid GitLab token" });
       return;
     }
     request.log.error(
       { err },
       "storeIntegrationHandler: Failed to store GitLab integration"
     );
-    reply.status(500).send({
+    await reply.status(500).send({
       error: "Failed to store integration",
       message: "An internal error occurred",
     });
@@ -142,12 +142,12 @@ async function getIntegrationHandler(
     const integration = await getGitlabIntegration(userId);
 
     if (!integration) {
-      reply.status(204).send();
+      await reply.status(204).send();
       return;
     }
 
     // Return only non-sensitive fields
-    reply.send({
+    await reply.send({
       id: integration.id,
       username: integration.username,
       gitlabUrl: integration.gitlabUrl,
@@ -159,7 +159,7 @@ async function getIntegrationHandler(
       { err },
       "getIntegrationHandler: Failed to get GitLab integration"
     );
-    reply.status(500).send({
+    await reply.status(500).send({
       error: "Failed to get integration",
       message: "An internal error occurred",
     });
@@ -181,13 +181,13 @@ async function deleteIntegrationHandler(
 
   try {
     await deleteGitlabIntegration(userId);
-    reply.status(204).send();
+    await reply.status(204).send();
   } catch (err) {
     request.log.error(
       { err },
       "deleteIntegrationHandler: Failed to delete GitLab integration"
     );
-    reply.status(500).send({
+    await reply.status(500).send({
       error: "Failed to delete integration",
       message: "An internal error occurred",
     });
@@ -209,14 +209,14 @@ async function listProjectsHandler(
   try {
     const userId = getAuthenticatedUserId(request);
     const projects = await listGitlabRepositories(userId);
-    reply.send(projects);
+    await reply.send(projects);
   } catch (err) {
     // Return empty array if integration not set up (normal state, not an error)
     if (
       err instanceof Error &&
       err.message === "GitLab integration not found"
     ) {
-      reply.send([]);
+      await reply.send([]);
       return;
     }
 
@@ -225,7 +225,7 @@ async function listProjectsHandler(
       "listProjectsHandler: Failed to list GitLab repositories"
     );
 
-    reply.status(500).send({
+    await reply.status(500).send({
       error: "Failed to list GitLab repositories",
       message: "An internal error occurred",
     });

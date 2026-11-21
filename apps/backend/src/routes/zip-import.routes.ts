@@ -171,13 +171,13 @@ async function importZipHandler(
     const result: ImportZipResult = await importZipFile(projectId, buffer);
 
     if (!result.success) {
-      reply.status(400).send({
+      await reply.status(400).send({
         error: result.error || "Failed to import zip file",
       } as ErrorResponse);
       return;
     }
 
-    reply.status(200).send(result as ImportZipResponse);
+    await reply.status(200).send(result as ImportZipResponse);
   } catch (error) {
     // Re-throw HttpError instances (e.g., ValidationError) so the global error handler can use their status code
     if (error instanceof HttpError) {
@@ -190,7 +190,9 @@ async function importZipHandler(
       );
     }
     request.log.error({ err: error }, "importZipHandler: Failed to import zip");
-    reply.status(500).send({ error: "Internal server error" } as ErrorResponse);
+    await reply
+      .status(500)
+      .send({ error: "Internal server error" } as ErrorResponse);
   }
 }
 
@@ -297,7 +299,7 @@ async function importProjectHandler(
         success: false,
         error: result.error || "Failed to import zip file",
       };
-      reply.status(400).send(failureResponse);
+      await reply.status(400).send(failureResponse);
       return;
     }
 
@@ -312,7 +314,7 @@ async function importProjectHandler(
       filesSkipped: result.filesSkipped,
       labelsCreated: result.labelsCreated,
     };
-    reply.status(201).send(successResponse);
+    await reply.status(201).send(successResponse);
   } catch (error) {
     // Re-throw HttpError instances (e.g., ValidationError) so the global error handler can use their status code
     if (error instanceof HttpError) {
@@ -322,7 +324,7 @@ async function importProjectHandler(
       { err: error },
       "importProjectHandler: Failed to import project from ZIP"
     );
-    reply.status(500).send({
+    await reply.status(500).send({
       error:
         "Failed to import project from ZIP file. Please check the file format and try again.",
     } as ErrorResponse);

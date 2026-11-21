@@ -53,7 +53,7 @@ async function getVisualSystemHandler(
     projectId,
     request.user!.id
   );
-  reply.status(200).send(config);
+  await reply.status(200).send(config);
 }
 
 /**
@@ -75,7 +75,7 @@ async function updateVisualSystemHandler(
     request.user!.id,
     request.body
   );
-  reply.status(200).send(config);
+  await reply.status(200).send(config);
 }
 
 // ============================================================================

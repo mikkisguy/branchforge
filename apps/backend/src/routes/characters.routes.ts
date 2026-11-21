@@ -86,7 +86,7 @@ async function detectCharactersHandler(
     projectId,
     request.user!.id
   );
-  reply.status(200).send(result);
+  await reply.status(200).send(result);
 }
 
 /**
@@ -108,7 +108,7 @@ async function importCharactersHandler(
     request.user!.id,
     request.body
   );
-  reply.status(201).send(result);
+  await reply.status(201).send(result);
 }
 
 /**
@@ -125,7 +125,7 @@ async function listCharactersHandler(
     projectId,
     request.user!.id
   );
-  reply.status(200).send({ characters });
+  await reply.status(200).send({ characters });
 }
 
 /**
@@ -142,7 +142,7 @@ async function getCharacterHandler(
     characterId,
     request.user!.id
   );
-  reply.status(200).send({ character });
+  await reply.status(200).send({ character });
 }
 
 /**
@@ -164,7 +164,7 @@ async function createCharacterHandler(
     request.user!.id,
     request.body
   );
-  reply.status(201).send({ character });
+  await reply.status(201).send({ character });
 }
 
 /**
@@ -186,7 +186,7 @@ async function updateCharacterHandler(
     request.user!.id,
     request.body
   );
-  reply.status(200).send({ character });
+  await reply.status(200).send({ character });
 }
 
 /**
@@ -200,7 +200,7 @@ async function deleteCharacterHandler(
 ): Promise<void> {
   const { characterId } = request.params;
   await charactersService.deleteCharacter(characterId, request.user!.id);
-  reply.status(204).send();
+  await reply.status(204).send();
 }
 
 /**
@@ -217,7 +217,7 @@ async function getProjectSettingsHandler(
     projectId,
     request.user!.id
   );
-  reply.status(200).send(settings);
+  await reply.status(200).send(settings);
 }
 
 /**
@@ -239,7 +239,7 @@ async function updateProjectSettingsHandler(
     request.user!.id,
     request.body
   );
-  reply.status(200).send(settings);
+  await reply.status(200).send(settings);
 }
 
 /**
@@ -304,7 +304,7 @@ async function uploadCharacterAvatarHandler(
     data.mimetype
   );
 
-  reply.status(200).send(result);
+  await reply.status(200).send(result);
 }
 
 /**
@@ -318,7 +318,7 @@ async function deleteCharacterAvatarHandler(
 ): Promise<void> {
   const { characterId } = request.params;
   await charactersService.deleteAvatar(characterId, request.user!.id);
-  reply.status(204).send();
+  await reply.status(204).send();
 }
 
 // ============================================================================

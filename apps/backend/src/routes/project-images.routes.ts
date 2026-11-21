@@ -213,7 +213,7 @@ async function listProjectImagesHandler(
   const { projectId } = request.params;
   const images = await listProjectImages(projectId, request.user!.id);
   const response: ListProjectImagesResponse = { images };
-  reply.status(200).send(response);
+  await reply.status(200).send(response);
 }
 
 async function uploadProjectImageHandler(
@@ -240,7 +240,7 @@ async function uploadProjectImageHandler(
   });
 
   const response: UploadProjectImageResponse = { image };
-  reply.status(201).send(response);
+  await reply.status(201).send(response);
 }
 
 async function replaceProjectImageHandler(
@@ -270,7 +270,7 @@ async function replaceProjectImageHandler(
   });
 
   const response: UploadProjectImageResponse = { image };
-  reply.status(200).send(response);
+  await reply.status(200).send(response);
 }
 
 async function deleteProjectImageHandler(
@@ -279,7 +279,7 @@ async function deleteProjectImageHandler(
 ): Promise<void> {
   const { imageId } = request.params;
   await deleteProjectImage(imageId, request.user!.id);
-  reply.status(204).send();
+  await reply.status(204).send();
 }
 
 export async function projectImagesRoutes(

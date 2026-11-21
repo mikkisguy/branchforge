@@ -74,7 +74,7 @@ async function listWorldElementsHandler(
 
   const elements = await listWorldElements(projectId, user.id);
 
-  reply.status(200).send({ elements } as ListWorldElementsResponse);
+  await reply.status(200).send({ elements } as ListWorldElementsResponse);
 }
 
 /**
@@ -95,7 +95,7 @@ async function getWorldElementHandler(
     throw new NotFoundError("World element not found");
   }
 
-  reply.status(200).send({ element } as GetWorldElementResponse);
+  await reply.status(200).send({ element } as GetWorldElementResponse);
 }
 
 /**
@@ -118,7 +118,7 @@ async function createWorldElementHandler(
 
   const element = await createWorldElement(projectId, user.id, body);
 
-  reply.status(201).send({ element } as CreateWorldElementResponse);
+  await reply.status(201).send({ element } as CreateWorldElementResponse);
 }
 
 /**
@@ -141,7 +141,7 @@ async function updateWorldElementHandler(
 
   const element = await updateWorldElement(elementId, user.id, body);
 
-  reply.status(200).send({ element } as UpdateWorldElementResponse);
+  await reply.status(200).send({ element } as UpdateWorldElementResponse);
 }
 
 /**
@@ -160,7 +160,7 @@ async function deleteWorldElementHandler(
 
   await deleteWorldElement(elementId, user.id);
 
-  reply.status(204).send();
+  await reply.status(204).send();
 }
 
 // ============================================================================

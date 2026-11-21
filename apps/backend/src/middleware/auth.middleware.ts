@@ -69,7 +69,7 @@ export async function authenticate(
         error: "Internal Server Error",
         message: "Unable to verify authentication",
       };
-      reply.status(500).send(error);
+      await reply.status(500).send(error);
       return;
     }
 
@@ -79,7 +79,7 @@ export async function authenticate(
         error: "Unauthorized",
         message: "Authentication required",
       };
-      reply.status(401).send(error);
+      await reply.status(401).send(error);
       return;
     }
 
@@ -94,7 +94,7 @@ export async function authenticate(
         error: "Unauthorized",
         message: "Invalid session",
       };
-      reply.status(401).send(error);
+      await reply.status(401).send(error);
       return;
     }
 
@@ -113,7 +113,7 @@ export async function authenticate(
       error: "Internal Server Error",
       message: "Unable to verify authentication",
     };
-    reply.status(500).send(internalError);
+    await reply.status(500).send(internalError);
   }
 }
 
@@ -190,7 +190,7 @@ export function requireRole(...allowedRoles: UserRole[]) {
           error: "Internal Server Error",
           message: "Unable to verify authentication",
         };
-        reply.status(500).send(error);
+        await reply.status(500).send(error);
         return;
       }
 
@@ -200,7 +200,7 @@ export function requireRole(...allowedRoles: UserRole[]) {
           error: "Unauthorized",
           message: "Authentication required",
         };
-        reply.status(401).send(error);
+        await reply.status(401).send(error);
         return;
       }
 
@@ -214,7 +214,7 @@ export function requireRole(...allowedRoles: UserRole[]) {
           error: "Unauthorized",
           message: "Invalid session",
         };
-        reply.status(401).send(error);
+        await reply.status(401).send(error);
         return;
       }
 
@@ -224,7 +224,7 @@ export function requireRole(...allowedRoles: UserRole[]) {
           error: "Forbidden",
           message: "Insufficient permissions",
         };
-        reply.status(403).send(error);
+        await reply.status(403).send(error);
         return;
       }
 
@@ -243,7 +243,7 @@ export function requireRole(...allowedRoles: UserRole[]) {
         error: "Internal Server Error",
         message: "Unable to verify authentication",
       };
-      reply.status(500).send(internalError);
+      await reply.status(500).send(internalError);
     }
   };
 }

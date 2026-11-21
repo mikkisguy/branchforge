@@ -51,7 +51,7 @@ async function flowGraphHandler(
   const { projectId } = request.query;
 
   const flowGraph = await getFlowGraph(projectId, user.id);
-  reply.status(200).send(flowGraph satisfies FlowGraph);
+  await reply.status(200).send(flowGraph satisfies FlowGraph);
 }
 
 /**
@@ -68,7 +68,7 @@ async function getLayoutHandler(
   const { projectId, mode } = request.query;
 
   const positions = await getFlowGraphLayout(projectId, user.id, mode);
-  reply
+  await reply
     .status(200)
     .send({ positions } satisfies { positions: FlowGraphPositions });
 }
@@ -96,7 +96,7 @@ async function saveLayoutHandler(
   const { projectId, mode, positions } = request.body;
 
   await saveFlowGraphLayout(projectId, user.id, positions, mode);
-  reply.status(204).send();
+  await reply.status(204).send();
 }
 
 /**
@@ -114,7 +114,7 @@ async function deleteLayoutHandler(
   const { projectId, mode } = request.query;
 
   await deleteFlowGraphLayout(projectId, user.id, mode);
-  reply.status(204).send();
+  await reply.status(204).send();
 }
 
 // ============================================================================

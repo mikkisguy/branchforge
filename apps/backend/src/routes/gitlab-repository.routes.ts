@@ -55,7 +55,7 @@ async function linkRepositoryHandler(
     // Fetch GitLab project details to get the repository name
     const gitlabProject = await getGitlabProject(userId, gitlabProjectId);
     if (!gitlabProject) {
-      reply.status(404).send({ error: "GitLab project not found" });
+      await reply.status(404).send({ error: "GitLab project not found" });
       return;
     }
 
@@ -69,18 +69,23 @@ async function linkRepositoryHandler(
       userId,
       branch
     );
-    reply.status(201).send();
+    await reply.status(201).send();
   } catch (err) {
     if (err instanceof ConflictError) {
-      reply.status(409).send({ error: "Conflict", message: err.userMessage });
+      await reply
+        .status(409)
+        .send({ error: "Conflict", message: err.userMessage });
       return;
     }
-    if (handleKnownRouteErrors(err, reply)) return;
+    if (handleKnownRouteErrors(err, reply)) {
+      await reply;
+      return;
+    }
     request.log.error(
       { err },
       "linkRepositoryHandler: Failed to link repository"
     );
-    reply.status(500).send({
+    await reply.status(500).send({
       error: "Failed to link repository",
       message: "An internal error occurred",
     });
@@ -103,14 +108,17 @@ async function unlinkRepositoryHandler(
 
   try {
     await unlinkRepository(projectId, userId);
-    reply.status(204).send();
+    await reply.status(204).send();
   } catch (err) {
-    if (handleKnownRouteErrors(err, reply)) return;
+    if (handleKnownRouteErrors(err, reply)) {
+      await reply;
+      return;
+    }
     request.log.error(
       { err, projectId },
       "unlinkRepositoryHandler: Failed to unlink repository"
     );
-    reply.status(500).send({
+    await reply.status(500).send({
       error: "Failed to unlink repository",
       message: "An internal error occurred",
     });
@@ -133,21 +141,21 @@ async function listRepositoriesHandler(
 
   try {
     const repositories = await listRepositoryLinks(userId);
-    reply.send(repositories);
+    await reply.send(repositories);
   } catch (err) {
     // Return empty array if integration not set up (normal state, not an error)
     if (
       err instanceof Error &&
       err.message === "GitLab integration not found"
     ) {
-      reply.send([]);
+      await reply.send([]);
       return;
     }
     request.log.error(
       { err },
       "listRepositoriesHandler: Failed to list linked repositories"
     );
-    reply.status(500).send({
+    await reply.status(500).send({
       error: "Failed to list linked repositories",
       message: "An internal error occurred",
     });
@@ -171,15 +179,18 @@ async function listBranchesHandler(
 
   try {
     const branches = await listBranches(projectId, userId);
-    reply.send(branches);
+    await reply.send(branches);
   } catch (err) {
     // Return empty array if repository not linked (normal state, not an error)
     if (err instanceof RepositoryNotLinkedError) {
-      reply.send([]);
+      await reply.send([]);
       return;
     }
 
-    if (handleKnownRouteErrors(err, reply)) return;
+    if (handleKnownRouteErrors(err, reply)) {
+      await reply;
+      return;
+    }
 
     request.log.error(
       { err, projectId },
@@ -187,14 +198,14 @@ async function listBranchesHandler(
     );
 
     if (err instanceof Error && err.message.startsWith("GitLab API error:")) {
-      reply.status(502).send({
+      await reply.status(502).send({
         error: "Failed to fetch branches from GitLab",
         message: "Unable to communicate with GitLab. Please try again later.",
       });
       return;
     }
 
-    reply.status(500).send({
+    await reply.status(500).send({
       error: "Failed to list branches",
       message: "An internal error occurred",
     });
@@ -222,15 +233,18 @@ async function listFilesHandler(
 
   try {
     const files = await listRpyFiles(projectId, branch, userId);
-    reply.send(files);
+    await reply.send(files);
   } catch (err) {
     // Return empty array if repository not linked (normal state, not an error)
     if (err instanceof RepositoryNotLinkedError) {
-      reply.send([]);
+      await reply.send([]);
       return;
     }
 
-    if (handleKnownRouteErrors(err, reply)) return;
+    if (handleKnownRouteErrors(err, reply)) {
+      await reply;
+      return;
+    }
 
     request.log.error(
       { err, projectId, branch },
@@ -238,14 +252,14 @@ async function listFilesHandler(
     );
 
     if (err instanceof Error && err.message.startsWith("GitLab API error:")) {
-      reply.status(502).send({
+      await reply.status(502).send({
         error: "Failed to fetch files from GitLab",
         message: "Unable to communicate with GitLab. Please try again later.",
       });
       return;
     }
 
-    reply.status(500).send({
+    await reply.status(500).send({
       error: "Failed to list RPY files",
       message: "An internal error occurred",
     });

@@ -71,7 +71,7 @@ async function generateExportHandler(
   try {
     const result = await generateExport(projectId, user.id);
 
-    reply.status(201).send(result as GenerateExportResponse);
+    await reply.status(201).send(result as GenerateExportResponse);
   } catch (error) {
     request.log.error(
       { err: error, projectId },
@@ -81,25 +81,25 @@ async function generateExportHandler(
     );
 
     if (error instanceof ForbiddenError) {
-      reply.status(403).send({ error: error.userMessage });
+      await reply.status(403).send({ error: error.userMessage });
       return;
     }
     if (error instanceof NotFoundError) {
-      reply.status(404).send({ error: error.userMessage });
+      await reply.status(404).send({ error: error.userMessage });
       return;
     }
     if (error instanceof RateLimitError) {
-      reply.status(429).send({
+      await reply.status(429).send({
         error: error.userMessage,
         retryAfter: error.retryAfter,
       });
       return;
     }
     if (error instanceof ConflictError) {
-      reply.status(409).send({ error: error.userMessage });
+      await reply.status(409).send({ error: error.userMessage });
       return;
     }
-    reply.status(500).send({ error: "Internal server error" });
+    await reply.status(500).send({ error: "Internal server error" });
   }
 }
 
@@ -119,7 +119,7 @@ async function listExportsHandler(
   try {
     const exports = await listExports(projectId, user.id);
 
-    reply.status(200).send({ exports } as ListExportsResponse);
+    await reply.status(200).send({ exports } as ListExportsResponse);
   } catch (error) {
     request.log.error(
       { err: error, projectId },
@@ -129,14 +129,14 @@ async function listExportsHandler(
     );
 
     if (error instanceof ForbiddenError) {
-      reply.status(403).send({ error: error.userMessage });
+      await reply.status(403).send({ error: error.userMessage });
       return;
     }
     if (error instanceof NotFoundError) {
-      reply.status(404).send({ error: error.userMessage });
+      await reply.status(404).send({ error: error.userMessage });
       return;
     }
-    reply.status(500).send({ error: "Internal server error" });
+    await reply.status(500).send({ error: "Internal server error" });
   }
 }
 
@@ -156,7 +156,7 @@ async function exportPreviewHandler(
   try {
     const result = await getExportPreview(projectId, user.id);
 
-    reply.status(200).send(result);
+    await reply.status(200).send(result);
   } catch (error) {
     request.log.error(
       { err: error, projectId },
@@ -166,25 +166,25 @@ async function exportPreviewHandler(
     );
 
     if (error instanceof ForbiddenError) {
-      reply.status(403).send({ error: error.userMessage });
+      await reply.status(403).send({ error: error.userMessage });
       return;
     }
     if (error instanceof NotFoundError) {
-      reply.status(404).send({ error: error.userMessage });
+      await reply.status(404).send({ error: error.userMessage });
       return;
     }
     if (error instanceof RateLimitError) {
-      reply.status(429).send({
+      await reply.status(429).send({
         error: error.userMessage,
         retryAfter: error.retryAfter,
       });
       return;
     }
     if (error instanceof ConflictError) {
-      reply.status(409).send({ error: error.userMessage });
+      await reply.status(409).send({ error: error.userMessage });
       return;
     }
-    reply.status(500).send({ error: "Internal server error" });
+    await reply.status(500).send({ error: "Internal server error" });
   }
 }
 
@@ -234,7 +234,7 @@ async function downloadExportHandler(
     reply.header("Content-Type", "application/zip");
     reply.header("Content-Disposition", `attachment; filename="${fileName}"`);
     reply.header("Content-Length", zipBuffer.length);
-    reply.send(zipBuffer);
+    await reply.send(zipBuffer);
   } catch (error) {
     request.log.error(
       { err: error, projectId, exportId },
@@ -244,14 +244,14 @@ async function downloadExportHandler(
     );
 
     if (error instanceof ForbiddenError) {
-      reply.status(403).send({ error: error.userMessage });
+      await reply.status(403).send({ error: error.userMessage });
       return;
     }
     if (error instanceof NotFoundError) {
-      reply.status(404).send({ error: error.userMessage });
+      await reply.status(404).send({ error: error.userMessage });
       return;
     }
-    reply.status(500).send({ error: "Internal server error" });
+    await reply.status(500).send({ error: "Internal server error" });
   }
 }
 

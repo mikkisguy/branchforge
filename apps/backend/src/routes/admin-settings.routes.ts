@@ -56,7 +56,7 @@ async function getSignUpStatusHandler(
   reply: FastifyReply
 ): Promise<void> {
   const enabled = await getAdminSetting("sign_ups_enabled");
-  reply.send({ enabled: enabled !== false } as SignUpStatusResponse);
+  await reply.send({ enabled: enabled !== false } as SignUpStatusResponse);
 }
 
 /**
@@ -72,7 +72,7 @@ async function getAllSettingsHandler(
   reply: FastifyReply
 ): Promise<void> {
   const settings = await getAllAdminSettings();
-  reply.send({ settings } as AllSettingsResponse);
+  await reply.send({ settings } as AllSettingsResponse);
 }
 
 /**
@@ -97,7 +97,7 @@ async function updateSettingHandler(
 
   await setAdminSetting(key, value, user.id);
 
-  reply.send({ key, value } as SettingResponse);
+  await reply.send({ key, value } as SettingResponse);
 }
 
 // ============================================================================

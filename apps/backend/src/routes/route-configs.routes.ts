@@ -84,7 +84,7 @@ async function listRouteConfigsByProjectHandler(
 
   const routeConfigs = await listRouteConfigs(projectId, user.id);
 
-  reply.status(200).send({ routeConfigs } as ListRouteConfigsResponse);
+  await reply.status(200).send({ routeConfigs } as ListRouteConfigsResponse);
 }
 
 /**
@@ -103,13 +103,13 @@ async function getRouteConfigHandler(
   const routeConfig = await getRouteConfig(routeConfigId, user.id);
 
   if (!routeConfig) {
-    reply
+    await reply
       .status(404)
       .send({ error: "Route configuration not found" } as ErrorResponse);
     return;
   }
 
-  reply.status(200).send({ routeConfig } as GetRouteConfigResponse);
+  await reply.status(200).send({ routeConfig } as GetRouteConfigResponse);
 }
 
 /**
@@ -131,7 +131,7 @@ async function createRouteConfigByProjectHandler(
 
   const routeConfig = await createRouteConfig(user.id, projectId, body);
 
-  reply.status(201).send({ routeConfig } as CreateRouteConfigResponse);
+  await reply.status(201).send({ routeConfig } as CreateRouteConfigResponse);
 }
 
 /**
@@ -153,7 +153,7 @@ async function updateRouteConfigHandler(
 
   const routeConfig = await updateRouteConfig(routeConfigId, user.id, body);
 
-  reply.status(200).send({ routeConfig } as UpdateRouteConfigResponse);
+  await reply.status(200).send({ routeConfig } as UpdateRouteConfigResponse);
 }
 
 /**
@@ -171,7 +171,7 @@ async function deleteRouteConfigHandler(
 
   await deleteRouteConfig(routeConfigId, user.id);
 
-  reply.status(204).send();
+  await reply.status(204).send();
 }
 
 // ============================================================================

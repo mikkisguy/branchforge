@@ -31,14 +31,17 @@ async function getGitLabFilesHandler(
 
   try {
     const files = await getGitLabFilesWithScenes(projectId, userId);
-    reply.send(files);
+    await reply.send(files);
   } catch (err) {
-    if (handleKnownRouteErrors(err, reply)) return;
+    if (handleKnownRouteErrors(err, reply)) {
+      await reply;
+      return;
+    }
     request.log.error(
       { err, projectId },
       "getGitLabFilesHandler: Failed to get GitLab files"
     );
-    reply.status(500).send({
+    await reply.status(500).send({
       error: "Failed to get GitLab files",
       message: "An internal error occurred",
     });
