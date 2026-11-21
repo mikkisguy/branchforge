@@ -1,5 +1,10 @@
+import type { RunEditorTransition } from "@/hooks/useGuardedEditorTabClose";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const runEditorTransition: RunEditorTransition = (action) => {
+  void action();
+};
 
 const testState = vi.hoisted(() => ({
   filesError: null as Error | null,
@@ -90,7 +95,12 @@ describe("ScriptMode", () => {
 
   it("shows the files error state and retries without rendering the empty import state", () => {
     testState.filesError = new Error("load failed");
-    render(<ScriptMode projectId="project-1" />);
+    render(
+      <ScriptMode
+        projectId="project-1"
+        runEditorTransition={runEditorTransition}
+      />
+    );
 
     expect(
       screen.getByText("Failed to load project files")

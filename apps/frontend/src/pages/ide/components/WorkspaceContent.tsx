@@ -1,6 +1,7 @@
 import { lazy, Suspense, useState } from "react";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { EmptyState } from "@/components/ui/empty-state";
+import type { RunEditorTransition } from "@/hooks/useGuardedEditorTabClose";
 import type { WorkspaceDocumentProps } from "@/hooks/useWorkspaceDocument";
 import type { Project } from "@/lib/api/projects";
 import type { WorkspaceView } from "@/lib/workspace-view";
@@ -17,6 +18,7 @@ interface WorkspaceContentProps extends WorkspaceDocumentProps {
   editorKey: string;
   unavailableProject: boolean;
   isResolvingScope: boolean;
+  runEditorTransition: RunEditorTransition;
   onOpenSettings: () => void;
   onFocusModeChange: (focused: boolean) => void;
 }
@@ -29,6 +31,7 @@ export function WorkspaceContent({
   isResolvingScope,
   initialDocumentId,
   onDocumentChange,
+  runEditorTransition,
   onOpenSettings,
   onFocusModeChange,
 }: WorkspaceContentProps) {
@@ -57,6 +60,7 @@ export function WorkspaceContent({
         key={editorKey}
         initialDocumentId={initialDocumentId}
         onDocumentChange={onDocumentChange}
+        runEditorTransition={runEditorTransition}
         projectName={project?.name}
         onOpenSettings={onOpenSettings}
         onFocusModeChange={onFocusModeChange}
@@ -99,6 +103,7 @@ export function WorkspaceContent({
           <ScriptMode
             initialDocumentId={initialDocumentId}
             onDocumentChange={onDocumentChange}
+            runEditorTransition={runEditorTransition}
             projectId={project?.id}
             projectName={project?.name}
             onOpenSettings={onOpenSettings}

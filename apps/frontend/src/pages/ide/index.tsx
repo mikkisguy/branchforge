@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect, useRef, useLayoutEffect } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useTheme } from "@/contexts/useTheme";
 import { useAuth } from "@/hooks/useAuth";
 import { useProject } from "@/hooks/useProject";
@@ -7,6 +7,7 @@ import {
   isEditorView,
   useWorkspaceNavigation,
 } from "@/hooks/useWorkspaceNavigation";
+import type { RunEditorTransition } from "@/hooks/useGuardedEditorTabClose";
 import { useWorkspaceTitle } from "@/hooks/useWorkspaceTitle";
 import { themePalettes, BASE_URL } from "@/lib/constants";
 import { flushModeBeforeTransition } from "@/lib/editor-sync-coordinator";
@@ -22,6 +23,11 @@ export function HomePageIDE() {
   const { theme, setTheme, isDarkMode, toggleDarkMode } = useTheme();
   const { logout } = useAuth();
   const navigate = useNavigate();
+  const locationKey = useLocation().key;
+  const locationKeyRef = useRef(locationKey);
+  useLayoutEffect(() => {
+    locationKeyRef.current = locationKey;
+  }, [locationKey]);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [initialSettingsTab, setInitialSettingsTab] = useState<Tab | undefined>(
     undefined
@@ -165,17 +171,28 @@ export function HomePageIDE() {
     })();
   };
 
+  const runEditorTransition: RunEditorTransition = (action) => {
+    if (flushingRef.current || isDeletingRef.current) return;
+    flushingRef.current = true;
+    setIsEditorTransitionPending(true);
+    void action().finally(() => {
+      flushingRef.current = false;
+      setIsEditorTransitionPending(false);
+    });
+  };
+
   const handleDeleteProject = async (projectId: string): Promise<void> => {
     if (isDeletingRef.current || flushingRef.current) {
       return;
     }
     isDeletingRef.current = true;
+    const locksEditor = projectId === currentProject?.id && isEditorView(view);
 
     try {
       // Deleting the currently open project must flush the active editor
       // mode first so pending edits are not lost. Deleting another project
       // does not touch the active editor and needs no flush.
-      if (projectId === currentProject?.id && isEditorView(view)) {
+      if (locksEditor) {
         flushingRef.current = true;
         setIsEditorTransitionPending(true);
 
@@ -201,7 +218,10 @@ export function HomePageIDE() {
       }
 
       await deleteProject(projectId);
-      if (projectId === currentProject?.id) {
+      if (
+        projectId === currentProject?.id &&
+        locationKeyRef.current === locationKey
+      ) {
         const nextProjectId = projects.find(
           (project) => project.id !== projectId
         )?.id;
@@ -209,7 +229,7 @@ export function HomePageIDE() {
       }
     } finally {
       isDeletingRef.current = false;
-      if (projectId === currentProject?.id) {
+      if (locksEditor) {
         flushingRef.current = false;
         // react-doctor-disable-next-line react-doctor/no-loading-flag-reset-outside-finally -- this is the finally block for deletion of the current project
         setIsEditorTransitionPending(false);
@@ -296,6 +316,7 @@ export function HomePageIDE() {
             isResolvingScope={isResolvingScope}
             initialDocumentId={entry.initialDocumentId}
             onDocumentChange={reportDocument}
+            runEditorTransition={runEditorTransition}
             onOpenSettings={handleOpenSettings}
             onFocusModeChange={setIsFocusMode}
           />

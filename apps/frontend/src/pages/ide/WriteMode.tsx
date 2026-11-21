@@ -9,6 +9,10 @@ import {
   useWorkspaceDocument,
   type WorkspaceDocumentProps,
 } from "@/hooks/useWorkspaceDocument";
+import {
+  useGuardedEditorTabClose,
+  type RunEditorTransition,
+} from "@/hooks/useGuardedEditorTabClose";
 import { useWorkspaceTitle } from "@/hooks/useWorkspaceTitle";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { WorkspaceFocusReporter } from "@/components/workspace/WorkspaceFocusReporter";
@@ -48,6 +52,7 @@ import type { DialogueEntry } from "@/lib/prose-types";
 
 interface WriteModeProps extends WorkspaceDocumentProps {
   projectName?: string;
+  runEditorTransition: RunEditorTransition;
   onOpenSettings?: () => void;
   onFocusModeChange?: (focused: boolean) => void;
 }
@@ -56,6 +61,7 @@ export function WriteMode({
   projectName,
   initialDocumentId,
   onDocumentChange,
+  runEditorTransition,
   onOpenSettings,
   onFocusModeChange,
 }: WriteModeProps) {
@@ -222,6 +228,18 @@ export function WriteMode({
       isLoadingLabels: isLoadingLabels || !!labelsError,
       initialDocumentId,
     });
+  const closeLabelTab = useGuardedEditorTabClose({
+    activeId: activeLabelId,
+    hasPendingSave: isDirty || saveStatus === "error",
+    save: triggerSave,
+    onClose: handleCloseTab,
+    runEditorTransition,
+    onSaveFailed: () =>
+      showErrorToast(
+        "Could not save pending edits. Resolve the save error before closing the label.",
+        "Close blocked"
+      ),
+  });
   const selectedLabel = labels.find((label) => label.id === activeLabelId);
   useWorkspaceDocument(onDocumentChange, selectedLabel?.id ?? null, isHydrated);
   useWorkspaceTitle(projectName, selectedLabel?.title, isDirty);
@@ -495,23 +513,7 @@ export function WriteMode({
           labels={storyLabels}
           activeLabelId={activeLabelId}
           onLabelSelect={handleLabelSelect}
-          onCloseTab={(event, labelId) => {
-            event.stopPropagation();
-            void (async () => {
-              if (
-                labelId === activeLabelId &&
-                isDirty &&
-                !(await triggerSave())
-              ) {
-                showErrorToast(
-                  "Could not save pending edits. Resolve the save error before closing the label.",
-                  "Close blocked"
-                );
-                return;
-              }
-              handleCloseTab(event, labelId);
-            })();
-          }}
+          onCloseTab={closeLabelTab}
           tabItems={tabItems}
           projectId={currentProject.id}
           onCreateLabel={createLabel}

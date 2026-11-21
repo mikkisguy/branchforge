@@ -3,6 +3,7 @@ import {
   useEffect,
   useEffectEvent,
   type RefObject,
+  useRef,
   useState,
 } from "react";
 import {
@@ -95,29 +96,40 @@ export function useWorkspaceNavigation(
     );
   });
 
+  const historySaveRef = useRef<Promise<boolean> | null>(null);
+
   useEffect(() => {
     if (blocker.state !== "blocked" || !isEditorView(view)) return;
-    if (flushingRef.current) {
-      blocker.reset();
-      return;
+
+    let save = historySaveRef.current;
+    if (!save) {
+      if (flushingRef.current) {
+        blocker.reset();
+        return;
+      }
+
+      flushingRef.current = true;
+      save = flushModeBeforeTransition(view)
+        .catch(() => false)
+        .finally(() => {
+          historySaveRef.current = null;
+          flushingRef.current = false;
+        });
+      historySaveRef.current = save;
     }
 
+    // Repeated Back requests can replace the blocker while the same save
+    // runs. The latest blocked destination receives the result.
     let active = true;
-    flushingRef.current = true;
-    void flushModeBeforeTransition(view)
-      .catch(() => false)
-      .then((saved) => {
-        if (!active) return;
-        if (saved) {
-          blocker.proceed();
-        } else {
-          blocker.reset();
-          warnSaveFailed();
-        }
-      })
-      .finally(() => {
-        flushingRef.current = false;
-      });
+    void save.then((saved) => {
+      if (!active) return;
+      if (saved) {
+        blocker.proceed();
+      } else {
+        blocker.reset();
+        warnSaveFailed();
+      }
+    });
     return () => {
       active = false;
     };

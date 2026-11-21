@@ -1,4 +1,8 @@
 import type { WorkspaceDocumentProps } from "@/hooks/useWorkspaceDocument";
+import {
+  useGuardedEditorTabClose,
+  type RunEditorTransition,
+} from "@/hooks/useGuardedEditorTabClose";
 import { useScriptDocument } from "@/hooks/useScriptDocument";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFileEditor } from "@/hooks/useFileEditor";
@@ -25,7 +29,12 @@ export function useScriptMode({
   projectName,
   initialDocumentId,
   onDocumentChange,
-}: WorkspaceDocumentProps & { projectId?: string; projectName?: string }) {
+  runEditorTransition,
+}: WorkspaceDocumentProps & {
+  projectId?: string;
+  projectName?: string;
+  runEditorTransition: RunEditorTransition;
+}) {
   const data = useScriptModeData({ projectId });
   const { currentProject } = useProject();
   const canModifyFiles = currentProject?.visibility === "OWNER";
@@ -155,23 +164,18 @@ export function useScriptMode({
     onNoTabsRemaining: handleNoTabsRemaining,
   });
 
-  const handleCloseFileTab: typeof closeFileTab = (event, fileId) => {
-    event.stopPropagation();
-    void (async () => {
-      if (
-        fileId === activeFileId &&
-        hasPendingSave &&
-        !(await triggerFileSave())
-      ) {
-        showErrorToast(
-          "Could not save pending edits. Resolve the save error before closing the file.",
-          "Close blocked"
-        );
-        return;
-      }
-      closeFileTab(event, fileId);
-    })();
-  };
+  const handleCloseFileTab = useGuardedEditorTabClose({
+    activeId: activeFileId,
+    hasPendingSave,
+    save: triggerFileSave,
+    onClose: closeFileTab,
+    runEditorTransition,
+    onSaveFailed: () =>
+      showErrorToast(
+        "Could not save pending edits. Resolve the save error before closing the file.",
+        "Close blocked"
+      ),
+  });
 
   const resetCreateFileError = data.resetCreateFileError;
   const handleOpenCreateFileDialog = useCallback(() => {

@@ -1,3 +1,4 @@
+import type { RunEditorTransition } from "@/hooks/useGuardedEditorTabClose";
 import type { WorkspaceDocumentProps } from "@/hooks/useWorkspaceDocument";
 import { ScriptModeEditorLayout } from "./components/ScriptModeEditorLayout";
 import { WorkspaceFocusReporter } from "@/components/workspace/WorkspaceFocusReporter";
@@ -13,6 +14,7 @@ import { useProject } from "@/hooks/useProject";
 interface ScriptModeProps extends WorkspaceDocumentProps {
   projectId?: string;
   projectName?: string;
+  runEditorTransition: RunEditorTransition;
   onOpenSettings?: () => void;
   onFocusModeChange?: (focused: boolean) => void;
 }
@@ -22,6 +24,7 @@ export function ScriptMode({
   projectName,
   initialDocumentId,
   onDocumentChange,
+  runEditorTransition,
   onOpenSettings,
   onFocusModeChange,
 }: ScriptModeProps) {
@@ -85,6 +88,7 @@ export function ScriptMode({
     projectName,
     initialDocumentId,
     onDocumentChange,
+    runEditorTransition,
   });
 
   const createFileDialog =
