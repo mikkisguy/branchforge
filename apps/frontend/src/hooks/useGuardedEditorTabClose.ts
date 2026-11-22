@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef } from "react";
 import type { KeyboardEvent, MouseEvent } from "react";
 
-export type RunEditorTransition = (action: () => Promise<void>) => void;
+export type RunEditorTransition = (action: () => Promise<void>) => false | void;
 
 type CloseTab = (event: MouseEvent | KeyboardEvent, id: string) => void;
 

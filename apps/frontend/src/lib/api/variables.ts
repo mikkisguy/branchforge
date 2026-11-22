@@ -6,7 +6,11 @@
  */
 
 import { request, requestVoid } from "./client";
-import type { Variable } from "@branchforge/shared";
+import type {
+  Variable,
+  VariableReference,
+  VariableReferencesResponse,
+} from "@branchforge/shared";
 
 // ============================================================================
 // Types
@@ -60,6 +64,17 @@ export const variablesApi = {
       }
     );
     return response.variable;
+  },
+
+  async listVariableReferences(
+    variableId: string,
+    signal?: AbortSignal
+  ): Promise<VariableReference[]> {
+    const response = await request<VariableReferencesResponse>(
+      `/variables/${encodeURIComponent(variableId)}/references`,
+      { signal }
+    );
+    return response.references;
   },
 
   /**

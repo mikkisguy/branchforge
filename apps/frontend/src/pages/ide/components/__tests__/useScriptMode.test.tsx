@@ -60,7 +60,10 @@ vi.mock("../useScriptModeData", () => ({
     isLoadingFiles: false,
     activeLabel: null,
     activeLabelId: null,
-    refreshFiles: vi.fn(),
+    refreshFiles: async () => ({
+      data: scriptFilesState.projectFiles,
+      isError: false,
+    }),
     showSyncDialog: false,
     setShowSyncDialog: vi.fn(),
     showZipImportDialog: false,
@@ -221,6 +224,61 @@ describe("useScriptMode generated preview lifecycle", () => {
     editorState.isFileDirty = false;
     editorState.fileSaveStatus = "idle";
     editorState.triggerFileSave.mockResolvedValue(true);
+  });
+
+  it("opens a variable reference in the selected file and leaves the preview", async () => {
+    selectFileTab.mockResolvedValueOnce(true);
+    const { result } = renderHook(() =>
+      useScriptMode({ runEditorTransition, projectId: "project-1" })
+    );
+    await act(async () => {
+      await result.current.onGeneratedFileSelect("branchforge_definitions.rpy");
+    });
+    await act(async () => {
+      expect(
+        await result.current.handleOpenVariableReference({
+          fileId: "file-1",
+          filePath: "game/script.rpy",
+          contentHash: "hash",
+          line: 2,
+          kind: "condition",
+        })
+      ).toBe(true);
+    });
+    expect(selectFileTab).toHaveBeenCalledWith("file-1", {
+      refreshedFile: scriptFilesState.projectFiles[0],
+    });
+    expect(result.current.isGeneratedPreview).toBe(false);
+    expect(result.current.scrollToLine).toMatchObject({ line: 2 });
+  });
+
+  it("keeps navigation inside the transition and rejects older coordinates after a save", async () => {
+    editorState.isFileDirty = true;
+    const transition = vi.fn<RunEditorTransition>((action) => {
+      void action();
+    });
+    editorState.triggerFileSave.mockImplementationOnce(async () => {
+      expect(transition).toHaveBeenCalledOnce();
+      scriptFilesState.projectFiles[0].contentHash = "new";
+      return true;
+    });
+    const { result } = renderHook(() =>
+      useScriptMode({ runEditorTransition: transition, projectId: "project-1" })
+    );
+    await act(async () => {
+      expect(
+        await result.current.handleOpenVariableReference({
+          fileId: "file-1",
+          filePath: "game/script.rpy",
+          contentHash: "hash",
+          line: 2,
+          kind: "condition",
+        })
+      ).toBe(false);
+    });
+    expect(editorState.triggerFileSave).toHaveBeenCalledOnce();
+    expect(selectFileTab).not.toHaveBeenCalled();
+    expect(result.current.scrollToLine).toBeNull();
   });
 
   it("selects a generated file into read-only preview and blocks undo/redo", async () => {

@@ -14,7 +14,7 @@ import {
 import { EDITOR_FONT_SIZE_CHANGED } from "../../FontSizeSwitcher";
 
 interface UseScriptEditorControllerOptions {
-  scrollToLine: number | null | undefined;
+  scrollToLine: number | { line: number } | null | undefined;
   labelTitles: LabelTitleMap | undefined;
   showOverlays: boolean;
   setHighlightEffect: StateEffectType<number | null>;
@@ -26,6 +26,8 @@ export function useScriptEditorController({
   showOverlays,
   setHighlightEffect,
 }: UseScriptEditorControllerOptions) {
+  const targetLine =
+    typeof scrollToLine === "object" ? scrollToLine?.line : scrollToLine;
   const hasScrolled = useRef(false);
   const editorViewRef = useRef<EditorView | null>(null);
 
@@ -51,7 +53,7 @@ export function useScriptEditorController({
   });
 
   // Track previous scrollToLine to detect changes
-  const prevScrollToLineRef = useRef<number | null | undefined>(scrollToLine);
+  const prevScrollToLineRef = useRef(scrollToLine);
 
   // Helper to scroll to a specific line with validation
   const scrollToLineIfValid = useCallback(
@@ -146,10 +148,10 @@ export function useScriptEditorController({
     (view: EditorView) => {
       editorViewRef.current = view;
       if (!hasScrolled.current) {
-        scrollToLineIfValid(view, scrollToLine);
+        scrollToLineIfValid(view, targetLine);
         // Trigger the highlight effect
-        if (scrollToLine) {
-          scheduleLineHighlight(view, scrollToLine);
+        if (targetLine) {
+          scheduleLineHighlight(view, targetLine);
         }
       }
       // Apply initial font size
@@ -165,7 +167,7 @@ export function useScriptEditorController({
       }
     },
     [
-      scrollToLine,
+      targetLine,
       scrollToLineIfValid,
       scheduleLineHighlight,
       applyEditorFontSize,
@@ -182,12 +184,12 @@ export function useScriptEditorController({
 
     const view = editorViewRef.current;
     // react-doctor-disable-next-line react-doctor/no-event-handler -- CodeMirror prop→view sync for dynamic scrollToLine
-    if (scrollToLine && !hasScrolled.current && view) {
-      scrollToLineIfValid(view, scrollToLine);
+    if (targetLine && !hasScrolled.current && view) {
+      scrollToLineIfValid(view, targetLine);
       // react-doctor-disable-next-line react-doctor/no-pass-data-to-parent -- highlight scheduling is editor-local, not parent data
-      scheduleLineHighlight(view, scrollToLine);
+      scheduleLineHighlight(view, targetLine);
     }
-  }, [scrollToLine, scrollToLineIfValid, scheduleLineHighlight]);
+  }, [scrollToLine, targetLine, scrollToLineIfValid, scheduleLineHighlight]);
 
   // Cleanup highlight timeout on unmount
   // react-doctor-disable-next-line react-doctor/exhaustive-deps -- unmount cleanup with [] reading refs is correct

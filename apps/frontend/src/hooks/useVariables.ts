@@ -7,7 +7,8 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { variablesApi, type UpdateVariableBody } from "@/lib/api/variables";
-import { variableKeys } from "@/lib/query-keys";
+import { ApiRequestError } from "@/lib/api/client";
+import { exportKeys, variableKeys } from "@/lib/query-keys";
 import { useToast } from "@/contexts/ToastContext";
 import type { Variable } from "@branchforge/shared";
 
@@ -115,9 +116,13 @@ export function useVariables(projectId: string): UseVariablesReturn {
       queryClient.invalidateQueries({
         queryKey: variableKeys.lists(projectId),
       });
+      queryClient.invalidateQueries({
+        queryKey: exportKeys.preview(projectId),
+      });
       toast.success("Variable deleted successfully", "Success");
     },
     onError: (error: Error) => {
+      if (error instanceof ApiRequestError && error.status === 409) return;
       toast.error(`Failed to delete variable: ${error.message}`, "Error");
     },
   });

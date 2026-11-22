@@ -27,7 +27,7 @@ export interface UseScriptModeDataReturn {
   setActiveLabelId: (labelId: string | null) => void;
   projectFiles: ProjectFileNode[];
   updateFileContent: UseProjectFilesReturn["updateFileContent"];
-  refreshFiles: () => Promise<unknown>;
+  refreshFiles: UseProjectFilesReturn["refreshFiles"];
   createFile: UseProjectFilesReturn["createFile"];
   isCreatingFile: boolean;
   createFileError: Error | null;

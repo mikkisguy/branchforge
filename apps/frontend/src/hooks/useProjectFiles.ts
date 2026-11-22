@@ -39,7 +39,7 @@ export interface UseProjectFilesReturn {
   filesError: Error | null;
 
   // Methods
-  refreshFiles: () => Promise<unknown>;
+  refreshFiles: () => Promise<{ data?: ProjectFileNode[]; isError: boolean }>;
   updateFileContent: (
     fileId: string,
     content: string,

@@ -5,6 +5,7 @@
  * getting, creating, updating, and deleting variables.
  */
 
+import type { VariableReferencesResponse } from "@branchforge/shared";
 import type { FastifyInstance } from "fastify";
 import type { FastifyRequest, FastifyReply } from "fastify";
 import { z } from "zod";
@@ -14,6 +15,8 @@ import {
   createVariable,
   updateVariable,
   deleteVariable,
+  listVariableReferences,
+  VariableInUseError,
   type PublicVariable,
 } from "../services/variables.service.js";
 import { authenticate } from "../middleware/auth.middleware.js";
@@ -100,6 +103,17 @@ async function getVariableHandler(
   await reply.status(200).send({ variable } as GetVariableResponse);
 }
 
+async function listVariableReferencesHandler(
+  request: FastifyRequest<{ Params: GetVariableParams }>,
+  reply: FastifyReply
+): Promise<void> {
+  const references = await listVariableReferences(
+    request.params.variableId,
+    request.user!.id
+  );
+  await reply.send({ references } satisfies VariableReferencesResponse);
+}
+
 /**
  * Create a new variable for a project
  *
@@ -157,7 +171,18 @@ async function deleteVariableHandler(
   const { variableId } = request.params;
   const user = request.user!;
 
-  await deleteVariable(variableId, user.id);
+  try {
+    await deleteVariable(variableId, user.id);
+  } catch (error) {
+    if (!(error instanceof VariableInUseError)) throw error;
+    await reply.status(409).send({
+      error: error.name,
+      message: error.message,
+      reason: error.reason,
+      references: error.references,
+    });
+    return;
+  }
 
   await reply.status(204).send();
 }
@@ -203,6 +228,16 @@ export async function variablesRoutes(fastify: FastifyInstance): Promise<void> {
       preValidation: validateParams(variableIdParamsSchema),
     },
     getVariableHandler
+  );
+
+  // List source references for a variable
+  fastify.get<{ Params: GetVariableParams }>(
+    "/variables/:variableId/references",
+    {
+      onRequest: authenticate,
+      preValidation: validateParams(variableIdParamsSchema),
+    },
+    listVariableReferencesHandler
   );
 
   // Update a variable

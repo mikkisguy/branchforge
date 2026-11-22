@@ -78,6 +78,16 @@ BranchForge detects the `if` conditions and displays them as badges in Write Mod
 You can manage stat definitions, variable definitions, and route configurations through their respective management panels, but the actual _usage_ of those values in your story lives in the `.rpy` files edited in Script Mode.
 :::
 
+### Deleting a Variable
+
+In Script Mode, open the Variables management panel and choose **Delete** next to a Variable. If the Variable is still used, select a file and line in the confirmation dialog to open it in the editor. Remove or update those references and save the scripts before trying again. BranchForge checks the saved project files again when you confirm deletion.
+
+The check covers direct `if` and `elif` conditions in scripts and screens, such as `if both_mode:`, `elif not both_mode:`, and `if both_mode == True:`. It also covers direct script assignments such as `$ both_mode = True`. Comments, quoted text, qualified names such as `persistent.both_mode`, and references shadowed by single-line label or screen parameters are ignored. Top-level screen defaults and simple screen loop variables are treated as local.
+
+After an unconditional screen loop of the form `for flag in [True, False]:`, its target is still treated as local. If BranchForge cannot tell whether a loop runs, it keeps later reads that might refer to the project Variable.
+
+Review compound expressions, multiline statements, and Python blocks separately. BranchForge does not run Python or follow indirect references such as aliases, lookups by name, or values passed between screens at runtime.
+
 ## Next Steps
 
 - See how conditions and jumps appear visually in the [Flow Graph](./flow-graph)

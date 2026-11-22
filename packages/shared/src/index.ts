@@ -120,6 +120,25 @@ export interface Variable {
   createdAt: string;
 }
 
+export const variableReferenceSchema = z.object({
+  fileId: z.uuid(),
+  filePath: z.string(),
+  contentHash: z.string(),
+  line: z.number().int().positive(),
+  kind: z.enum(["condition", "assignment"]),
+});
+
+export type VariableReference = z.infer<typeof variableReferenceSchema>;
+
+export interface VariableReferencesResponse {
+  references: VariableReference[];
+}
+
+export const variableInUseResponseSchema = z.object({
+  reason: z.literal("VARIABLE_IN_USE"),
+  references: z.array(variableReferenceSchema).min(1),
+});
+
 // ============================================================================
 // Stat Configuration
 // ============================================================================

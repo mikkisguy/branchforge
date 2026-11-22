@@ -6,9 +6,11 @@
  */
 
 import { getDb } from "../db/index.js";
-import { variables, projects } from "../db/schema/index.js";
-import { eq, and, asc } from "drizzle-orm";
+import { projectFiles, variables, projects } from "../db/schema/index.js";
+import type { Transaction } from "../db/types.js";
+import { eq, and, asc, isNull } from "drizzle-orm";
 import type { Variable, NewVariable } from "../db/schema/index.js";
+import type { VariableReference } from "@branchforge/shared";
 import {
   ConflictError,
   NotFoundError,
@@ -16,6 +18,16 @@ import {
 } from "../middleware/error-handler.middleware.js";
 import { ensureCharacterSourcePreservation } from "./character-source-preservation.service.js";
 import { isUniqueConstraintViolation } from "../lib/db.js";
+import { lockProject } from "./project-files-operations.service.js";
+import { findVariableReferences } from "./variable-references.js";
+
+export class VariableInUseError extends ConflictError {
+  constructor(public readonly references: VariableReference[]) {
+    super("Variable is still referenced in project scripts", {
+      reason: "VARIABLE_IN_USE",
+    });
+  }
+}
 
 // ============================================================================
 // Public Types
@@ -235,37 +247,68 @@ export async function updateVariable(
   }
 }
 
-/**
- * Delete a variable
- * @param variableId - The variable ID to delete
- * @param userId - The user ID making the request (for authorization)
- * @returns True if deleted successfully
- */
+async function readVariableReferences(
+  variable: Pick<PublicVariable, "projectId" | "key">,
+  tx?: Transaction
+): Promise<VariableReference[]> {
+  const query = (tx ?? getDb())
+    .select({
+      fileId: projectFiles.id,
+      filePath: projectFiles.filePath,
+      content: projectFiles.content,
+      contentHash: projectFiles.contentHash,
+    })
+    .from(projectFiles)
+    .where(
+      and(
+        eq(projectFiles.projectId, variable.projectId),
+        isNull(projectFiles.deletedAt)
+      )
+    )
+    .orderBy(asc(projectFiles.id));
+
+  // Write Mode can update source while holding only a file lock.
+  const files = await (tx ? query.for("update") : query);
+  files.sort((a, b) => a.filePath.localeCompare(b.filePath));
+  return findVariableReferences(variable.key, files);
+}
+
+export async function listVariableReferences(
+  variableId: string,
+  userId: string
+): Promise<VariableReference[]> {
+  const variable = await getVariable(variableId, userId);
+  if (!variable) throw new NotFoundError("Variable");
+  return readVariableReferences(variable);
+}
+
+/** Check current source and delete under the same transaction. */
 export async function deleteVariable(
   variableId: string,
   userId: string
 ): Promise<boolean> {
-  const db = getDb();
+  const target = await getVariable(variableId, userId);
+  if (!target) throw new NotFoundError("Variable");
 
-  // Verify user has access to the variable
-  const accessCheck = await db
-    .select({ id: variables.id })
-    .from(variables)
-    .innerJoin(projects, eq(variables.projectId, projects.id))
-    .where(and(eq(variables.id, variableId), eq(projects.userId, userId)))
-    .limit(1);
+  return getDb().transaction(async (tx) => {
+    // Serialize imports and file membership changes before locking active files.
+    await lockProject(tx, target.projectId);
+    const [variable] = await tx
+      .select({ projectId: variables.projectId, key: variables.key })
+      .from(variables)
+      .innerJoin(projects, eq(variables.projectId, projects.id))
+      .where(and(eq(variables.id, variableId), eq(projects.userId, userId)));
+    if (!variable) throw new NotFoundError("Variable");
 
-  if (accessCheck.length === 0) {
-    throw new NotFoundError("Variable");
-  }
+    const references = await readVariableReferences(variable, tx);
+    if (references.length > 0) throw new VariableInUseError(references);
 
-  // Delete the variable
-  const result = await db
-    .delete(variables)
-    .where(eq(variables.id, variableId))
-    .returning();
-
-  return result.length > 0;
+    const result = await tx
+      .delete(variables)
+      .where(eq(variables.id, variableId))
+      .returning({ id: variables.id });
+    return result.length > 0;
+  });
 }
 
 /**

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import type { VariableReference } from "@branchforge/shared";
 import { Plus, Loader2 } from "lucide-react";
 import { DialogShell } from "@/components/ui/DialogShell";
 import { InlineMessage } from "@/components/ui/inline-error";
@@ -11,12 +12,16 @@ interface VariablesDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   projectId: string;
+  onOpenReference: (reference: VariableReference) => Promise<boolean>;
+  onBeforeDelete: () => Promise<boolean>;
 }
 
 export function VariablesDialog({
   open,
   onOpenChange,
   projectId,
+  onOpenReference,
+  onBeforeDelete,
 }: VariablesDialogProps) {
   const MODE_NEW = "__new__" as const;
   type EditMode = null | typeof MODE_NEW | string;
@@ -37,11 +42,12 @@ export function VariablesDialog({
     isCreatingVariable || isUpdatingVariable || isDeletingVariable;
 
   const handleDelete = async (variableId: string) => {
-    try {
-      await deleteVariable(variableId);
-    } catch {
-      // Error handled by hook toast
+    if (!(await onBeforeDelete())) {
+      throw new Error(
+        "Save pending script edits before deleting this variable."
+      );
     }
+    await deleteVariable(variableId);
   };
 
   return (
@@ -92,6 +98,11 @@ export function VariablesDialog({
             isSaving={isSaving}
             onEdit={setEditingVariableId}
             onDelete={handleDelete}
+            onOpenReference={async (reference) => {
+              const opened = await onOpenReference(reference);
+              if (opened) onOpenChange(false);
+              return opened;
+            }}
           />
         </div>
       )}
