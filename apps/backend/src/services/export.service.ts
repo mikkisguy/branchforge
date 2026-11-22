@@ -39,7 +39,10 @@ import {
 } from "./rpy-statements.service.js";
 import { ensureCharacterSourcePreservation } from "./character-source-preservation.service.js";
 import { catchUpManagedDefaults } from "./managed-defaults.service.js";
-import { fetchSupportingFileSources } from "./export-sources.service.js";
+import {
+  fetchExportPreviewSources,
+  fetchSupportingFileSources,
+} from "./export-sources.service.js";
 import { assertExcludedCharactersHaveSourceOwnership } from "./export-consistency.service.js";
 import { checkRateLimit } from "./rate-limiter.service.js";
 import { logInfo, logError, logWarn, LogEventType } from "../lib/logger.js";
@@ -475,18 +478,8 @@ export async function getExportPreview(
 
   // Use the same ownership boundary as the ZIP export, including active
   // source files. Old managed rows may still exist after a source restore.
-  const db = getDb();
   const excludedTags = await fetchProjectExcludedTags(projectId);
-  const sources = await fetchSupportingFileSources(projectId);
-  const sourceFiles = await db
-    .select({
-      filePath: projectFiles.filePath,
-      content: projectFiles.content,
-    })
-    .from(projectFiles)
-    .where(
-      and(eq(projectFiles.projectId, projectId), isNull(projectFiles.deletedAt))
-    );
+  const { sources, sourceFiles } = await fetchExportPreviewSources(projectId);
   const { projectVariables, projectStats, projectCharacters } =
     excludeSourceOwnedSymbols(
       sources,

@@ -153,6 +153,63 @@ describe("managed defaults (Integration)", () => {
     expect(after.stats).toEqual([]);
   });
 
+  it("keeps preview source ownership and managed defaults on the same snapshot", async () => {
+    const screensPath = "game/screens.rpy";
+    expect(
+      await importZipFile(
+        projectId,
+        await archive(baseStory, {
+          [screensPath]: "default score = 80",
+        })
+      )
+    ).toMatchObject({ success: true });
+    await db.insert(stats).values({
+      projectId,
+      key: "score",
+      name: "Score",
+      authoredDefault: "120",
+      minValue: 100,
+    });
+    const nextArchive = await archive(`default score = True\n${baseStory}`, {
+      [screensPath]: "# No score declaration",
+    });
+    const transaction = db.transaction.bind(db);
+    const intercept = vi
+      .spyOn(db, "transaction")
+      .mockImplementationOnce((read, config) =>
+        transaction(async (tx) => {
+          // Pin the preview snapshot before the ZIP import commits on another
+          // connection. The old snapshot still has the protected declaration.
+          await tx
+            .select({ key: stats.key })
+            .from(stats)
+            .where(eq(stats.projectId, projectId));
+          expect(await importZipFile(projectId, nextArchive)).toMatchObject({
+            success: true,
+          });
+          return read(tx);
+        }, config)
+      );
+    try {
+      const before = await getExportPreview(projectId, userId);
+      expect(before.files.find((file) => file.kind === "stats")?.isEmpty).toBe(
+        true
+      );
+      expect(
+        before.files.find((file) => file.kind === "variables")?.isEmpty
+      ).toBe(true);
+    } finally {
+      intercept.mockRestore();
+    }
+    const after = await getExportPreview(projectId, userId);
+    expect(after.files.find((file) => file.kind === "stats")?.isEmpty).toBe(
+      true
+    );
+    expect(
+      after.files.find((file) => file.kind === "variables")?.content
+    ).toContain("default score = True\n");
+  });
+
   it("round-trips ZIP defaults exactly once and keeps values through metadata and dialogue edits", async () => {
     const defaults = [
       "default both_mode = True",
