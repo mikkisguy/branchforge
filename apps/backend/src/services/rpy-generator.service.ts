@@ -14,6 +14,7 @@ import {
   type StatCondition,
 } from "@branchforge/shared";
 import { logWarn, LogEventType } from "../lib/logger.js";
+import { isManagedNumericLiteral } from "./rpy-statements.service.js";
 import { normalizeStatCondition } from "./label-line-mapper.js";
 import { renderCharacterSourceDefinition } from "./character-source-definition.js";
 
@@ -560,6 +561,7 @@ export function patchRPYWithVariables(
 export function generateVariablesFile(
   variables: Array<{
     key: string;
+    authoredDefault?: boolean | null;
     description?: string | null;
     category?: string | null;
   }>
@@ -580,19 +582,19 @@ export function generateVariablesFile(
   lines.push("");
 
   // Group by category
-  const grouped = new Map<string, string[]>();
+  const grouped = new Map<string, typeof variables>();
   for (const sv of variables) {
     const category = sv.category?.trim() || "Uncategorized";
     if (!grouped.has(category)) {
       grouped.set(category, []);
     }
-    grouped.get(category)!.push(sv.key);
+    grouped.get(category)!.push(sv);
   }
 
   // Generate init statements grouped by category
-  for (const [category, keys] of grouped) {
+  for (const [category, entries] of grouped) {
     lines.push(`# ${category}`);
-    for (const key of keys) {
+    for (const { key, authoredDefault } of entries) {
       // Validate variable key before using it
       if (!isValidRenpyIdentifier(key)) {
         logWarn(LogEventType.VALIDATION_WARNING, {
@@ -600,7 +602,7 @@ export function generateVariablesFile(
         });
         continue;
       }
-      lines.push(`default ${key} = False`);
+      lines.push(`default ${key} = ${authoredDefault ? "True" : "False"}`);
     }
     lines.push("");
   }
@@ -626,6 +628,7 @@ function sanitizeComment(value: string): string {
 export function generateStatsFile(
   statsList: Array<{
     key: string;
+    authoredDefault?: string | null;
     name: string;
     minValue: number;
     maxValue: number;
@@ -663,7 +666,12 @@ export function generateStatsFile(
     } else {
       lines.push(`# ${sanitizedName}`);
     }
-    lines.push(`default ${stat.key} = ${stat.minValue}`);
+    const literal = stat.authoredDefault;
+    const value =
+      literal != null && isManagedNumericLiteral(literal)
+        ? literal
+        : stat.minValue;
+    lines.push(`default ${stat.key} = ${value}`);
     lines.push("");
   }
 

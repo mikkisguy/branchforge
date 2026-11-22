@@ -102,6 +102,7 @@ type MockFn = ReturnType<typeof vi.fn>;
  * Mirrors the chainable, thenable query builder pattern.
  */
 interface MockDb {
+  transaction: MockFn;
   select: MockFn;
   from: MockFn;
   innerJoin: MockFn;
@@ -125,6 +126,7 @@ interface MockDb {
  */
 function createMockDb(): MockDb {
   const db = {} as MockDb;
+  db.transaction = vi.fn((callback: (tx: MockDb) => unknown) => callback(db));
   db.select = vi.fn(() => db);
   db.from = vi.fn(() => db);
   db.innerJoin = vi.fn(() => db);
@@ -214,6 +216,10 @@ describe("ExportService", () => {
       await generateExport(PROJECT_ID, USER_ID);
 
       const payload = mockDb.values.mock.calls[0][0] as { content: string };
+      expect(mockDb.transaction).toHaveBeenCalledWith(expect.any(Function), {
+        isolationLevel: "repeatable read",
+        accessMode: "read only",
+      });
       const exported: Record<string, string> = JSON.parse(payload.content);
       expect(exported["game/screens.rpy"]).toBe(content);
       expect(exported["game/branchforge_variables.rpy"]).toContain(

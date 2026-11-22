@@ -1,5 +1,5 @@
 import JSZip from "jszip";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { getDb } from "../../db/index.js";
 import {
@@ -19,6 +19,14 @@ import {
   getExportPreview,
 } from "../export.service.js";
 import { ConflictError } from "../../middleware/error-handler.middleware.js";
+import {
+  extractAndStripRpySymbols,
+  filterGeneratedDefaults,
+} from "../rpy-statements.service.js";
+import { statsService } from "../stats.service.js";
+import { createVariable, updateVariable } from "../variables.service.js";
+import { fetchSupportingFileSources } from "../export-sources.service.js";
+import { promoteManagedDefaults } from "../managed-defaults.service.js";
 
 const userId = testUuid("09000000", 80);
 const projectId = testUuid("19000000", 80);
@@ -27,9 +35,13 @@ const baseStory = `label start:
     "Narration"
     return`;
 
-async function archive(content: string): Promise<Buffer> {
+async function archive(
+  content: string,
+  extra: Record<string, string> = {}
+): Promise<Buffer> {
   const zip = new JSZip();
   zip.file("game/script.rpy", content);
+  for (const [path, source] of Object.entries(extra)) zip.file(path, source);
   return zip.generateAsync({ type: "nodebuffer" });
 }
 
@@ -76,6 +88,336 @@ describe("managed defaults (Integration)", () => {
     await db.delete(projects).where(eq(projects.id, projectId));
     await db.delete(users).where(eq(users.id, userId));
   });
+
+  async function exportFiles() {
+    const exported = await generateExport(projectId, userId);
+    const download = await getExportForDownload(exported.id, projectId, userId);
+    return JSON.parse(download.content) as Record<string, string>;
+  }
+
+  it("keeps one default snapshot across a concurrent accepted type change", async () => {
+    await db.insert(variables).values({ projectId, key: "score" });
+    await db.insert(stats).values({
+      projectId,
+      key: "score",
+      name: "Score",
+      authoredDefault: "120",
+      minValue: 100,
+    });
+    const readSources = async () => {
+      const { projectVariables, projectStats } =
+        await fetchSupportingFileSources(projectId);
+      return filterGeneratedDefaults(projectVariables, projectStats, new Set());
+    };
+    const transaction = db.transaction.bind(db);
+    const intercept = vi
+      .spyOn(db, "transaction")
+      .mockImplementationOnce((read, config) =>
+        transaction(async (tx) => {
+          // Establish the reader snapshot, then commit the import before the
+          // supporting file queries run. The import uses another connection.
+          await tx
+            .select({ key: variables.key })
+            .from(variables)
+            .where(eq(variables.projectId, projectId));
+          await transaction(async (writer) => {
+            await promoteManagedDefaults(
+              writer,
+              projectId,
+              [
+                {
+                  key: "score",
+                  value: "True",
+                  kind: "variable",
+                },
+              ],
+              "accepted"
+            );
+          });
+          return read(tx);
+        }, config)
+      );
+    try {
+      const before = await readSources();
+      expect(before.variables).toEqual([]);
+      expect(before.stats).toMatchObject([
+        { key: "score", authoredDefault: "120" },
+      ]);
+    } finally {
+      intercept.mockRestore();
+    }
+    const after = await readSources();
+    expect(after.variables).toMatchObject([
+      { key: "score", authoredDefault: true },
+    ]);
+    expect(after.stats).toEqual([]);
+  });
+
+  it("keeps preview source ownership and managed defaults on the same snapshot", async () => {
+    const screensPath = "game/screens.rpy";
+    expect(
+      await importZipFile(
+        projectId,
+        await archive(baseStory, {
+          [screensPath]: "default score = 80",
+        })
+      )
+    ).toMatchObject({ success: true });
+    await db.insert(stats).values({
+      projectId,
+      key: "score",
+      name: "Score",
+      authoredDefault: "120",
+      minValue: 100,
+    });
+    const nextArchive = await archive(`default score = True\n${baseStory}`, {
+      [screensPath]: "# No score declaration",
+    });
+    const transaction = db.transaction.bind(db);
+    const intercept = vi
+      .spyOn(db, "transaction")
+      .mockImplementationOnce((read, config) =>
+        transaction(async (tx) => {
+          // Pin the preview snapshot before the ZIP import commits on another
+          // connection. The old snapshot still has the protected declaration.
+          await tx
+            .select({ key: stats.key })
+            .from(stats)
+            .where(eq(stats.projectId, projectId));
+          expect(await importZipFile(projectId, nextArchive)).toMatchObject({
+            success: true,
+          });
+          return read(tx);
+        }, config)
+      );
+    try {
+      const before = await getExportPreview(projectId, userId);
+      expect(before.files.find((file) => file.kind === "stats")?.isEmpty).toBe(
+        true
+      );
+      expect(
+        before.files.find((file) => file.kind === "variables")?.isEmpty
+      ).toBe(true);
+    } finally {
+      intercept.mockRestore();
+    }
+    const after = await getExportPreview(projectId, userId);
+    expect(after.files.find((file) => file.kind === "stats")?.isEmpty).toBe(
+      true
+    );
+    expect(
+      after.files.find((file) => file.kind === "variables")?.content
+    ).toContain("default score = True\n");
+  });
+
+  it("round-trips ZIP defaults exactly once and keeps values through metadata and dialogue edits", async () => {
+    const defaults = [
+      "default both_mode = True",
+      "default other_mode = False",
+      "default text_speed = 0.5",
+      "default route_offset = -3",
+      "default starting_points = 120",
+      "default ordinary = 42",
+      "default whole_float = 1.0",
+      "default big_integer = 9007199254740993",
+      "default padded_float = 00.50",
+      "default padded_zero = 000",
+    ];
+    const preserved =
+      "default expression = 1e2\ndefault chapter = 01\ndefault persistent.visited = True";
+    const screens = "default protected_flag = True";
+    const story = [...defaults, preserved, baseStory].join("\n");
+    await db.insert(stats).values([
+      { projectId, key: "expression", name: "Expression" },
+      { projectId, key: "chapter", name: "Chapter" },
+      { projectId, key: "both_mode", name: "Existing Stat" },
+    ]);
+    await db.insert(variables).values({ projectId, key: "protected_flag" });
+    expect(
+      await importZipFile(
+        projectId,
+        await archive(story, { "game/screens.rpy": screens })
+      )
+    ).toMatchObject({ success: true });
+
+    const assertRoundTrip = async () => {
+      const preview = await getExportPreview(projectId, userId);
+      const files = await exportFiles();
+      const allLines = Object.values(files).flatMap((content) =>
+        content.split("\n")
+      );
+      for (const declaration of [
+        ...defaults,
+        ...preserved.split("\n"),
+        screens,
+      ]) {
+        const key = declaration.split(" = ")[0];
+        expect(allLines.filter((line) => line.startsWith(`${key} = `))).toEqual(
+          [declaration]
+        );
+      }
+      for (const entry of preview.files.filter(
+        (item) => item.kind !== "definitions"
+      )) {
+        expect(files[`game/${entry.fileName}`]).toBe(entry.content);
+      }
+      expect(files["game/screens.rpy"]).toBe(screens);
+      expect(files["game/script.rpy"]).toContain(preserved);
+    };
+    await assertRoundTrip();
+
+    const flag = (await getVariablesRow("both_mode"))!;
+    await updateVariable(flag.id, userId, {
+      description: "Edited description",
+    });
+    const stat = (await statsService.listStats(projectId, userId)).find(
+      (row) => row.key === "starting_points"
+    )!;
+    await statsService.updateStat(stat.id, userId, {
+      minValue: 5,
+      maxValue: 15,
+      name: "Points",
+    });
+    const [file] = await db
+      .select()
+      .from(projectFiles)
+      .where(eq(projectFiles.filePath, "game/script.rpy"));
+    const saved = await updateFileContent(
+      file.id,
+      userId,
+      file.content.replace("Narration", "Edited narration"),
+      file.contentHash
+    );
+    expect(saved.generatedFilesChanged).toBe(false);
+    await assertRoundTrip();
+
+    // Reimport only the literal changes, so the stripped story hash stays identical.
+    const editedArchive = await archive(
+      story
+        .replace("Narration", "Edited narration")
+        .replace("both_mode = True", "both_mode = False")
+        .replace("starting_points = 120", "starting_points = 121")
+    );
+    expect(await importZipFile(projectId, editedArchive)).toMatchObject({
+      success: true,
+      filesUpdated: 1,
+      filesSkipped: 0,
+    });
+    const files = await exportFiles();
+    expect(files["game/branchforge_variables.rpy"]).toContain(
+      "default both_mode = False"
+    );
+    expect(files["game/branchforge_stats.rpy"]).toContain(
+      "default starting_points = 121"
+    );
+    expect(await statsService.listStats(projectId, userId)).toContainEqual(
+      expect.objectContaining({
+        key: "starting_points",
+        minValue: 5,
+        maxValue: 15,
+        name: "Points",
+      })
+    );
+  });
+
+  it("recovers only trustworthy legacy defaults and retains fallbacks for other rows", async () => {
+    const trusted = `default old_flag = True\ndefault old_stat = -3.0\n${baseStory}`;
+    const ambiguous = `default ambiguous_flag = True\n${baseStory}`;
+    for (const [path, raw] of [
+      ["game/trusted.rpy", trusted],
+      ["game/edited.rpy", ambiguous],
+    ]) {
+      const file = await insertRawFile(
+        path,
+        extractAndStripRpySymbols(raw, path).cleanedContent
+      );
+      await db
+        .update(projectFiles)
+        .set({
+          originalContent: raw,
+          ...(raw === ambiguous && {
+            updatedAt: new Date(file.createdAt.getTime() + 1000),
+          }),
+        })
+        .where(eq(projectFiles.id, file.id));
+    }
+    await db.insert(variables).values([
+      { projectId, key: "old_flag" },
+      { projectId, key: "ambiguous_flag" },
+    ]);
+    await db.insert(stats).values([
+      { projectId, key: "old_stat", name: "Old", minValue: 5 },
+      { projectId, key: "legacy_fallback", name: "Fallback", minValue: 7 },
+    ]);
+    await createVariable(userId, projectId, { key: "new_flag" });
+    const first = await exportFiles();
+    expect(first["game/branchforge_variables.rpy"]).toContain(
+      "default old_flag = True"
+    );
+    expect(first["game/branchforge_variables.rpy"]).toContain(
+      "default ambiguous_flag = False"
+    );
+    expect(first["game/branchforge_variables.rpy"]).toContain(
+      "default new_flag = False"
+    );
+    expect(first["game/branchforge_stats.rpy"]).toContain(
+      "default old_stat = -3.0"
+    );
+    expect(first["game/branchforge_stats.rpy"]).toContain(
+      "default legacy_fallback = 7"
+    );
+
+    const flag = (await getVariablesRow("old_flag"))!;
+    await db.delete(variables).where(eq(variables.id, flag.id));
+    await createVariable(userId, projectId, { key: "old_flag" });
+    expect((await exportFiles())["game/branchforge_variables.rpy"]).toContain(
+      "default old_flag = False"
+    );
+  });
+
+  it.each([
+    {
+      kind: "variables",
+      declaration: "default recreated = True",
+      fallback: "False",
+    },
+    { kind: "stats", declaration: "default recreated = 120", fallback: "5" },
+  ])(
+    "keeps a newly recreated $kind row independent of archived defaults",
+    async ({ kind, declaration, fallback }) => {
+      const raw = `${declaration}\n${baseStory}`;
+      const path = "game/recreated.rpy";
+      const file = await insertRawFile(
+        path,
+        extractAndStripRpySymbols(raw, path).cleanedContent
+      );
+      await db
+        .update(projectFiles)
+        .set({ originalContent: raw })
+        .where(eq(projectFiles.id, file.id));
+
+      if (kind === "variables") {
+        await createVariable(userId, projectId, { key: "recreated" });
+      } else {
+        await statsService.createStat(projectId, userId, {
+          key: "recreated",
+          name: "Recreated",
+          minValue: 5,
+        });
+      }
+      const files = await exportFiles();
+      expect(files[`game/branchforge_${kind}.rpy`]).toContain(
+        `default recreated = ${fallback}\n`
+      );
+
+      expect(await importZipFile(projectId, await archive(raw))).toMatchObject({
+        success: true,
+      });
+      expect((await exportFiles())[`game/branchforge_${kind}.rpy`]).toContain(
+        `${declaration}\n`
+      );
+    }
+  );
 
   it("promotes defaults authored on save, previews them, and exports them exactly once", async () => {
     await importZipFile(projectId, await archive(baseStory));

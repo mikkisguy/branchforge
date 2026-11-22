@@ -54,7 +54,10 @@ import {
   syncAuthoredCharacterDefinitions,
   stripManagedCharacterDeclarations,
 } from "./character-source-preservation.service.js";
-import { promoteManagedDefaults } from "./managed-defaults.service.js";
+import {
+  collectManagedDefaults,
+  promoteManagedDefaults,
+} from "./managed-defaults.service.js";
 import {
   DEFAULT_EXCLUDED_RENPY_TAGS,
   collectSourceOwnedRpySymbolKeys,
@@ -824,13 +827,21 @@ async function applyFileUpdate(
     fileType = parseRPYFileWithLabels(canonicalContent, file.filePath).fileType;
     const newContentHash = calculateContentHash(canonicalContent);
 
-    // Promote boolean/numeric defaults from the authored content into the
-    // managed variables/stats tables inside this same locked transaction, so
-    // a saved default is exportable as soon as the file commit lands.
-    // Existing rows (metadata/values) are preserved.
-    const defaultsInserted = await promoteManagedDefaults(tx, file.projectId, [
+    // Only a declaration edit may replace the saved authored value.
+    const beforeDefaults = new Map(
+      collectManagedDefaults([
+        { filePath: file.filePath, content: lockedFile.content },
+      ]).map((item) => [item.key, item.value])
+    );
+    const changedDefaults = collectManagedDefaults([
       { filePath: file.filePath, content },
-    ]);
+    ]).filter((item) => beforeDefaults.get(item.key) !== item.value);
+    const changedDefaultKeys = await promoteManagedDefaults(
+      tx,
+      file.projectId,
+      changedDefaults,
+      "accepted"
+    );
     const previousOwned = collectSourceOwnedRpySymbolKeys(
       [{ filePath: file.filePath, content: lockedFile.content }],
       excludedTags
@@ -911,7 +922,7 @@ async function applyFileUpdate(
       deletedCount,
       canonicalContent,
       generatedFilesChanged:
-        defaultsInserted || managedTags.size > 0 || ownershipChanged,
+        changedDefaultKeys.size > 0 || managedTags.size > 0 || ownershipChanged,
     };
   });
 

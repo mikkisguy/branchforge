@@ -35,6 +35,9 @@ export const projectSettings = pgTable(
     )
       .default(0)
       .notNull(),
+    managedDefaultsRecovered: boolean("managed_defaults_recovered")
+      .default(false)
+      .notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
   (table) => [index("project_settings_updated_at_idx").on(table.updatedAt)]

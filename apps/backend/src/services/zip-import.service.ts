@@ -12,8 +12,6 @@ import type { Transaction } from "../db/types.js";
 import {
   projectFiles,
   characters,
-  variables,
-  stats,
   labels,
   projectSettings,
 } from "../db/schema/index.js";
@@ -39,6 +37,8 @@ import {
   updateIncomingJumpsForLabels,
 } from "./labels.service.js";
 import { createProject, deleteProject } from "./projects.service.js";
+import { lockProject } from "./project-files-operations.service.js";
+import { promoteManagedDefaults } from "./managed-defaults.service.js";
 import { inferNameTypeFromStoredName } from "./character-parser/name-resolution.js";
 import {
   MAX_ZIP_BUFFER_BYTES,
@@ -132,35 +132,6 @@ function firstWinsInsert<K, V>(
     const key = keyFn(item);
     if (!map.has(key)) map.set(key, item);
   }
-}
-
-/**
- * Aggregate a successfully imported file's extracted symbols into
- * the running cross-file maps. The first occurrence of a given
- * tag/key wins so symbol metadata is stable when the same name
- * appears in multiple files.
- *
- * Only files that have been successfully inserted/updated (i.e.
- * survived their per-file savepoint) should be passed in here —
- * otherwise symbols from failed files would be promoted with no
- * matching `project_files` row, leaving the database in an
- * inconsistent state.
- */
-function accumulateSymbols(
-  entry: {
-    symbols: {
-      characters: DetectedCharacterStatement[];
-      variables: DetectedDefaultStatement[];
-      stats: DetectedDefaultStatement[];
-    };
-  },
-  charactersByTag: Map<string, DetectedCharacterStatement>,
-  variablesByKey: Map<string, DetectedDefaultStatement>,
-  statsByKey: Map<string, DetectedDefaultStatement>
-): void {
-  firstWinsInsert(entry.symbols.characters, (c) => c.tag, charactersByTag);
-  firstWinsInsert(entry.symbols.variables, (v) => v.key, variablesByKey);
-  firstWinsInsert(entry.symbols.stats, (s) => s.key, statsByKey);
 }
 
 /**
@@ -381,13 +352,14 @@ export async function importZipFile(
     let labelsCreated = 0;
 
     const charactersByTag = new Map<string, DetectedCharacterStatement>();
-    const variablesByKey = new Map<string, DetectedDefaultStatement>();
-    const statsByKey = new Map<string, DetectedDefaultStatement>();
+    const defaultsByKey = new Map<string, DetectedDefaultStatement>();
+    const skippedDefaultPaths = new Map<string, string>();
 
     // Step 4: Process all files in a single transaction.
     // Any per-file failure aborts the whole import so callers never see a
     // partial success with some ZIP files committed and others missing.
     await db.transaction(async (tx) => {
+      await lockProject(tx, projectId);
       let fileIndex = 0;
       for (const entry of preProcessedFiles) {
         const result = await processFileInTransaction(
@@ -409,9 +381,24 @@ export async function importZipFile(
             break;
         }
 
-        // Accumulate symbols only after a successful per-file write.
+        // An accepted ZIP entry can change a default without changing its
+        // stripped file body. Include those entries even on a content skip.
+        for (const item of [
+          ...entry.symbols.variables,
+          ...entry.symbols.stats,
+        ]) {
+          if (defaultsByKey.has(item.key)) continue;
+          defaultsByKey.set(item.key, item);
+          if (result.action === "skipped") {
+            skippedDefaultPaths.set(item.key, entry.filePath);
+          }
+        }
         if (result.action === "imported" || result.action === "updated") {
-          accumulateSymbols(entry, charactersByTag, variablesByKey, statsByKey);
+          firstWinsInsert(
+            entry.symbols.characters,
+            (c) => c.tag,
+            charactersByTag
+          );
         }
 
         labelsCreated += result.labelsCreated;
@@ -419,13 +406,21 @@ export async function importZipFile(
       }
 
       // Step 5: Promote symbols into the database
-      await promoteSymbols(
+      await promoteCharacters(tx, charactersByTag, projectId);
+      const changedDefaults = await promoteManagedDefaults(
         tx,
-        charactersByTag,
-        variablesByKey,
-        statsByKey,
-        projectId
+        projectId,
+        [...defaultsByKey.values()],
+        "accepted"
       );
+
+      const defaultOnlyUpdates = new Set<string>();
+      for (const key of changedDefaults) {
+        const filePath = skippedDefaultPaths.get(key);
+        if (filePath) defaultOnlyUpdates.add(filePath);
+      }
+      filesUpdated += defaultOnlyUpdates.size;
+      filesSkipped -= defaultOnlyUpdates.size;
 
       // Step 6: Compute incomingJumps for all project labels.
       // C4 fix: this now runs inside the main transaction so that
@@ -636,24 +631,13 @@ async function processFileInTransaction(
 // Symbol Promotion (inside transaction)
 // ============================================================================
 
-/**
- * Promote extracted `define`/`default` symbols into the database tables
- * (characters, variables, stats). Uses `onConflictDoNothing` so re-imports
- * are no-ops and user edits are preserved.
- */
-async function promoteSymbols(
+/** Insert missing character metadata without overwriting user edits. */
+async function promoteCharacters(
   tx: Transaction,
   charactersByTag: Map<string, DetectedCharacterStatement>,
-  variablesByKey: Map<string, DetectedDefaultStatement>,
-  statsByKey: Map<string, DetectedDefaultStatement>,
   projectId: string
 ): Promise<void> {
-  const allCharacters = Array.from(charactersByTag.values());
-  const allVariables = Array.from(variablesByKey.values());
-  const allStats = Array.from(statsByKey.values());
-  // Batch-insert each collection in a single round-trip per table.
-  // `onConflictDoNothing` preserves existing rows and user edits on
-  // re-import.
+  const allCharacters = [...charactersByTag.values()];
   if (allCharacters.length > 0) {
     await tx
       .insert(characters)
@@ -672,43 +656,6 @@ async function promoteSymbols(
       )
       .onConflictDoNothing({
         target: [characters.projectId, characters.renpyTag],
-      });
-  }
-  if (allVariables.length > 0) {
-    await tx
-      .insert(variables)
-      .values(
-        allVariables.map((v) => ({
-          projectId,
-          key: v.key,
-        }))
-      )
-      .onConflictDoNothing({
-        target: [variables.projectId, variables.key],
-      });
-  }
-  if (allStats.length > 0) {
-    await tx
-      .insert(stats)
-      .values(
-        allStats.map((s) => {
-          // Clamp parsed value to the valid [0, 100] range so a
-          // `default some_stat = 999` line produces minValue=100
-          // rather than silently exceeding the hard-coded maxValue.
-          const parsed = Math.round(Number.parseFloat(s.value)) || 0;
-          const minValue = Math.max(0, Math.min(parsed, 100));
-          return {
-            projectId,
-            key: s.key,
-            name: s.key,
-            minValue,
-            maxValue: 100,
-            updatedAt: new Date(),
-          };
-        })
-      )
-      .onConflictDoNothing({
-        target: [stats.projectId, stats.key],
       });
   }
 }

@@ -28,7 +28,7 @@ describe("catchUpManagedDefaults", () => {
     vi.clearAllMocks();
     vi.mocked(getDb).mockReturnValue(db as unknown as ReturnType<typeof getDb>);
     values.mockReturnValue({
-      onConflictDoNothing: () => ({ returning: async () => [{ id: "new" }] }),
+      onConflictDoUpdate: () => ({ returning: async () => [{ id: "new" }] }),
     });
     lockedRead.mockImplementation(async () => {
       expect(lockProject).toHaveBeenCalledWith(tx, "project");
@@ -76,7 +76,7 @@ describe("catchUpManagedDefaults", () => {
     await catchUpManagedDefaults("project");
 
     expect(values).toHaveBeenCalledExactlyOnceWith([
-      { projectId: "project", key: "current_flag" },
+      { projectId: "project", key: "current_flag", authoredDefault: true },
     ]);
   });
 });

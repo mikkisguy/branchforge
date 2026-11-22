@@ -35,9 +35,6 @@ import {
   projectFilePendingOperations,
   labels,
   labelLines,
-  characters,
-  stats,
-  variables,
   projects,
   projectSettings,
 } from "../../db/schema/index.js";
@@ -54,14 +51,15 @@ import {
   extractAndStripRpySymbols,
   isSourceOwnedRpyFile,
   collectSourceOwnedRpySymbolKeys,
+  filterGeneratedDefaults,
   DEFAULT_EXCLUDED_RENPY_TAGS,
 } from "../rpy-statements.service.js";
 import { ensureCharacterSourcePreservation } from "../character-source-preservation.service.js";
 import { catchUpManagedDefaults } from "../managed-defaults.service.js";
+import { fetchSupportingFileSources } from "../export-sources.service.js";
 import { assertExcludedCharactersHaveSourceOwnership } from "../export-consistency.service.js";
 
 import type { SyncOperation } from "../gitlab.types.js";
-import type { CharacterSourceDefinition } from "@branchforge/shared";
 import {
   createSyncOperation,
   updateSyncOperation,
@@ -203,30 +201,6 @@ function buildPlannedActions(
   return { actions, operations, contentUpdatedFiles };
 }
 
-interface GeneratedExportData {
-  variables: Array<{
-    key: string;
-    description: string | null;
-    category: string | null;
-  }>;
-  stats: Array<{
-    key: string;
-    name: string;
-    minValue: number;
-    maxValue: number;
-    description: string | null;
-  }>;
-  characters: Array<{
-    renpyTag: string;
-    name: string;
-    nameType: string;
-    color: string;
-    isNarrator: boolean;
-    displayName: string;
-    sourceDefinition: CharacterSourceDefinition | null;
-  }>;
-}
-
 /**
  * Generated files are not tracked in project_files, so GitLab needs an
  * explicit create action on their first export and an update thereafter.
@@ -236,7 +210,7 @@ async function buildGeneratedActions(
   userId: string,
   branch: string,
   fileDirPrefix: string,
-  generated: GeneratedExportData,
+  generated: Awaited<ReturnType<typeof fetchSupportingFileSources>>,
   activeFiles: ProjectFileRow[],
   excludedTags: ReadonlySet<string>
 ): Promise<PlannedAction[]> {
@@ -254,13 +228,13 @@ async function buildGeneratedActions(
   // is still pushed (overwriting a stale remote copy that may otherwise
   // collide with the protected declarations). Only a category with no DB
   // rows at all produces no action.
-  const filteredVariables = generated.variables.filter(
-    (variable) => !sourceOwnedKeys.has(variable.key)
-  );
-  const filteredStats = generated.stats.filter(
-    (stat) => !sourceOwnedKeys.has(stat.key)
-  );
-  const filteredCharacters = generated.characters.filter(
+  const { variables: filteredVariables, stats: filteredStats } =
+    filterGeneratedDefaults(
+      generated.projectVariables,
+      generated.projectStats,
+      sourceOwnedKeys
+    );
+  const filteredCharacters = generated.projectCharacters.filter(
     (character) =>
       !sourceOwnedKeys.has(character.renpyTag) &&
       !excludedTags.has(character.renpyTag)
@@ -268,19 +242,19 @@ async function buildGeneratedActions(
 
   const candidates: Array<{ filePath: string; content: string }> = [];
 
-  if (generated.variables.length > 0) {
+  if (generated.projectVariables.length > 0) {
     candidates.push({
       filePath: `${fileDirPrefix}branchforge_variables.rpy`,
       content: generateVariablesFile(filteredVariables),
     });
   }
-  if (generated.stats.length > 0) {
+  if (generated.projectStats.length > 0) {
     candidates.push({
       filePath: `${fileDirPrefix}branchforge_stats.rpy`,
       content: generateStatsFile(filteredStats),
     });
   }
-  if (generated.characters.length > 0) {
+  if (generated.projectCharacters.length > 0) {
     candidates.push({
       filePath: `${fileDirPrefix}branchforge_definitions.rpy`,
       content: generateCharacterDefinitionsFile(
@@ -927,47 +901,14 @@ export async function exportToGitlab(
       activeFiles.map((f) => f.filePath)
     );
 
-    const [projectVariables, projectStats, projectCharacters] =
-      await Promise.all([
-        db
-          .select({
-            key: variables.key,
-            description: variables.description,
-            category: variables.category,
-          })
-          .from(variables)
-          .where(eq(variables.projectId, projectId)),
-        db
-          .select({
-            key: stats.key,
-            name: stats.name,
-            minValue: stats.minValue,
-            maxValue: stats.maxValue,
-            description: stats.description,
-          })
-          .from(stats)
-          .where(eq(stats.projectId, projectId))
-          .orderBy(stats.key),
-        db
-          .select({
-            renpyTag: characters.renpyTag,
-            name: characters.name,
-            nameType: characters.nameType,
-            color: characters.color,
-            isNarrator: characters.isNarrator,
-            displayName: characters.displayName,
-            sourceDefinition: characters.sourceDefinition,
-          })
-          .from(characters)
-          .where(eq(characters.projectId, projectId)),
-      ]);
+    const generated = await fetchSupportingFileSources(projectId);
 
     // Export consistency: an excluded DB character without any current
     // active source-owned global declaration would silently disappear
     // from the remote tree. Fail with an actionable conflict before any
     // remote write.
     assertExcludedCharactersHaveSourceOwnership(
-      projectCharacters,
+      generated.projectCharacters,
       excludedTags,
       activeFiles.map((file) => ({
         filePath: file.filePath,
@@ -981,11 +922,7 @@ export async function exportToGitlab(
       userId,
       contentBranch,
       fileDirPrefix,
-      {
-        variables: projectVariables,
-        stats: projectStats,
-        characters: projectCharacters,
-      },
+      generated,
       activeFiles,
       excludedTags
     );

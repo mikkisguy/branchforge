@@ -12,9 +12,6 @@ import {
   exportsTable,
   projectFiles,
   labels,
-  variables,
-  stats,
-  characters,
   projects,
   projectSettings,
 } from "../db/schema/index.js";
@@ -37,10 +34,15 @@ import {
   extractAndStripRpySymbols,
   isSourceOwnedRpyFile,
   collectSourceOwnedRpySymbolKeys,
+  filterGeneratedDefaults,
   DEFAULT_EXCLUDED_RENPY_TAGS,
 } from "./rpy-statements.service.js";
 import { ensureCharacterSourcePreservation } from "./character-source-preservation.service.js";
 import { catchUpManagedDefaults } from "./managed-defaults.service.js";
+import {
+  fetchExportPreviewSources,
+  fetchSupportingFileSources,
+} from "./export-sources.service.js";
 import { assertExcludedCharactersHaveSourceOwnership } from "./export-consistency.service.js";
 import { checkRateLimit } from "./rate-limiter.service.js";
 import { logInfo, logError, logWarn, LogEventType } from "../lib/logger.js";
@@ -89,51 +91,6 @@ function sanitizeZipEntryPath(filePath: string): string | null {
 }
 
 /**
- * Fetch variables, stats, and characters used by export generation/preview.
- * Shared so both paths keep identical projections and projectId filters.
- */
-async function fetchSupportingFileSources(projectId: string) {
-  const db = getDb();
-
-  const [projectVariables, projectStats, projectCharacters] = await Promise.all(
-    [
-      db
-        .select({
-          key: variables.key,
-          description: variables.description,
-          category: variables.category,
-        })
-        .from(variables)
-        .where(eq(variables.projectId, projectId)),
-      db
-        .select({
-          key: stats.key,
-          name: stats.name,
-          minValue: stats.minValue,
-          maxValue: stats.maxValue,
-          description: stats.description,
-        })
-        .from(stats)
-        .where(eq(stats.projectId, projectId)),
-      db
-        .select({
-          renpyTag: characters.renpyTag,
-          name: characters.name,
-          nameType: characters.nameType,
-          color: characters.color,
-          isNarrator: characters.isNarrator,
-          displayName: characters.displayName,
-          sourceDefinition: characters.sourceDefinition,
-        })
-        .from(characters)
-        .where(eq(characters.projectId, projectId)),
-    ]
-  );
-
-  return { projectVariables, projectStats, projectCharacters };
-}
-
-/**
  * Collect the set of identifier names declared in source-owned RPY
  * files (screens.rpy, options.rpy, gui.rpy, etc.). These names are
  * owned by the user's project and must not be emitted by BranchForge
@@ -145,9 +102,14 @@ function excludeSourceOwnedSymbols(
   excludedTags: ReadonlySet<string>
 ) {
   const owned = collectSourceOwnedRpySymbolKeys(files, excludedTags);
+  const defaults = filterGeneratedDefaults(
+    sources.projectVariables,
+    sources.projectStats,
+    owned
+  );
   return {
-    projectVariables: sources.projectVariables.filter((v) => !owned.has(v.key)),
-    projectStats: sources.projectStats.filter((s) => !owned.has(s.key)),
+    projectVariables: defaults.variables,
+    projectStats: defaults.stats,
     projectCharacters: sources.projectCharacters.filter(
       (c) => !owned.has(c.renpyTag) && !excludedTags.has(c.renpyTag)
     ),
@@ -516,23 +478,8 @@ export async function getExportPreview(
 
   // Use the same ownership boundary as the ZIP export, including active
   // source files. Old managed rows may still exist after a source restore.
-  const db = getDb();
   const excludedTags = await fetchProjectExcludedTags(projectId);
-  const [sources, sourceFiles] = await Promise.all([
-    fetchSupportingFileSources(projectId),
-    db
-      .select({
-        filePath: projectFiles.filePath,
-        content: projectFiles.content,
-      })
-      .from(projectFiles)
-      .where(
-        and(
-          eq(projectFiles.projectId, projectId),
-          isNull(projectFiles.deletedAt)
-        )
-      ),
-  ]);
+  const { sources, sourceFiles } = await fetchExportPreviewSources(projectId);
   const { projectVariables, projectStats, projectCharacters } =
     excludeSourceOwnedSymbols(
       sources,

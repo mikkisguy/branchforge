@@ -41,6 +41,22 @@ applies when those files are in subdirectories or use different casing.
 Persistent settings (`default persistent.…`), string defaults, and name
 constants such as `define ne_first = "Nelson"` remain in your source files.
 
+ZIP imports and accepted GitLab pulls preserve boolean and simple numeric
+defaults from story files. Managed Variables and Stats show those values
+in the generated export preview. Changing Stat bounds or descriptions
+does not change the starting value. Numeric expressions that BranchForge
+does not manage remain in the source file.
+
+For older projects, BranchForge can recover authored defaults from active
+source or a verified, unchanged import snapshot. Older imports sometimes
+discarded a boolean value or rounded a number, and an old snapshot can be
+too ambiguous to use. In those cases, export retains the previous fallback
+of `False` for a Variable or the minimum bound for a Stat. Reimport the
+original declaration to restore its starting value.
+
+If an older ZIP import skipped a change that only affected a declaration,
+reimport the version of the file with your intended starting value.
+
 If an older import removed a setting such as `default quick_menu = True`,
 restore it from your original project or reimport the original file.
 BranchForge preserves the restored value and excludes matching declarations

@@ -19,6 +19,7 @@ import {
 } from "@/lib/api/gitlab";
 import {
   characterKeys,
+  exportKeys,
   gitlabKeys,
   labelKeys,
   projectFilesKeys,
@@ -217,9 +218,14 @@ export function useGitLabSync(): UseGitLabSyncReturn {
 
       if (op.status === "COMPLETED" && projectId) {
         invalidateProjectCaches(projectId);
+        if (op.operation === "IMPORT") {
+          void queryClient.refetchQueries({
+            queryKey: exportKeys.preview(projectId),
+          });
+        }
       }
     },
-    [invalidateProjectCaches, updateActiveOperationId]
+    [invalidateProjectCaches, queryClient, updateActiveOperationId]
   );
 
   // Query for polling the active operation

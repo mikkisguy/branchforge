@@ -29,6 +29,11 @@ export function localContentBaselineHash(
 ): string | null {
   if (file.lastPushedContentHash) return file.lastPushedContentHash;
   if (!file.originalContent) return null;
+  const currentPolicyHash = calculateContentHash(
+    extractAndStripRpySymbols(file.originalContent, file.filePath, excludedTags)
+      .cleanedContent
+  );
+  if (file.contentHash === currentPolicyHash) return currentPolicyHash;
   // Old imports without an explicit push baseline used the generic notice
   // and stripped even standard UI files. Recognize that exact historical
   // content only when it matches the current hash, so changing our ownership
@@ -37,13 +42,17 @@ export function localContentBaselineHash(
   if (file.contentHash) {
     // The previous ownership-aware extractor used one combined notice.
     // Recognize that exact content too, without hiding later authored edits.
-    const previous = extractLegacyRpySymbols(
-      file.originalContent,
-      file.filePath,
-      excludedTags ?? new Set(DEFAULT_EXCLUDED_RENPY_TAGS)
-    ).cleanedContent;
-    const previousHash = calculateContentHash(previous);
-    if (file.contentHash === previousHash) return previousHash;
+    const tags = excludedTags ?? new Set(DEFAULT_EXCLUDED_RENPY_TAGS);
+    for (const notices of ["separate", "combined"] as const) {
+      const previous = extractLegacyRpySymbols(
+        file.originalContent,
+        file.filePath,
+        tags,
+        notices
+      ).cleanedContent;
+      const previousHash = calculateContentHash(previous);
+      if (file.contentHash === previousHash) return previousHash;
+    }
     const legacy = extractLegacyRpySymbols(file.originalContent);
     if (
       legacy.characters.length ||
@@ -60,12 +69,7 @@ export function localContentBaselineHash(
       if (file.contentHash === legacyHash) return legacyHash;
     }
   }
-  const cleaned = extractAndStripRpySymbols(
-    file.originalContent,
-    file.filePath,
-    excludedTags
-  ).cleanedContent;
-  return calculateContentHash(cleaned);
+  return currentPolicyHash;
 }
 
 /**

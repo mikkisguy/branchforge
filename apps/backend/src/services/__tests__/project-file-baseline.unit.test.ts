@@ -76,6 +76,26 @@ describe("project-file-baseline", () => {
       )
     ).toBe(false);
   });
+
+  it("recognizes the last stripping policy for invalid integers", () => {
+    const originalContent =
+      "default flag = True\ndefault chapter = 01\nlabel start:\n    return";
+    const filePath = "game/script.rpy";
+    const previousContent = extractLegacyRpySymbols(
+      originalContent,
+      filePath,
+      new Set(),
+      "separate"
+    ).cleanedContent;
+    expect(
+      hasUnpushedLocalContent({
+        filePath,
+        originalContent,
+        contentHash: calculateContentHash(previousContent),
+        lastPushedContentHash: null,
+      })
+    ).toBe(false);
+  });
   it.each(["game/script.rpy", "game/screens.rpy"])(
     "recognizes an untouched legacy stripped baseline for %s",
     (filePath) => {

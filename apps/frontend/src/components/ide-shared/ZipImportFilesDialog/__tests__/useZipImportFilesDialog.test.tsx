@@ -10,6 +10,7 @@ import { useZipImportFilesDialog } from "../useZipImportFilesDialog";
 import { projectFilesApi } from "@/lib/api/project-files";
 import { charactersApi } from "@/lib/api/characters";
 import { createTestQueryClient } from "@/test/query-client";
+import { exportKeys } from "@/lib/query-keys";
 import type { ImportZipResponse } from "@branchforge/shared";
 
 const successToast = vi.fn();
@@ -63,6 +64,11 @@ describe("useZipImportFilesDialog", () => {
   });
 
   it("keeps auto-inserted discoveries out of the pre-import tag snapshot", async () => {
+    const previewQuery = vi.fn().mockResolvedValue({ files: [] });
+    await queryClient.fetchQuery({
+      queryKey: exportKeys.preview("proj-1"),
+      queryFn: previewQuery,
+    });
     vi.mocked(charactersApi.listCharacters).mockResolvedValue([
       {
         id: "old-id",
@@ -119,6 +125,7 @@ describe("useZipImportFilesDialog", () => {
     await act(async () => {
       await result.current.handleImport();
     });
+    expect(previewQuery).toHaveBeenCalledTimes(2);
     expect(result.current.showCharacterWizard).toBe(true);
     expect(result.current.detectedCharacters?.existingTags).toEqual(["old"]);
     expect(result.current.detectedCharacters?.characters[0].tag).toBe("new");

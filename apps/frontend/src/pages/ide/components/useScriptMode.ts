@@ -64,11 +64,14 @@ export function useScriptMode({
     };
   }, []);
 
-  const [generatedPreview, setGeneratedPreview] = useState<{
-    fileName: string;
-    content: string;
-  } | null>(null);
+  const [generatedPreviewFileName, setGeneratedPreviewFileName] = useState<
+    string | null
+  >(null);
   const previewQuery = useExportPreview(projectId);
+  const generatedPreview =
+    previewQuery.data?.files.find(
+      (file) => file.fileName === generatedPreviewFileName
+    ) ?? null;
   const {
     fileSaveStatus,
     isFileDirty,
@@ -121,7 +124,7 @@ export function useScriptMode({
         }
       }
 
-      setGeneratedPreview({ fileName: file.fileName, content: file.content });
+      setGeneratedPreviewFileName(file.fileName);
       setActiveLabelId(null);
     },
     [
@@ -137,7 +140,7 @@ export function useScriptMode({
     void clearEditorState();
     setActiveLabelId(null);
     setScrollToLine(null);
-    setGeneratedPreview(null);
+    setGeneratedPreviewFileName(null);
   }, [clearEditorState, setActiveLabelId]);
 
   const handleFileActivated = useCallback(() => {
@@ -227,7 +230,7 @@ export function useScriptMode({
       }
       pendingSelectionIdRef.current = null;
       setPendingSelectFileId(null);
-      setGeneratedPreview(null);
+      setGeneratedPreviewFileName(null);
     })();
     return () => {
       cancelled = true;
@@ -247,7 +250,7 @@ export function useScriptMode({
     clearTabsState();
     void clearEditorState();
     setScrollToLine(null);
-    setGeneratedPreview(null);
+    setGeneratedPreviewFileName(null);
     setFoldersToExpand([]);
     setPendingSelectFileId(null);
     setShowCreateFileDialog(false);
@@ -449,7 +452,7 @@ export function useScriptMode({
 
   const handleGitLabFileSelect = useCallback(
     (fileId: string) => {
-      setGeneratedPreview(null);
+      setGeneratedPreviewFileName(null);
       void selectFileTab(fileId);
     },
     [selectFileTab]
@@ -457,7 +460,7 @@ export function useScriptMode({
 
   const handleSelectFileTab = useCallback(
     async (fileId: string) => {
-      setGeneratedPreview(null);
+      setGeneratedPreviewFileName(null);
       await selectFileTab(fileId);
     },
     [selectFileTab]
@@ -465,7 +468,7 @@ export function useScriptMode({
 
   const handleGitLabSceneSelect = useCallback(
     (sceneId: string) => {
-      setGeneratedPreview(null);
+      setGeneratedPreviewFileName(null);
       setActiveLabelId(sceneId);
     },
     [setActiveLabelId]

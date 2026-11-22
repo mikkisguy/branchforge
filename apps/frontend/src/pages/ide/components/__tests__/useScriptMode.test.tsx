@@ -244,6 +244,31 @@ describe("useScriptMode generated preview lifecycle", () => {
     expect(setActiveLabelId).toHaveBeenCalledWith(null);
   });
 
+  it("updates an open generated preview when the query refreshes", async () => {
+    const fileName = "branchforge_variables.rpy";
+    const first = {
+      fileName,
+      content: "default flag = False",
+      isEmpty: false,
+      emptyReason: null,
+    };
+    previewState.data = { files: [first] };
+    const { result, rerender } = renderHook(() =>
+      useScriptMode({ runEditorTransition, projectId: "project-1" })
+    );
+    await act(async () => {
+      await result.current.onGeneratedFileSelect!(fileName);
+    });
+    expect(result.current.activeFileContent).toContain("default flag = False");
+
+    previewState.data = {
+      files: [{ ...first, content: "default flag = True" }],
+    };
+    rerender();
+    expect(result.current.activeGeneratedFileId).toBe(fileName);
+    expect(result.current.activeFileContent).toContain("default flag = True");
+  });
+
   it("saves dirty content before switching to generated preview", async () => {
     editorState.isFileDirty = true;
     editorState.triggerFileSave.mockResolvedValueOnce(true);

@@ -292,6 +292,7 @@ describe("ZipImportService", () => {
       select: vi.fn().mockReturnThis(),
       from: vi.fn().mockReturnThis(),
       where: vi.fn().mockReturnThis(),
+      for: vi.fn().mockReturnThis(),
       limit: vi.fn().mockResolvedValue([]),
       update: vi.fn().mockReturnThis(),
       execute: vi.fn().mockResolvedValue(undefined),

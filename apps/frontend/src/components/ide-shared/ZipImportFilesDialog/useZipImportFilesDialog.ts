@@ -8,7 +8,7 @@
 import { useReducer, useCallback, useRef, useEffect } from "react";
 import { useToast } from "@/contexts/ToastContext";
 import { useLabels } from "@/hooks/useLabels";
-import { projectFilesKeys, characterKeys } from "@/lib/query-keys";
+import { projectFilesKeys, characterKeys, exportKeys } from "@/lib/query-keys";
 import { useQueryClient } from "@tanstack/react-query";
 import { charactersApi } from "@/lib/api/characters";
 import { projectFilesApi } from "@/lib/api/project-files";
@@ -139,6 +139,9 @@ export function useZipImportFilesDialog(
             }),
             queryClient.refetchQueries({
               queryKey: characterKeys.lists(projectId),
+            }),
+            queryClient.refetchQueries({
+              queryKey: exportKeys.preview(projectId),
             }),
           ]);
         } catch (cacheError) {

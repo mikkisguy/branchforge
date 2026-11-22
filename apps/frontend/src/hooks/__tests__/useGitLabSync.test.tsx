@@ -11,7 +11,12 @@ import { QueryClientProvider, type QueryClient } from "@tanstack/react-query";
 import { useGitLabSync } from "../useGitLabSync";
 import { gitlabApi } from "@/lib/api/gitlab";
 import type { SyncOperation, ConflictResolution } from "@/lib/api/gitlab";
-import { characterKeys, labelKeys, projectFilesKeys } from "@/lib/query-keys";
+import {
+  characterKeys,
+  exportKeys,
+  labelKeys,
+  projectFilesKeys,
+} from "@/lib/query-keys";
 import { createTestQueryClient } from "@/test/query-client";
 
 // Mock the gitlab API
@@ -289,18 +294,26 @@ describe("useGitLabSync", () => {
       );
     });
 
-    it("should complete import operation successfully", async () => {
-      vi.mocked(gitlabApi.importFromGitlab).mockResolvedValue(
-        mockPendingOperation
-      );
+    it("refreshes the generated preview after import completes", async () => {
+      const previewQuery = vi.fn().mockResolvedValue({ files: [] });
+      await queryClient.fetchQuery({
+        queryKey: exportKeys.preview("project-1"),
+        queryFn: previewQuery,
+      });
+      vi.mocked(gitlabApi.importFromGitlab).mockResolvedValue({
+        ...mockPendingOperation,
+        operation: "IMPORT",
+      });
 
       // Mock status transitions
       let callCount = 0;
       vi.mocked(gitlabApi.getOperationStatus).mockImplementation(async () => {
         callCount++;
-        if (callCount === 1) return mockPendingOperation;
-        if (callCount === 2) return mockInProgressOperation;
-        return mockCompletedOperation;
+        if (callCount === 1)
+          return { ...mockPendingOperation, operation: "IMPORT" };
+        if (callCount === 2)
+          return { ...mockInProgressOperation, operation: "IMPORT" };
+        return { ...mockCompletedOperation, operation: "IMPORT" };
       });
 
       const { result } = renderHook(() => useGitLabSync(), { wrapper });
@@ -321,6 +334,7 @@ describe("useGitLabSync", () => {
 
       expect(result.current.state.operation?.status).toBe("COMPLETED");
       expect(result.current.state.progress).toBe(100);
+      expect(previewQuery).toHaveBeenCalledTimes(2);
     });
 
     it("should handle import errors", async () => {
