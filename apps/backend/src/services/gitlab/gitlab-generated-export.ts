@@ -110,7 +110,7 @@ export async function buildGeneratedActions(
       if (remote.content === null && !hasRows) return null;
       if (remote.content === content) return null;
       if (
-        !hasRows &&
+        content === empty &&
         remote.content
           ?.split(/\r?\n/)
           .every((line) => /^[ \t]*(?:#.*)?$/.test(line))
@@ -120,7 +120,10 @@ export async function buildGeneratedActions(
 
       // A changed prefix only suggests where a generated file might exist.
       // A handwritten file at that previous location is outside the cleanup.
-      if (previous && !remote.content?.startsWith(empty)) return null;
+      const hasGeneratedHeader = remote.content
+        ?.replace(/\r\n/g, "\n")
+        .startsWith(empty);
+      if (previous && !hasGeneratedHeader) return null;
 
       const path = filePath.toLowerCase();
       for (const occupied of occupiedPaths) {
@@ -139,7 +142,7 @@ export async function buildGeneratedActions(
       }
       // The empty generator output includes a newline boundary after the
       // full category-specific header.
-      if (!remote.lastCommitId || !remote.content.startsWith(empty)) {
+      if (!remote.lastCommitId || !hasGeneratedHeader) {
         throw createGeneratedPathConflictError(filePath);
       }
       return {

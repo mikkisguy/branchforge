@@ -23,8 +23,8 @@
  *   branch, because the new branch does not exist until the commit.
  * - Before the remote call the attempt is durably marked on the pending
  *   rows; on an ambiguous response or retry, the remote source/destination
- *   paths and content are re-read, and the attempt is only treated as
- *   successful when the ENTIRE atomic action set is observed.
+ *   paths and content are verified at one remote commit before pending
+ *   structural operations are finalized.
  * - Pending rows/tombstones/baselines are only finalized after confirmed
  *   success, in one DB transaction. No force path exists.
  */
@@ -67,18 +67,15 @@ import {
   findGeneratedCommitConflict,
 } from "./gitlab-generated-export.js";
 import {
-  _listFilesWithAuth,
   getBranchCommitSha,
   getFileContentWithMetadata,
   getRepositoryLink,
 } from "./gitlab-repository.service.js";
 import { calculateContentHash } from "../../lib/hash.js";
-import { validateGitLabUrl } from "../encryption.service.js";
-import { getDecryptedToken } from "./gitlab-integration.service.js";
 import { requireProjectOwnership } from "../authz.service.js";
 import { lockProject } from "../project-files-operations.service.js";
 import { localContentBaselineHash } from "../project-file-baseline.js";
-import { logWarn, logError } from "../../lib/logger.js";
+import { logError } from "../../lib/logger.js";
 import {
   NotFoundError,
   RepositoryNotLinkedError,
@@ -263,9 +260,8 @@ function buildPushedContent(
 }
 
 /**
- * Verify that the ENTIRE atomic action set is observable on the remote.
- * Used to reconcile a durably-marked push attempt after an ambiguous
- * response.
+ * Read each affected path at one immutable revision. A mismatch permits
+ * retrying the push, while a failed read leaves the attempt recoverable.
  */
 async function verifyActionSetObserved(
   projectId: string,
@@ -273,61 +269,41 @@ async function verifyActionSetObserved(
   branch: string,
   actions: BatchCommitAction[]
 ): Promise<boolean> {
-  try {
-    const repoLink = await getRepositoryLink(projectId);
-    if (!repoLink) return false;
-    const token = await getDecryptedToken(userId);
-    const url = validateGitLabUrl(repoLink.gitlabUrl || undefined);
-    const listing = await _listFilesWithAuth(
-      token,
-      url,
-      String(repoLink.gitlabProjectId),
-      branch,
-      () => true
-    );
-    const remotePaths = new Set(listing.map((f) => f.path));
+  if (actions.length === 0) return false;
 
-    const finalPaths = new Map<string, string | undefined>();
-    const removedPaths = new Set<string>();
-    for (const action of actions) {
-      if (action.action === "delete") {
-        removedPaths.add(action.filePath);
-        finalPaths.delete(action.filePath);
-      } else if (action.action === "move") {
-        const source = action.previousPath ?? action.filePath;
-        removedPaths.add(source);
-        finalPaths.delete(source);
-        finalPaths.set(action.filePath, action.content);
-      } else {
-        finalPaths.set(action.filePath, action.content);
+  const expectedContents = new Map<string, string | null | undefined>();
+  for (const action of actions) {
+    if (action.action === "delete") {
+      expectedContents.set(action.filePath, null);
+    } else {
+      if (action.action === "move") {
+        expectedContents.set(action.previousPath ?? action.filePath, null);
       }
+      expectedContents.set(action.filePath, action.content);
     }
-
-    for (const removedPath of removedPaths) {
-      if (!finalPaths.has(removedPath) && remotePaths.has(removedPath)) {
-        return false;
-      }
-    }
-    for (const [filePath, content] of finalPaths) {
-      if (!remotePaths.has(filePath)) return false;
-      if (content === undefined) continue;
-      const meta = await getFileContentWithMetadata(
-        projectId,
-        userId,
-        filePath,
-        branch
-      );
-      if (meta.content !== content) return false;
-    }
-    return true;
-  } catch (error) {
-    logWarn("gitlab_export.reconciliation_check_failed", {
-      projectId,
-      branch,
-      error: error instanceof Error ? error.message : String(error),
-    });
-    return false;
   }
+
+  let revision: string;
+  try {
+    revision = await getBranchCommitSha(projectId, userId, branch);
+  } catch (error) {
+    // If the target was never created, retry against the default branch.
+    if (error instanceof NotFoundError) return false;
+    throw error;
+  }
+  for (const [path, expected] of expectedContents) {
+    const { content } = await getFileContentWithMetadata(
+      projectId,
+      userId,
+      path,
+      revision
+    );
+    // A move without content still requires the destination to exist.
+    if (expected === undefined ? content === null : content !== expected) {
+      return false;
+    }
+  }
+  return true;
 }
 
 /**
@@ -335,14 +311,16 @@ async function verifyActionSetObserved(
  * content baseline:
  * - an expected source that 404s is a conflict (normally)
  * - a create/update destination that already exists is a conflict
- * - remote content drift from the stored per-file baseline is a conflict
+ * - remote drift is a conflict unless a reconciled batch already left
+ *   the exact desired content at a path with only a plain update
  */
 async function preflightConflicts(
   projectId: string,
   userId: string,
   branch: string,
   files: ProjectFileRow[],
-  plan: ExportPlan
+  plan: ExportPlan,
+  reconciledAttempt: boolean
 ): Promise<Map<string, string | null>> {
   const filesByRemoteBasePath = new Map<string, ProjectFileRow>();
   for (const f of files) {
@@ -352,7 +330,10 @@ async function preflightConflicts(
   const mustNotExist = new Set<string>();
   const mustExist = new Set<string>();
   const producedPaths = new Set<string>();
+  const structuralPaths = new Set<string>();
   for (const action of plan.actions) {
+    if (action.action !== "update") structuralPaths.add(action.filePath);
+    if (action.previousPath) structuralPaths.add(action.previousPath);
     if (action.action === "delete") {
       mustExist.add(action.filePath);
       mustNotExist.delete(action.filePath);
@@ -381,6 +362,12 @@ async function preflightConflicts(
   }
 
   const remoteContents = new Map<string, string | null>();
+  const localUpdates = new Map(
+    plan.contentUpdatedFiles.map(({ file, content }) => [
+      file.filePath,
+      content,
+    ])
+  );
 
   for (const remotePath of mustExist) {
     const meta = await getFileContentWithMetadata(
@@ -393,6 +380,15 @@ async function preflightConflicts(
       throw createPreflightSourceMissingError(remotePath);
     }
     remoteContents.set(remotePath, meta.content);
+    if (
+      reconciledAttempt &&
+      !structuralPaths.has(remotePath) &&
+      localUpdates.get(remotePath) === meta.content
+    ) {
+      // An applied batch can leave the plain update's local baseline stale.
+      // Matching bytes let the caller omit the update and advance its baseline.
+      continue;
+    }
     const storedFile = filesByRemoteBasePath.get(remotePath);
     const expectedHash = storedFile
       ? remoteContentBaselineHash(storedFile)
@@ -611,12 +607,13 @@ async function resolveExportContentBranch(
 }
 
 async function clearAttemptMarkers(
+  db: ExportTx | ReturnType<typeof getDb>,
   ids: string[],
   branch: string,
   attemptStartedAt?: Date
 ): Promise<void> {
   if (ids.length === 0) return;
-  await getDb()
+  await db
     .update(projectFilePendingOperations)
     .set({
       attemptStartedAt: null,
@@ -694,7 +691,15 @@ export async function exportToGitlab(
     // Include every tracked path in the generated-file collision check.
     let [trackedFiles, ops] = await loadExportState();
     let files = trackedFiles.filter((file) => file.source === "GITLAB");
+    const opsByFileId = new Map(ops.map((op) => [op.projectFileId, op]));
+    const previousPaths = files.flatMap((file) => {
+      const op = opsByFileId.get(file.id);
+      if (op?.operation === "CREATE") return [];
+      return [op?.remoteBasePath ?? file.remoteFilePath ?? file.filePath];
+    });
+    const previousPrefix = computeCommonDirectoryPrefix(previousPaths);
     let reconciledCommitId: string | null = null;
+    let reconciledAttempt = false;
 
     // Reconcile a previous ambiguous attempt on this branch before planning
     // against the current source baselines and generated declarations.
@@ -702,17 +707,48 @@ export async function exportToGitlab(
       (op) => op.attemptStartedAt !== null && op.attemptBranch === targetBranch
     );
     if (unresolved.length > 0) {
-      const previousPlan = buildPlannedActions(files, unresolved, excludedTags);
-      const observed = await verifyActionSetObserved(
+      // Only marked structural operations identify members of the prior
+      // attempt. Unrelated local edits are planned after reconciliation.
+      const unresolvedFileIds = new Set(
+        unresolved.map((op) => op.projectFileId)
+      );
+      const previousPlan = buildPlannedActions(
+        files.filter((file) => unresolvedFileIds.has(file.id)),
+        unresolved,
+        excludedTags
+      );
+      reconciledAttempt = await verifyActionSetObserved(
         projectId,
         userId,
         targetBranch,
         previousPlan.actions
       );
-      if (observed) {
-        reconciledCommitId = unresolved[0]?.lastAttemptCommitId ?? null;
-        await db.transaction(async (tx) => {
-          await lockProject(tx, projectId);
+      const unresolvedIds = unresolved.map((op) => op.id);
+      await db.transaction(async (tx) => {
+        await lockProject(tx, projectId);
+        const currentAttempts = await tx
+          .select()
+          .from(projectFilePendingOperations)
+          .where(inArray(projectFilePendingOperations.id, unresolvedIds))
+          .for("update");
+        const currentById = new Map(currentAttempts.map((op) => [op.id, op]));
+        for (const op of unresolved) {
+          const current = currentById.get(op.id);
+          if (
+            !current ||
+            current.updatedAt.getTime() !== op.updatedAt.getTime() ||
+            current.attemptStartedAt?.getTime() !==
+              op.attemptStartedAt?.getTime() ||
+            current.attemptBranch !== op.attemptBranch ||
+            current.lastAttemptCommitId !== op.lastAttemptCommitId
+          ) {
+            throw new Error(
+              "Pending GitLab export attempt changed during reconciliation"
+            );
+          }
+        }
+        if (reconciledAttempt) {
+          reconciledCommitId = unresolved[0]?.lastAttemptCommitId ?? null;
           await finalizeSuccessfulPush(
             tx,
             projectId,
@@ -720,15 +756,12 @@ export async function exportToGitlab(
             targetBranch,
             reconciledCommitId
           );
-        });
-        [trackedFiles, ops] = await loadExportState();
-        files = trackedFiles.filter((file) => file.source === "GITLAB");
-      } else {
-        await clearAttemptMarkers(
-          unresolved.map((op) => op.id),
-          targetBranch
-        );
-      }
+        } else {
+          await clearAttemptMarkers(tx, unresolvedIds, targetBranch);
+        }
+      });
+      [trackedFiles, ops] = await loadExportState();
+      files = trackedFiles.filter((file) => file.source === "GITLAB");
     }
 
     // Active (non-tombstoned) files for label patching and generated files.
@@ -834,12 +867,6 @@ export async function exportToGitlab(
       }))
     );
 
-    const opsByFileId = new Map(ops.map((op) => [op.projectFileId, op]));
-    const previousPaths = files.flatMap((file) => {
-      const op = opsByFileId.get(file.id);
-      if (op?.operation === "CREATE") return [];
-      return [op?.remoteBasePath ?? file.remoteFilePath ?? file.filePath];
-    });
     const occupiedPaths = new Set(
       [
         ...trackedFiles.flatMap((file) => [file.filePath, file.remoteFilePath]),
@@ -857,7 +884,7 @@ export async function exportToGitlab(
       userId,
       contentBranch,
       fileDirPrefix,
-      computeCommonDirectoryPrefix(previousPaths),
+      previousPrefix,
       generated,
       activeFiles,
       occupiedPaths,
@@ -874,7 +901,8 @@ export async function exportToGitlab(
         userId,
         contentBranch,
         files,
-        plan
+        plan,
+        reconciledAttempt
       );
 
       // Keep contentUpdatedFiles so omitted updates still advance baselines.
@@ -920,7 +948,12 @@ export async function exportToGitlab(
       } catch (error) {
         if (error instanceof GitLabCommitRejectedError) {
           // An explicit rejection cannot be reconciled as an applied commit.
-          await clearAttemptMarkers(plannedIds, targetBranch, attemptStartedAt);
+          await clearAttemptMarkers(
+            db,
+            plannedIds,
+            targetBranch,
+            attemptStartedAt
+          );
           if (generatedActions.length > 0) {
             const recheckBranch =
               contentBranch === targetBranch
