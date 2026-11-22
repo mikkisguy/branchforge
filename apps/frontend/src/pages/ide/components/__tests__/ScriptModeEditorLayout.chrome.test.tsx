@@ -83,6 +83,8 @@ function renderLayout(isFocusMode: boolean, saveStatus?: SaveStatus) {
         activeProjectFile={null}
         activeFileContent=""
         scrollToLine={null}
+        onOpenVariableReference={async () => true}
+        onBeforeVariableDelete={async () => true}
         initialExpandedFolders={[]}
         tabItems={[]}
         projectCharacters={[]}

@@ -52,6 +52,8 @@ export function ScriptMode({
     handleCloseFileTab,
     handleGitLabFileSelect,
     handleGitLabSceneSelect,
+    handleOpenVariableReference,
+    flushScriptForVariableDelete,
     handleContentChange,
     canUndo,
     canRedo,
@@ -208,6 +210,8 @@ export function ScriptMode({
           onFocusModeToggle={handleFocusModeToggle}
           onFileSelect={handleGitLabFileSelect}
           onSceneSelect={handleGitLabSceneSelect}
+          onOpenVariableReference={handleOpenVariableReference}
+          onBeforeVariableDelete={flushScriptForVariableDelete}
           onSelectTab={handleSelectFileTab}
           onCloseTab={handleCloseFileTab}
           onContentChange={handleContentChange}

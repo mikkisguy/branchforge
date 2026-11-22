@@ -35,7 +35,10 @@ interface UseFileEditorReturn {
   setEditedFileContent: (content: string) => void;
   triggerFileSave: () => Promise<boolean>;
   retryFileSave: () => Promise<boolean>;
-  switchToFile: (file: SwitchFileTarget) => Promise<boolean>;
+  switchToFile: (
+    file: SwitchFileTarget,
+    options?: { reload?: boolean }
+  ) => Promise<boolean>;
   clearEditorState: (flush?: boolean) => Promise<boolean>;
 }
 
@@ -224,8 +227,8 @@ export function useFileEditor({
   }, [isFileDirty]);
 
   const switchToFile = useCallback(
-    async (file: SwitchFileTarget) => {
-      if (currentEditFileId === file.id) {
+    async (file: SwitchFileTarget, { reload = false } = {}) => {
+      if (currentEditFileId === file.id && !reload) {
         return true;
       }
 

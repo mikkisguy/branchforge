@@ -60,7 +60,10 @@ vi.mock("../useScriptModeData", () => ({
     isLoadingFiles: false,
     activeLabel: null,
     activeLabelId: null,
-    refreshFiles: vi.fn(),
+    refreshFiles: async () => ({
+      data: scriptFilesState.projectFiles,
+      isError: false,
+    }),
     showSyncDialog: false,
     setShowSyncDialog: vi.fn(),
     showZipImportDialog: false,
@@ -221,6 +224,31 @@ describe("useScriptMode generated preview lifecycle", () => {
     editorState.isFileDirty = false;
     editorState.fileSaveStatus = "idle";
     editorState.triggerFileSave.mockResolvedValue(true);
+  });
+
+  it("opens a variable reference in the selected file and leaves the preview", async () => {
+    selectFileTab.mockResolvedValueOnce(true);
+    const { result } = renderHook(() =>
+      useScriptMode({ runEditorTransition, projectId: "project-1" })
+    );
+    await act(async () => {
+      await result.current.onGeneratedFileSelect("branchforge_definitions.rpy");
+    });
+    await act(async () => {
+      expect(
+        await result.current.handleOpenVariableReference({
+          fileId: "file-1",
+          filePath: "game/script.rpy",
+          line: 2,
+          kind: "condition",
+        })
+      ).toBe(true);
+    });
+    expect(selectFileTab).toHaveBeenCalledWith("file-1", {
+      refreshedFile: scriptFilesState.projectFiles[0],
+    });
+    expect(result.current.isGeneratedPreview).toBe(false);
+    expect(result.current.scrollToLine).toMatchObject({ line: 2 });
   });
 
   it("selects a generated file into read-only preview and blocks undo/redo", async () => {

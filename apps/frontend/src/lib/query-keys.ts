@@ -154,6 +154,8 @@ export const variableKeys = {
   all: ["variables"] as const,
   lists: (projectId: string) => ["variables", projectId, "list"] as const,
   detail: (variableId: string) => ["variables", "detail", variableId] as const,
+  references: (variableId: string) =>
+    [...variableKeys.detail(variableId), "references"] as const,
 } as const;
 
 // ============================================================================

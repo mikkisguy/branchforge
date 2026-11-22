@@ -5,7 +5,14 @@
  * Features customizable title, description, button labels, and loading state.
  */
 
-import { useCallback, useEffect, useEffectEvent, useId, useRef } from "react";
+import {
+  useCallback,
+  useEffect,
+  useEffectEvent,
+  useId,
+  useRef,
+  type ReactNode,
+} from "react";
 import { cn } from "@/lib/utils";
 import { nativeDialogOverlayClassName } from "@/components/ui/native-dialog-overlay";
 import { Button } from "@/components/ui/button";
@@ -23,6 +30,8 @@ interface ConfirmDialogProps {
   title: string;
   /** Dialog description explaining the action */
   description: string;
+  children?: ReactNode;
+  confirmDisabled?: boolean;
   /** Text for the cancel button (default: "Cancel") */
   cancelLabel?: string;
   /** Text for the confirm button (default: "Confirm") */
@@ -45,6 +54,8 @@ export function ConfirmDialog({
   onConfirm,
   title,
   description,
+  children,
+  confirmDisabled = false,
   cancelLabel = "Cancel",
   confirmLabel = "Confirm",
   isLoading = false,
@@ -73,7 +84,7 @@ export function ConfirmDialog({
   }, [isLoading, onOpenChange]);
 
   const handleConfirm = useCallback(async () => {
-    if (!isLoading) {
+    if (!isLoading && !confirmDisabled) {
       try {
         await onConfirm();
       } catch (error) {
@@ -85,7 +96,7 @@ export function ConfirmDialog({
         }
       }
     }
-  }, [isLoading, onConfirm, onError]);
+  }, [isLoading, confirmDisabled, onConfirm, onError]);
 
   const handleClose = useEffectEvent(() => onOpenChange(false));
 
@@ -157,6 +168,8 @@ export function ConfirmDialog({
           </p>
         </div>
 
+        {children}
+
         {/* Footer */}
         <div className="p-6 max-sm:p-4 border-t border-border/30 flex justify-end gap-2">
           <Button variant="outline" onClick={handleCancel} disabled={isLoading}>
@@ -165,7 +178,7 @@ export function ConfirmDialog({
           <Button
             variant={isNonDestructive ? "default" : "destructive"}
             onClick={handleConfirm}
-            disabled={isLoading}
+            disabled={isLoading || confirmDisabled}
           >
             {isLoading ? (
               <>

@@ -6,15 +6,16 @@
 
 import { useMemo, useState } from "react";
 import { Pencil, Trash2 } from "lucide-react";
-import type { Variable } from "@branchforge/shared";
+import type { Variable, VariableReference } from "@branchforge/shared";
 import { Button } from "@/components/ui/button";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { DeleteVariableDialog } from "./DeleteVariableDialog";
 
 interface VariablesListProps {
   variables: Variable[];
   isSaving: boolean;
   onEdit: (variableId: string) => void;
-  onDelete: (variableId: string) => void | Promise<void>;
+  onDelete: (variableId: string) => Promise<void>;
+  onOpenReference: (reference: VariableReference) => Promise<boolean>;
 }
 
 export function VariablesList({
@@ -22,9 +23,9 @@ export function VariablesList({
   isSaving,
   onEdit,
   onDelete,
+  onOpenReference,
 }: VariablesListProps) {
   const [deleteTarget, setDeleteTarget] = useState<Variable | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
 
   const groupedVariables = useMemo(() => {
     const groups: Record<string, Variable[]> = {};
@@ -42,20 +43,8 @@ export function VariablesList({
     return null;
   }
 
-  const handleConfirmDelete = async () => {
-    if (!deleteTarget) return;
-
-    setIsDeleting(true);
-    try {
-      await onDelete(deleteTarget.id);
-      setDeleteTarget(null);
-    } finally {
-      setIsDeleting(false);
-    }
-  };
-
   return (
-    <>
+    <div>
       <div className="space-y-6">
         {Object.entries(groupedVariables).map(([category, items]) => (
           <div key={category} className="space-y-3">
@@ -115,21 +104,15 @@ export function VariablesList({
         ))}
       </div>
 
-      <ConfirmDialog
-        open={deleteTarget !== null}
-        onOpenChange={(open) => {
-          if (!open && !isDeleting) {
-            setDeleteTarget(null);
-          }
-        }}
-        onConfirm={handleConfirmDelete}
-        title="Delete Variable"
-        description={`Are you sure you want to delete ${deleteTarget?.key || "this variable"}? This action cannot be undone and will remove it from your project.`}
-        cancelLabel="Cancel"
-        confirmLabel="Delete Variable"
-        isLoading={isDeleting}
-        loadingLabel="Deleting..."
-      />
-    </>
+      {deleteTarget && (
+        <DeleteVariableDialog
+          key={deleteTarget.id}
+          variable={deleteTarget}
+          onClose={() => setDeleteTarget(null)}
+          onDelete={onDelete}
+          onOpenReference={onOpenReference}
+        />
+      )}
+    </div>
   );
 }

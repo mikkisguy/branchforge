@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import type { Character } from "@branchforge/shared";
+import type { Character, VariableReference } from "@branchforge/shared";
 import { VariablesDialog } from "@/components/script-mode/VariablesDialog";
 import { StatManagementDialog } from "@/components/script-mode/StatManagementDialog";
 import { WorldElementsDialog } from "@/components/world-elements/WorldElementsDialog";
@@ -15,12 +15,16 @@ interface ScriptReferencePanelProps {
   projectId: string;
   projectCharacters: Character[];
   onCharacterEdit?: (characterId: string) => void;
+  onOpenVariableReference: (reference: VariableReference) => Promise<boolean>;
+  onBeforeVariableDelete: () => Promise<boolean>;
 }
 
 export function ScriptReferencePanel({
   projectId,
   projectCharacters,
   onCharacterEdit,
+  onOpenVariableReference,
+  onBeforeVariableDelete,
 }: ScriptReferencePanelProps) {
   const [variablesDialogOpen, setVariablesDialogOpen] = useState(false);
   const [statsDialogOpen, setStatsDialogOpen] = useState(false);
@@ -93,6 +97,8 @@ export function ScriptReferencePanel({
         open={variablesDialogOpen}
         onOpenChange={setVariablesDialogOpen}
         projectId={projectId}
+        onOpenReference={onOpenVariableReference}
+        onBeforeDelete={onBeforeVariableDelete}
       />
       <StatManagementDialog
         open={statsDialogOpen}

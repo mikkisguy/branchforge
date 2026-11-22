@@ -109,6 +109,11 @@ describe("ScriptReferencePanel - Characters Section", () => {
     <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
   );
 
+  const navigation = {
+    onOpenVariableReference: async () => true,
+    onBeforeVariableDelete: async () => true,
+  };
+
   beforeEach(() => {
     queryClient = createTestQueryClient();
     mockVariables.length = 0;
@@ -117,7 +122,11 @@ describe("ScriptReferencePanel - Characters Section", () => {
 
   it("renders empty state when no characters exist", () => {
     render(
-      <ScriptReferencePanel projectId={mockProjectId} projectCharacters={[]} />,
+      <ScriptReferencePanel
+        {...navigation}
+        projectId={mockProjectId}
+        projectCharacters={[]}
+      />,
       { wrapper }
     );
 
@@ -127,6 +136,7 @@ describe("ScriptReferencePanel - Characters Section", () => {
   it("sorts characters alphabetically by displayName", () => {
     const { container } = render(
       <ScriptReferencePanel
+        {...navigation}
         projectId={mockProjectId}
         projectCharacters={[
           mockCharacters[1], // Natsuki
@@ -148,6 +158,7 @@ describe("ScriptReferencePanel - Characters Section", () => {
   it("displays character avatars when avatarUrl exists", () => {
     const { container } = render(
       <ScriptReferencePanel
+        {...navigation}
         projectId={mockProjectId}
         projectCharacters={[mockCharacters[1]]} // Natsuki with avatarUrl
       />,
@@ -162,6 +173,7 @@ describe("ScriptReferencePanel - Characters Section", () => {
   it("falls back to colored circle when avatarUrl is missing", () => {
     const { container } = render(
       <ScriptReferencePanel
+        {...navigation}
         projectId={mockProjectId}
         projectCharacters={[mockCharacters[0]]} // Emily without avatarUrl
       />,
@@ -182,6 +194,7 @@ describe("ScriptReferencePanel - Characters Section", () => {
   it("displays Ren'Py tags in monospace", () => {
     const { container } = render(
       <ScriptReferencePanel
+        {...navigation}
         projectId={mockProjectId}
         projectCharacters={mockCharacters}
       />,
@@ -197,6 +210,7 @@ describe("ScriptReferencePanel - Characters Section", () => {
   it("shows heart icon only for love interests", () => {
     const { container } = render(
       <ScriptReferencePanel
+        {...navigation}
         projectId={mockProjectId}
         projectCharacters={mockCharacters}
       />,
@@ -210,6 +224,7 @@ describe("ScriptReferencePanel - Characters Section", () => {
   it("shows a book icon only for narrators", () => {
     const { container } = render(
       <ScriptReferencePanel
+        {...navigation}
         projectId={mockProjectId}
         projectCharacters={mockCharacters}
       />,
@@ -251,7 +266,11 @@ describe("ScriptReferencePanel - Characters Section", () => {
     );
 
     render(
-      <ScriptReferencePanel projectId={mockProjectId} projectCharacters={[]} />,
+      <ScriptReferencePanel
+        {...navigation}
+        projectId={mockProjectId}
+        projectCharacters={[]}
+      />,
       { wrapper }
     );
 

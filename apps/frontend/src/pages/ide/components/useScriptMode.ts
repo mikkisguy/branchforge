@@ -14,7 +14,7 @@ import { useProjectReset } from "@/hooks/useProjectReset";
 import { useScriptModeRefresh } from "@/hooks/useScriptModeRefresh";
 import { useTextUndo } from "@/hooks/useTextUndo";
 import type { LabelTitleMap } from "@/lib/codemirror/label-title-decoration";
-import type { SourceOrigin } from "@branchforge/shared";
+import type { SourceOrigin, VariableReference } from "@branchforge/shared";
 import { useScriptModeData } from "./useScriptModeData";
 import { useExportPreview } from "@/hooks/useExportPreview";
 import type { ProjectFileNode } from "@/hooks/useProjectFiles";
@@ -44,9 +44,14 @@ export function useScriptMode({
     skipSaveRef,
     labels,
     showErrorToast,
+    refreshFiles,
   } = data;
   const previousEditFileIdRef = useRef<string | null>(null);
   const [scrollToLine, setScrollToLine] = useState<number | null>(null);
+  const [referenceLocation, setReferenceLocation] = useState<{
+    fileId: string;
+    line: number;
+  } | null>(null);
   const [showCreateFileDialog, setShowCreateFileDialog] = useState(false);
   const [foldersToExpand, setFoldersToExpand] = useState<string[]>([]);
   const [pendingSelectFileId, setPendingSelectFileId] = useState<string | null>(
@@ -92,12 +97,12 @@ export function useScriptMode({
   });
 
   const handleScriptFileSelect = useCallback(
-    async (fileId: string) => {
-      const file = projectFiles.find(
-        (projectFile) => projectFile.id === fileId
-      );
+    async (fileId: string, refreshedFile?: ProjectFileNode) => {
+      const file =
+        refreshedFile ??
+        projectFiles.find((projectFile) => projectFile.id === fileId);
       if (!file) return false;
-      return await switchToFile(file);
+      return await switchToFile(file, { reload: !!refreshedFile });
     },
     [projectFiles, switchToFile]
   );
@@ -140,11 +145,13 @@ export function useScriptMode({
     void clearEditorState();
     setActiveLabelId(null);
     setScrollToLine(null);
+    setReferenceLocation(null);
     setGeneratedPreviewFileName(null);
   }, [clearEditorState, setActiveLabelId]);
 
   const handleFileActivated = useCallback(() => {
     setScrollToLine(null);
+    setReferenceLocation(null);
     setActiveLabelId(null);
   }, [setActiveLabelId]);
 
@@ -250,6 +257,7 @@ export function useScriptMode({
     clearTabsState();
     void clearEditorState();
     setScrollToLine(null);
+    setReferenceLocation(null);
     setGeneratedPreviewFileName(null);
     setFoldersToExpand([]);
     setPendingSelectFileId(null);
@@ -469,9 +477,24 @@ export function useScriptMode({
   const handleGitLabSceneSelect = useCallback(
     (sceneId: string) => {
       setGeneratedPreviewFileName(null);
+      setReferenceLocation(null);
       setActiveLabelId(sceneId);
     },
     [setActiveLabelId]
+  );
+
+  const handleOpenVariableReference = useCallback(
+    async ({ fileId, line }: VariableReference) => {
+      if (hasPendingSave && !(await triggerFileSave())) return false;
+      const refreshed = await refreshFiles();
+      const file = refreshed.data?.find((candidate) => candidate.id === fileId);
+      if (refreshed.isError || !file) return false;
+      if (!(await selectFileTab(fileId, { refreshedFile: file }))) return false;
+      setGeneratedPreviewFileName(null);
+      setReferenceLocation({ fileId, line });
+      return true;
+    },
+    [hasPendingSave, triggerFileSave, refreshFiles, selectFileTab]
   );
 
   const initialExpandedFolders = useMemo(() => {
@@ -571,7 +594,7 @@ export function useScriptMode({
     activeLabel: data.activeLabel,
     activeLabelId: data.activeLabelId,
     projectFiles: data.projectFiles,
-    refreshFiles: data.refreshFiles,
+    refreshFiles,
     showSyncDialog: data.showSyncDialog,
     setShowSyncDialog: data.setShowSyncDialog,
     showZipImportDialog: data.showZipImportDialog,
@@ -587,12 +610,17 @@ export function useScriptMode({
     handleCloseFileTab,
     handleGitLabFileSelect,
     handleGitLabSceneSelect,
+    handleOpenVariableReference,
+    flushScriptForVariableDelete: triggerFileSave,
     handleContentChange,
     canUndo: isGeneratedPreview ? false : canUndo,
     canRedo: isGeneratedPreview ? false : canRedo,
     onUndo,
     onRedo,
-    scrollToLine,
+    scrollToLine:
+      referenceLocation && referenceLocation.fileId === activeFileId
+        ? referenceLocation
+        : scrollToLine,
     fileSaveStatus,
     onSaveRequest,
     labelTitles,

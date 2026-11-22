@@ -9,25 +9,42 @@
  * - Test database must exist and have proper schema
  */
 
-import { describe, it, expect, beforeEach, afterEach, beforeAll } from "vitest";
+import {
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterEach,
+  beforeAll,
+  vi,
+} from "vitest";
+import Fastify from "fastify";
+import cookie from "@fastify/cookie";
+import session from "@fastify/session";
 import { getDb } from "../../db/index.js";
 import {
   users,
   projects,
+  projectFiles,
   variables,
   type NewUser,
   type NewProject,
   type NewVariable,
 } from "../../db/schema/index.js";
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import {
   listVariables,
   getVariable,
   createVariable,
   updateVariable,
   deleteVariable,
+  listVariableReferences,
 } from "../variables.service.js";
 import { testEmail, testUuid } from "../../utils/test-ids.js";
+import { updateFileContent } from "../projects.service.js";
+import { calculateContentHash } from "../../lib/hash.js";
+import { variablesRoutes } from "../../routes/variables.routes.js";
+import { globalErrorHandler } from "../../middleware/error-handler.middleware.js";
 
 describe("VariablesService (Integration)", () => {
   let db: ReturnType<typeof getDb>;
@@ -487,6 +504,201 @@ describe("VariablesService (Integration)", () => {
   // ============================================================================
 
   describe("deleteVariable", () => {
+    const fileId = testUuid("34000000", 1);
+    const filePath = "game/chapter.rpy";
+    const unusedContent =
+      "label chapter:\n    if persistent.met_eileen:\n        pass\n";
+    const referencedContent =
+      unusedContent + "    elif met_eileen:\n        $ met_eileen = True\n";
+
+    async function addScript(content: string) {
+      await db.insert(projectFiles).values({
+        id: fileId,
+        projectId: ownedProject.id!,
+        source: "ZIP",
+        fileType: "STORY",
+        filePath,
+        content,
+        contentHash: calculateContentHash(content),
+      });
+    }
+
+    it("blocks a direct DELETE after the preview becomes stale and leaves the source and defaults intact", async () => {
+      await addScript(unusedContent);
+      await db
+        .update(variables)
+        .set({ authoredDefault: true })
+        .where(eq(variables.id, testVariable1.id!));
+
+      const app = Fastify();
+      app.register(cookie);
+      app.register(session, {
+        secret: "test-session-secret-at-least-32-characters",
+        cookie: { secure: false },
+      });
+      app.setErrorHandler(globalErrorHandler);
+      app.register(variablesRoutes);
+      app.post("/test-login", async (request, reply) => {
+        request.session.user = {
+          id: testUserId,
+          email: testUser.email,
+          role: "OWNER",
+        };
+        return reply.status(204).send();
+      });
+
+      try {
+        const login = await app.inject({ method: "POST", url: "/test-login" });
+        const cookies = { [login.cookies[0].name]: login.cookies[0].value };
+        const url = `/variables/${testVariable1.id}`;
+        const preview = await app.inject({ url: `${url}/references`, cookies });
+        expect(preview.statusCode).toBe(200);
+        expect(preview.json()).toEqual({ references: [] });
+
+        await updateFileContent(fileId, testUserId, referencedContent);
+        const before = {
+          files: await db
+            .select()
+            .from(projectFiles)
+            .where(eq(projectFiles.id, fileId)),
+          variables: await db
+            .select()
+            .from(variables)
+            .where(eq(variables.projectId, ownedProject.id!)),
+        };
+        const rejected = await app.inject({ method: "DELETE", url, cookies });
+        expect(rejected.statusCode).toBe(409);
+        expect(rejected.json()).toMatchObject({
+          reason: "VARIABLE_IN_USE",
+          references: [
+            { fileId, filePath, line: 4, kind: "condition" },
+            { fileId, filePath, line: 5, kind: "assignment" },
+          ],
+        });
+        expect(
+          await db
+            .select()
+            .from(projectFiles)
+            .where(eq(projectFiles.id, fileId))
+        ).toEqual(before.files);
+        expect(
+          await db
+            .select()
+            .from(variables)
+            .where(eq(variables.projectId, ownedProject.id!))
+        ).toEqual(before.variables);
+
+        await updateFileContent(fileId, testUserId, unusedContent);
+        const [resolvedFile] = await db
+          .select()
+          .from(projectFiles)
+          .where(eq(projectFiles.id, fileId));
+        const deleted = await app.inject({ method: "DELETE", url, cookies });
+        expect(deleted.statusCode).toBe(204);
+        expect(await getVariable(testVariable1.id!, testUserId)).toBeNull();
+        expect(await getVariable(testVariable2.id!, testUserId)).not.toBeNull();
+        expect(
+          await db
+            .select()
+            .from(projectFiles)
+            .where(eq(projectFiles.id, fileId))
+        ).toEqual([resolvedFile]);
+      } finally {
+        await app.close();
+      }
+    });
+
+    it("waits for a file-only source writer before deciding whether to delete", async () => {
+      await addScript(unusedContent);
+      const fileLocked = Promise.withResolvers<void>();
+      const releaseWriter = Promise.withResolvers<void>();
+      const writer = db.transaction(async (tx) => {
+        await tx
+          .select({ id: projectFiles.id })
+          .from(projectFiles)
+          .where(eq(projectFiles.id, fileId))
+          .for("update");
+        fileLocked.resolve();
+        await releaseWriter.promise;
+        await tx
+          .update(projectFiles)
+          .set({
+            content: referencedContent,
+            contentHash: calculateContentHash(referencedContent),
+          })
+          .where(eq(projectFiles.id, fileId));
+      });
+      await Promise.race([fileLocked.promise, writer]);
+      const deletion = deleteVariable(testVariable1.id!, testUserId);
+      const result = expect(deletion).rejects.toMatchObject({
+        reason: "VARIABLE_IN_USE",
+      });
+      try {
+        await vi.waitFor(
+          async () => {
+            const { rows } = await db.execute(sql`
+            select 1 from pg_stat_activity
+            where datname = current_database() and wait_event_type = 'Lock'
+              and query like 'select%from "project_files"%for update'
+          `);
+            expect(rows).toHaveLength(1);
+          },
+          { timeout: 5000 }
+        );
+      } finally {
+        releaseWriter.resolve();
+        await Promise.all([writer, result]);
+      }
+    });
+
+    it("rejects reference lookup for another project's variable", async () => {
+      await expect(
+        listVariableReferences(testVariable1.id!, otherUserId)
+      ).rejects.toThrow("Variable");
+    });
+
+    it("finds references across active project files and skips deleted files", async () => {
+      await addScript(referencedContent);
+      const settingsId = testUuid("34000000", 2);
+      const content =
+        'screen other():\n    if met_eileen == False:\n        text "Optional"';
+      await db.insert(projectFiles).values([
+        {
+          id: settingsId,
+          projectId: ownedProject.id!,
+          source: "ZIP",
+          fileType: "SETTINGS",
+          filePath: "game/settings.rpy",
+          content,
+          contentHash: calculateContentHash(content),
+        },
+        {
+          projectId: ownedProject.id!,
+          source: "GITLAB",
+          fileType: "STORY",
+          filePath: "game/removed.rpy",
+          content,
+          contentHash: calculateContentHash(content),
+          deletedAt: new Date(),
+        },
+      ]);
+
+      const references = await listVariableReferences(
+        testVariable1.id!,
+        testUserId
+      );
+      expect(references).toEqual([
+        { fileId, filePath, line: 4, kind: "condition" },
+        { fileId, filePath, line: 5, kind: "assignment" },
+        {
+          fileId: settingsId,
+          filePath: "game/settings.rpy",
+          line: 2,
+          kind: "condition",
+        },
+      ]);
+    });
+
     it("should delete variable", async () => {
       const result = await deleteVariable(testVariable1.id!, testUserId);
 

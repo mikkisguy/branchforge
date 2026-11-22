@@ -25,7 +25,7 @@ const ScriptEditorFallback = () => (
 interface ScriptEditorProps {
   content: string;
   onChange?: (value: string) => void;
-  scrollToLine?: number | null;
+  scrollToLine?: number | { line: number } | null;
   readOnly?: boolean;
   isFocusMode?: boolean;
   saveStatus?: import("@/hooks/useAutosave").SaveStatus;

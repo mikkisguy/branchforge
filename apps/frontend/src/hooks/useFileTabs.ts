@@ -16,6 +16,7 @@ import type { ProjectFileNode } from "./useProjectFiles";
 
 interface SelectFileOptions {
   notify?: boolean;
+  refreshedFile?: ProjectFileNode;
 }
 
 interface UseFileTabsProps {
@@ -24,7 +25,10 @@ interface UseFileTabsProps {
   isLoadingFiles: boolean;
   initialDocumentId?: string | null;
   isResettingRef?: MutableRefObject<boolean>;
-  onFileSelect: (fileId: string) => Promise<boolean> | boolean;
+  onFileSelect: (
+    fileId: string,
+    refreshedFile?: ProjectFileNode
+  ) => Promise<boolean> | boolean;
   onFileActivated?: (fileId: string) => void;
   onNoTabsRemaining?: () => void;
 }
@@ -95,14 +99,18 @@ export function useFileTabs({
 
   const selectFileTab = useCallback(
     async (fileId: string, options: SelectFileOptions = {}) => {
-      const file = projectFiles.find(
-        (projectFile) => projectFile.id === fileId
-      );
-      if (!file) {
+      const { refreshedFile } = options;
+      if (
+        refreshedFile
+          ? refreshedFile.id !== fileId || refreshedFile.projectId !== projectId
+          : !projectFiles.some((file) => file.id === fileId)
+      ) {
         return false;
       }
 
-      const switched = await onFileSelect(fileId);
+      const switched = refreshedFile
+        ? await onFileSelect(fileId, refreshedFile)
+        : await onFileSelect(fileId);
       if (!switched) {
         return false;
       }
@@ -121,7 +129,7 @@ export function useFileTabs({
 
       return true;
     },
-    [onFileActivated, onFileSelect, projectFiles]
+    [onFileActivated, onFileSelect, projectFiles, projectId]
   );
 
   const handleCloseFileTab = useCallback(

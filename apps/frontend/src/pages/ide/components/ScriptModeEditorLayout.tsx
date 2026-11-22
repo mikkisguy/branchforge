@@ -46,6 +46,7 @@ import { useWorkspacePanel } from "@/hooks/useWorkspacePanel";
 import { useFocusModeKeyboardHandler } from "@/hooks/useFocusModeKeyboardHandler";
 import { SCRIPT_LEFT_PANEL, SCRIPT_RIGHT_PANEL } from "@/lib/workspace-panels";
 import type {
+  VariableReference,
   LabelDetail,
   Character,
   SourceOrigin,
@@ -72,7 +73,7 @@ interface ScriptModeEditorLayoutProps {
   activeLabel: LabelDetail | undefined;
   activeProjectFile: ProjectFileNode | null;
   activeFileContent: string;
-  scrollToLine: number | null;
+  scrollToLine: number | { line: number } | null;
   initialExpandedFolders: string[];
   foldersToExpand?: string[];
   tabItems: EditorTabBarItem[];
@@ -82,6 +83,8 @@ interface ScriptModeEditorLayoutProps {
   onFocusModeToggle: () => void;
   onFileSelect: (fileId: string) => void;
   onSceneSelect: (sceneId: string) => void;
+  onOpenVariableReference: (reference: VariableReference) => Promise<boolean>;
+  onBeforeVariableDelete: () => Promise<boolean>;
   onSelectTab: (fileId: string) => void | Promise<void>;
   onCloseTab: (event: MouseEvent | KeyboardEvent, fileId: string) => void;
   onContentChange: (value: string) => void;
@@ -128,6 +131,8 @@ export function ScriptModeEditorLayout({
   onFocusModeToggle,
   onFileSelect,
   onSceneSelect,
+  onOpenVariableReference,
+  onBeforeVariableDelete,
   onSelectTab,
   onCloseTab,
   onContentChange,
@@ -413,6 +418,8 @@ export function ScriptModeEditorLayout({
                   projectId={projectId ?? ""}
                   projectCharacters={projectCharacters}
                   onCharacterEdit={setEditingCharacterId}
+                  onOpenVariableReference={onOpenVariableReference}
+                  onBeforeVariableDelete={onBeforeVariableDelete}
                 />
               </div>
             }
