@@ -12,9 +12,6 @@ import {
   exportsTable,
   projectFiles,
   labels,
-  variables,
-  stats,
-  characters,
   projects,
   projectSettings,
 } from "../db/schema/index.js";
@@ -42,6 +39,7 @@ import {
 } from "./rpy-statements.service.js";
 import { ensureCharacterSourcePreservation } from "./character-source-preservation.service.js";
 import { catchUpManagedDefaults } from "./managed-defaults.service.js";
+import { fetchSupportingFileSources } from "./export-sources.service.js";
 import { assertExcludedCharactersHaveSourceOwnership } from "./export-consistency.service.js";
 import { checkRateLimit } from "./rate-limiter.service.js";
 import { logInfo, logError, logWarn, LogEventType } from "../lib/logger.js";
@@ -87,53 +85,6 @@ export interface GenerateExportResult {
 function sanitizeZipEntryPath(filePath: string): string | null {
   const canonical = canonicalizeRpyFilePath(filePath);
   return canonical.ok ? canonical.filePath : null;
-}
-
-/**
- * Fetch variables, stats, and characters used by export generation/preview.
- * Shared so both paths keep identical projections and projectId filters.
- */
-async function fetchSupportingFileSources(projectId: string) {
-  const db = getDb();
-
-  const [projectVariables, projectStats, projectCharacters] = await Promise.all(
-    [
-      db
-        .select({
-          key: variables.key,
-          authoredDefault: variables.authoredDefault,
-          description: variables.description,
-          category: variables.category,
-        })
-        .from(variables)
-        .where(eq(variables.projectId, projectId)),
-      db
-        .select({
-          key: stats.key,
-          authoredDefault: stats.authoredDefault,
-          name: stats.name,
-          minValue: stats.minValue,
-          maxValue: stats.maxValue,
-          description: stats.description,
-        })
-        .from(stats)
-        .where(eq(stats.projectId, projectId)),
-      db
-        .select({
-          renpyTag: characters.renpyTag,
-          name: characters.name,
-          nameType: characters.nameType,
-          color: characters.color,
-          isNarrator: characters.isNarrator,
-          displayName: characters.displayName,
-          sourceDefinition: characters.sourceDefinition,
-        })
-        .from(characters)
-        .where(eq(characters.projectId, projectId)),
-    ]
-  );
-
-  return { projectVariables, projectStats, projectCharacters };
 }
 
 /**
@@ -526,21 +477,16 @@ export async function getExportPreview(
   // source files. Old managed rows may still exist after a source restore.
   const db = getDb();
   const excludedTags = await fetchProjectExcludedTags(projectId);
-  const [sources, sourceFiles] = await Promise.all([
-    fetchSupportingFileSources(projectId),
-    db
-      .select({
-        filePath: projectFiles.filePath,
-        content: projectFiles.content,
-      })
-      .from(projectFiles)
-      .where(
-        and(
-          eq(projectFiles.projectId, projectId),
-          isNull(projectFiles.deletedAt)
-        )
-      ),
-  ]);
+  const sources = await fetchSupportingFileSources(projectId);
+  const sourceFiles = await db
+    .select({
+      filePath: projectFiles.filePath,
+      content: projectFiles.content,
+    })
+    .from(projectFiles)
+    .where(
+      and(eq(projectFiles.projectId, projectId), isNull(projectFiles.deletedAt))
+    );
   const { projectVariables, projectStats, projectCharacters } =
     excludeSourceOwnedSymbols(
       sources,

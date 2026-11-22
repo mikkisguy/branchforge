@@ -2484,6 +2484,51 @@ describe("GitLabSyncService (Integration)", () => {
   });
 
   describe("importFromGitlab", () => {
+    it.each(["branchforge_wins", "gitlab_wins", "manual_review"] as const)(
+      "keeps a default-only Script Mode save on an unchanged remote under %s",
+      async (policy) => {
+        const remote = `default starting_points = 120\n${testGitlabFile.content}`;
+        vi.spyOn(gitlabRepoService, "listRpyFiles").mockResolvedValue([
+          { name: "script.rpy", path: testGitlabFile.filePath },
+        ]);
+        vi.spyOn(
+          gitlabRepoService,
+          "getFileContentWithMetadata"
+        ).mockResolvedValue({
+          content: remote,
+          lastCommitId: "unchanged",
+          contentSha256: null,
+          blobId: null,
+        });
+        vi.spyOn(rpyParserService, "parseRPYFileWithLabels").mockImplementation(
+          parseRealRPY
+        );
+        const pull = () =>
+          importFromGitlab(testProjectId, testUserId, testBranch, policy);
+        expect(await pull()).toMatchObject({ status: "COMPLETED" });
+        const [file] = await db
+          .select()
+          .from(projectFiles)
+          .where(eq(projectFiles.id, testGitlabFileId));
+        const edited = `default starting_points = 121\n${file.content}`;
+        const saved = await updateFileContent(
+          file.id,
+          testUserId,
+          edited,
+          file.contentHash
+        );
+        expect(saved.contentHash).not.toBe(file.lastPushedContentHash);
+        expect(await pull()).toMatchObject({
+          status: "COMPLETED",
+          conflictCount: 0,
+        });
+        const preview = await getExportPreview(testProjectId, testUserId);
+        expect(
+          preview.files.find((item) => item.kind === "stats")?.content
+        ).toContain("default starting_points = 121\n");
+      }
+    );
+
     it("round-trips authored defaults and applies only accepted remote values", async () => {
       const declarations = [
         "default both_mode = True",

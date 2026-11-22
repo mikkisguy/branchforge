@@ -1,5 +1,5 @@
 import JSZip from "jszip";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { getDb } from "../../db/index.js";
 import {
@@ -19,9 +19,14 @@ import {
   getExportPreview,
 } from "../export.service.js";
 import { ConflictError } from "../../middleware/error-handler.middleware.js";
-import { extractAndStripRpySymbols } from "../rpy-statements.service.js";
+import {
+  extractAndStripRpySymbols,
+  filterGeneratedDefaults,
+} from "../rpy-statements.service.js";
 import { statsService } from "../stats.service.js";
 import { createVariable, updateVariable } from "../variables.service.js";
+import { fetchSupportingFileSources } from "../export-sources.service.js";
+import { promoteManagedDefaults } from "../managed-defaults.service.js";
 
 const userId = testUuid("09000000", 80);
 const projectId = testUuid("19000000", 80);
@@ -89,6 +94,64 @@ describe("managed defaults (Integration)", () => {
     const download = await getExportForDownload(exported.id, projectId, userId);
     return JSON.parse(download.content) as Record<string, string>;
   }
+
+  it("keeps one default snapshot across a concurrent accepted type change", async () => {
+    await db.insert(variables).values({ projectId, key: "score" });
+    await db.insert(stats).values({
+      projectId,
+      key: "score",
+      name: "Score",
+      authoredDefault: "120",
+      minValue: 100,
+    });
+    const readSources = async () => {
+      const { projectVariables, projectStats } =
+        await fetchSupportingFileSources(projectId);
+      return filterGeneratedDefaults(projectVariables, projectStats, new Set());
+    };
+    const transaction = db.transaction.bind(db);
+    const intercept = vi
+      .spyOn(db, "transaction")
+      .mockImplementationOnce((read, config) =>
+        transaction(async (tx) => {
+          // Establish the reader snapshot, then commit the import before the
+          // supporting file queries run. The import uses another connection.
+          await tx
+            .select({ key: variables.key })
+            .from(variables)
+            .where(eq(variables.projectId, projectId));
+          await transaction(async (writer) => {
+            await promoteManagedDefaults(
+              writer,
+              projectId,
+              [
+                {
+                  key: "score",
+                  value: "True",
+                  kind: "variable",
+                },
+              ],
+              "accepted"
+            );
+          });
+          return read(tx);
+        }, config)
+      );
+    try {
+      const before = await readSources();
+      expect(before.variables).toEqual([]);
+      expect(before.stats).toMatchObject([
+        { key: "score", authoredDefault: "120" },
+      ]);
+    } finally {
+      intercept.mockRestore();
+    }
+    const after = await readSources();
+    expect(after.variables).toMatchObject([
+      { key: "score", authoredDefault: true },
+    ]);
+    expect(after.stats).toEqual([]);
+  });
 
   it("round-trips ZIP defaults exactly once and keeps values through metadata and dialogue edits", async () => {
     const defaults = [
@@ -254,6 +317,50 @@ describe("managed defaults (Integration)", () => {
       "default old_flag = False"
     );
   });
+
+  it.each([
+    {
+      kind: "variables",
+      declaration: "default recreated = True",
+      fallback: "False",
+    },
+    { kind: "stats", declaration: "default recreated = 120", fallback: "5" },
+  ])(
+    "keeps a newly recreated $kind row independent of archived defaults",
+    async ({ kind, declaration, fallback }) => {
+      const raw = `${declaration}\n${baseStory}`;
+      const path = "game/recreated.rpy";
+      const file = await insertRawFile(
+        path,
+        extractAndStripRpySymbols(raw, path).cleanedContent
+      );
+      await db
+        .update(projectFiles)
+        .set({ originalContent: raw })
+        .where(eq(projectFiles.id, file.id));
+
+      if (kind === "variables") {
+        await createVariable(userId, projectId, { key: "recreated" });
+      } else {
+        await statsService.createStat(projectId, userId, {
+          key: "recreated",
+          name: "Recreated",
+          minValue: 5,
+        });
+      }
+      const files = await exportFiles();
+      expect(files[`game/branchforge_${kind}.rpy`]).toContain(
+        `default recreated = ${fallback}\n`
+      );
+
+      expect(await importZipFile(projectId, await archive(raw))).toMatchObject({
+        success: true,
+      });
+      expect((await exportFiles())[`game/branchforge_${kind}.rpy`]).toContain(
+        `${declaration}\n`
+      );
+    }
+  );
 
   it("promotes defaults authored on save, previews them, and exports them exactly once", async () => {
     await importZipFile(projectId, await archive(baseStory));

@@ -14,6 +14,7 @@ import {
   NotFoundError,
   ValidationError,
 } from "../middleware/error-handler.middleware.js";
+import { ensureCharacterSourcePreservation } from "./character-source-preservation.service.js";
 import { isUniqueConstraintViolation } from "../lib/db.js";
 
 // ============================================================================
@@ -138,6 +139,8 @@ export async function createVariable(
   if (projectCheck.length === 0) {
     throw new NotFoundError("Project");
   }
+
+  await ensureCharacterSourcePreservation(projectId);
 
   const newVariable: NewVariable = {
     projectId,

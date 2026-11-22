@@ -16,6 +16,7 @@ import {
   ValidationError,
 } from "../middleware/error-handler.middleware.js";
 import { requireProjectOwnership } from "./authz.service.js";
+import { ensureCharacterSourcePreservation } from "./character-source-preservation.service.js";
 import { isUniqueConstraintViolation } from "../lib/db.js";
 import type {
   StatLabelEffect,
@@ -124,6 +125,8 @@ export class StatsService {
         "Minimum value must be less than or equal to maximum value"
       );
     }
+
+    await ensureCharacterSourcePreservation(projectId);
 
     const newStat: NewStat = {
       projectId,
