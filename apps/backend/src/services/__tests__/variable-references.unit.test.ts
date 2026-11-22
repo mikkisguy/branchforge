@@ -3,7 +3,12 @@ import { findVariableReferences } from "../variable-references.js";
 
 function scan(content: string) {
   return findVariableReferences("both_mode", [
-    { fileId: "file", filePath: "game/script.rpy", content },
+    {
+      fileId: "file",
+      filePath: "game/script.rpy",
+      content,
+      contentHash: "revision",
+    },
   ]).map(({ line, kind }) => [line, kind]);
 }
 
@@ -109,8 +114,57 @@ label start:
     $ both_mode = True`)
     ).toEqual([
       [2, "condition"],
-      [7, "condition"],
       [16, "assignment"],
     ]);
   });
+  it.each([
+    "(both_mode) == (True)",
+    "(False) != ((both_mode))",
+    "((both_mode)) is (False)",
+    "((True) is not (both_mode))",
+    "not ((both_mode) == (False))",
+  ])("counts grouped operands in %s", (condition) => {
+    expect(
+      scan(`if ${condition}:
+    pass`)
+    ).toEqual([[1, "condition"]]);
+  });
+
+  it("ignores grouped persistent attributes", () => {
+    expect(scan("if (persistent.both_mode) == (True):\n    pass")).toEqual([]);
+  });
+
+  it("detects screen parameters separately from inline properties", () => {
+    expect(
+      scan(`screen local(both_mode=False) modal bool(True):
+    if both_mode:
+        text "Local"
+screen global_flag() modal True:
+    if both_mode:
+        text "Global"`)
+    ).toEqual([[5, "condition"]]);
+  });
+
+  it("detects screen bindings with an index clause", () => {
+    expect(
+      scan(`screen hud():
+    for both_mode index both_mode in flags:
+        if both_mode:
+            text "Loop value"`)
+    ).toEqual([]);
+  });
+
+  it.each(["[]", "flags"])(
+    "keeps potential global reads after a loop over %s",
+    (iterable) => {
+      expect(
+        scan(`screen hud():
+    for both_mode in ${iterable}:
+        if both_mode:
+            text "Loop value"
+    if not both_mode:
+        text "Global if the loop was empty"`)
+      ).toEqual([[5, "condition"]]);
+    }
+  );
 });

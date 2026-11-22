@@ -77,7 +77,10 @@ export function DeleteVariableDialog({
         onClose();
         return;
       }
-      setActionError("Could not open this line. Check the file and try again.");
+      await refetch();
+      setActionError(
+        "Could not open this line. Check the latest references and try again."
+      );
     } catch {
       setActionError("Could not open this line. Check the file and try again.");
     } finally {

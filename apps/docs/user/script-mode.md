@@ -84,6 +84,8 @@ In Script Mode, open the Variables management panel and choose **Delete** next t
 
 The check covers direct `if` and `elif` conditions in scripts and screens, such as `if both_mode:`, `elif not both_mode:`, and `if both_mode == True:`. It also covers direct script assignments such as `$ both_mode = True`. Comments, quoted text, qualified names such as `persistent.both_mode`, and references shadowed by single-line label or screen parameters are ignored. Top-level screen defaults and simple screen loop variables are treated as local.
 
+After an unconditional screen loop of the form `for flag in [True, False]:`, its target is still treated as local. If BranchForge cannot tell whether a loop runs, it keeps later reads that might refer to the project Variable.
+
 Review compound expressions, multiline statements, and Python blocks separately. BranchForge does not run Python or follow indirect references such as aliases, lookups by name, or values passed between screens at runtime.
 
 ## Next Steps

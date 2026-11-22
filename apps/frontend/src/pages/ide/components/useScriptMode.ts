@@ -484,17 +484,45 @@ export function useScriptMode({
   );
 
   const handleOpenVariableReference = useCallback(
-    async ({ fileId, line }: VariableReference) => {
-      if (hasPendingSave && !(await triggerFileSave())) return false;
-      const refreshed = await refreshFiles();
-      const file = refreshed.data?.find((candidate) => candidate.id === fileId);
-      if (refreshed.isError || !file) return false;
-      if (!(await selectFileTab(fileId, { refreshedFile: file }))) return false;
-      setGeneratedPreviewFileName(null);
-      setReferenceLocation({ fileId, line });
-      return true;
-    },
-    [hasPendingSave, triggerFileSave, refreshFiles, selectFileTab]
+    ({ fileId, line, contentHash }: VariableReference) =>
+      new Promise<boolean>((resolve, reject) => {
+        const started = runEditorTransition(async () => {
+          try {
+            if (hasPendingSave && !(await triggerFileSave())) {
+              resolve(false);
+              return;
+            }
+
+            const refreshed = await refreshFiles();
+            const file = refreshed.data?.find(
+              (candidate) => candidate.id === fileId
+            );
+            if (refreshed.isError || file?.contentHash !== contentHash) {
+              resolve(false);
+              return;
+            }
+
+            if (!(await selectFileTab(fileId, { refreshedFile: file }))) {
+              resolve(false);
+              return;
+            }
+
+            setGeneratedPreviewFileName(null);
+            setReferenceLocation({ fileId, line });
+            resolve(true);
+          } catch (error) {
+            reject(error);
+          }
+        });
+        if (started === false) resolve(false);
+      }),
+    [
+      hasPendingSave,
+      triggerFileSave,
+      refreshFiles,
+      selectFileTab,
+      runEditorTransition,
+    ]
   );
 
   const initialExpandedFolders = useMemo(() => {

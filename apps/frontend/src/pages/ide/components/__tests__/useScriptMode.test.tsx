@@ -239,6 +239,7 @@ describe("useScriptMode generated preview lifecycle", () => {
         await result.current.handleOpenVariableReference({
           fileId: "file-1",
           filePath: "game/script.rpy",
+          contentHash: "hash",
           line: 2,
           kind: "condition",
         })
@@ -249,6 +250,35 @@ describe("useScriptMode generated preview lifecycle", () => {
     });
     expect(result.current.isGeneratedPreview).toBe(false);
     expect(result.current.scrollToLine).toMatchObject({ line: 2 });
+  });
+
+  it("keeps navigation inside the transition and rejects older coordinates after a save", async () => {
+    editorState.isFileDirty = true;
+    const transition = vi.fn<RunEditorTransition>((action) => {
+      void action();
+    });
+    editorState.triggerFileSave.mockImplementationOnce(async () => {
+      expect(transition).toHaveBeenCalledOnce();
+      scriptFilesState.projectFiles[0].contentHash = "new";
+      return true;
+    });
+    const { result } = renderHook(() =>
+      useScriptMode({ runEditorTransition: transition, projectId: "project-1" })
+    );
+    await act(async () => {
+      expect(
+        await result.current.handleOpenVariableReference({
+          fileId: "file-1",
+          filePath: "game/script.rpy",
+          contentHash: "hash",
+          line: 2,
+          kind: "condition",
+        })
+      ).toBe(false);
+    });
+    expect(editorState.triggerFileSave).toHaveBeenCalledOnce();
+    expect(selectFileTab).not.toHaveBeenCalled();
+    expect(result.current.scrollToLine).toBeNull();
   });
 
   it("selects a generated file into read-only preview and blocks undo/redo", async () => {

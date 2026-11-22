@@ -256,6 +256,7 @@ async function readVariableReferences(
       fileId: projectFiles.id,
       filePath: projectFiles.filePath,
       content: projectFiles.content,
+      contentHash: projectFiles.contentHash,
     })
     .from(projectFiles)
     .where(

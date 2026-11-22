@@ -269,6 +269,8 @@ export function useFileEditor({
           (Date.parse(latestFile.updatedAt ?? "") || 0)
           ? saved
           : latestFile;
+      if (reload && target.contentHash !== file.contentHash) return false;
+
       setEditedFileContent(target.content);
       setCurrentEditFileId(file.id);
       currentEditFileHashRef.current = target.contentHash ?? null;

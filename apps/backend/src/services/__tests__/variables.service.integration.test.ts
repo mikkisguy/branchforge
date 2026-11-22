@@ -571,8 +571,20 @@ describe("VariablesService (Integration)", () => {
         expect(rejected.json()).toMatchObject({
           reason: "VARIABLE_IN_USE",
           references: [
-            { fileId, filePath, line: 4, kind: "condition" },
-            { fileId, filePath, line: 5, kind: "assignment" },
+            {
+              fileId,
+              filePath,
+              contentHash: before.files[0].contentHash,
+              line: 4,
+              kind: "condition",
+            },
+            {
+              fileId,
+              filePath,
+              contentHash: before.files[0].contentHash,
+              line: 5,
+              kind: "assignment",
+            },
           ],
         });
         expect(
@@ -688,11 +700,24 @@ describe("VariablesService (Integration)", () => {
         testUserId
       );
       expect(references).toEqual([
-        { fileId, filePath, line: 4, kind: "condition" },
-        { fileId, filePath, line: 5, kind: "assignment" },
+        {
+          fileId,
+          filePath,
+          contentHash: calculateContentHash(referencedContent),
+          line: 4,
+          kind: "condition",
+        },
+        {
+          fileId,
+          filePath,
+          contentHash: calculateContentHash(referencedContent),
+          line: 5,
+          kind: "assignment",
+        },
         {
           fileId: settingsId,
           filePath: "game/settings.rpy",
+          contentHash: calculateContentHash(content),
           line: 2,
           kind: "condition",
         },

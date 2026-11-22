@@ -5,6 +5,7 @@
  * getting, creating, updating, and deleting variables.
  */
 
+import type { VariableReferencesResponse } from "@branchforge/shared";
 import type { FastifyInstance } from "fastify";
 import type { FastifyRequest, FastifyReply } from "fastify";
 import { z } from "zod";
@@ -110,7 +111,7 @@ async function listVariableReferencesHandler(
     request.params.variableId,
     request.user!.id
   );
-  await reply.send({ references });
+  await reply.send({ references } satisfies VariableReferencesResponse);
 }
 
 /**

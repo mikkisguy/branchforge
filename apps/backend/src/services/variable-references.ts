@@ -4,36 +4,47 @@ interface ReferenceSource {
   fileId: string;
   filePath: string;
   content: string;
+  contentHash: string;
 }
 
-const IDENTIFIER = String.raw`[_\p{ID_Start}][_\p{ID_Continue}]*`;
-const DIRECT_NAME = new RegExp(`^${IDENTIFIER}$`, "u");
-const BOOLEAN_COMPARISON = new RegExp(
-  `^(${IDENTIFIER})\\s*(?:==|!=|\\bis(?:\\s+not)?\\b)\\s*(${IDENTIFIER})$`,
-  "u"
-);
-const ASSIGNMENT = new RegExp(`^\\$\\s*(${IDENTIFIER})\\s*=(?!=)\\s*\\S`, "u");
+const DIRECT_NAME = /^[_\p{ID_Start}][_\p{ID_Continue}]*$/u;
+const ASSIGNMENT = /^\$\s*([_\p{ID_Start}][_\p{ID_Continue}]*)\s*=(?!=)\s*\S/u;
 const LABEL_PARAMETERS = /^label\s+[^\s(]+\s*\((.*)\)(?:\s*hide)?\s*:$/;
-const SCREEN = /^screen\s+[^\s(:]+(?:\s*\((.*)\))?\s*:$/;
-const SCREEN_DEFAULT = new RegExp(
-  "^default\\s+(" + IDENTIFIER + ")\\s*=(?!=)",
-  "u"
-);
-const SCREEN_LOOP = new RegExp("^for\\s+(" + IDENTIFIER + ")\\s+in\\s", "u");
+const SCREEN_HEADER = /^screen\s+[^\s(:]+/;
+const SCREEN_DEFAULT =
+  /^default\s+([_\p{ID_Start}][_\p{ID_Continue}]*)\s*=(?!=)/u;
+const SCREEN_LOOP =
+  /^for\s+([_\p{ID_Start}][_\p{ID_Continue}]*)\s+(?:index\s|in\s+(?<items>.+):$)/u;
+// A plain list of literal values is known to yield at least one item.
+const NONEMPTY_LITERAL_LIST =
+  /^\[\s*(?:True|False|None|@|[+-]?\d+)(?:\s*,\s*(?:True|False|None|@|[+-]?\d+))*\s*(?:,\s*)?\]$/;
 const UNSUPPORTED_BLOCK_PREFIX =
   /^(?:(?:init(?:\s+[+-]?\d+)?\s+)?python\b|transform\s+|translate\s+\S+\s+python\b)/;
 
 function unwrapCondition(expression: string): string {
+  const trimmed = expression.trim();
+  if (!trimmed.startsWith("(") || !trimmed.endsWith(")")) return trimmed;
+
+  const starts: number[] = [];
+  const closingByStart = new Map<number, number>();
+  for (let index = 0; index < trimmed.length; index++) {
+    if (trimmed[index] === "(") starts.push(index);
+    if (trimmed[index] === ")") {
+      const start = starts.pop();
+      if (start === undefined) return trimmed;
+      closingByStart.set(start, index);
+    }
+  }
+
   let start = 0;
-  let end = expression.length - 1;
-  while (start <= end) {
-    while (/\s/.test(expression[start] ?? "")) start++;
-    while (/\s/.test(expression[end] ?? "")) end--;
-    if (expression[start] !== "(" || expression[end] !== ")") break;
+  let end = trimmed.length - 1;
+  while (closingByStart.get(start) === end) {
     start++;
     end--;
+    while (/\s/.test(trimmed[start] ?? "")) start++;
+    while (/\s/.test(trimmed[end] ?? "")) end--;
   }
-  return expression.slice(start, end + 1);
+  return trimmed.slice(start, end + 1);
 }
 
 function conditionUsesKey(expression: string, key: string): boolean {
@@ -42,13 +53,28 @@ function conditionUsesKey(expression: string, key: string): boolean {
   const inner = negation
     ? unwrapCondition(unwrapped.slice(negation[0].length))
     : unwrapped;
-  const comparison = BOOLEAN_COMPARISON.exec(inner);
-  if (!comparison) return inner === key;
-  const [, left, right] = comparison;
+  const operands = inner.split(
+    /==|!=|(?<![_\p{ID_Continue}])is(?:\s+not)?(?![_\p{ID_Continue}])/u
+  );
+  if (operands.length !== 2) return inner === key;
+  const [left, right] = operands.map(unwrapCondition);
   return (
     (left === key && (right === "True" || right === "False")) ||
     (right === key && (left === "True" || left === "False"))
   );
+}
+
+// Read only the initial parameter group. Inline property values can also
+// contain parentheses, including calls with keyword arguments.
+function screenParameters(suffix: string): string | undefined {
+  const text = suffix.trimStart();
+  if (!text.startsWith("(")) return undefined;
+  let depth = 0;
+  for (let index = 0; index < text.length; index++) {
+    if (text[index] === "(") depth++;
+    if (text[index] === ")" && --depth === 0) return text.slice(1, index);
+  }
+  return undefined;
 }
 
 function parametersShadowKey(parameters: string, key: string): boolean {
@@ -137,10 +163,11 @@ export function findVariableReferences(
   if (!DIRECT_NAME.test(key)) return [];
 
   const references: VariableReference[] = [];
-  for (const { fileId, filePath, content } of sources) {
+  for (const { fileId, filePath, content, contentHash } of sources) {
     const lines = sourceCodeLines(content);
     let excludedIndent: number | undefined;
-    let screenIndent: number | undefined;
+    let screen:
+      { indent: number; bodyIndent?: number; loopBound?: boolean } | undefined;
     for (const [index, line] of lines.entries()) {
       const statement = line.trim();
       if (!statement || statement === "@") continue;
@@ -148,15 +175,16 @@ export function findVariableReferences(
       const indent = indentation(line);
       if (excludedIndent !== undefined && indent > excludedIndent) continue;
       excludedIndent = undefined;
-      if (screenIndent !== undefined && indent <= screenIndent) {
-        screenIndent = undefined;
-      }
+      if (screen && indent <= screen.indent) screen = undefined;
+      if (screen?.loopBound) continue;
+      if (screen) screen.bodyIndent ??= indent;
 
-      const screen = SCREEN.exec(statement);
-      if (screen) {
-        screenIndent = indent;
+      const header = SCREEN_HEADER.exec(statement);
+      if (header && statement.endsWith(":")) {
+        screen = { indent };
+        const parameters = screenParameters(statement.slice(header[0].length));
         if (
-          (screen[1] && parametersShadowKey(screen[1], key)) ||
+          (parameters && parametersShadowKey(parameters, key)) ||
           screenDefaultShadowsKey(lines, index + 1, indent, key)
         ) {
           excludedIndent = indent;
@@ -167,10 +195,22 @@ export function findVariableReferences(
       const parameters = LABEL_PARAMETERS.exec(statement)?.[1];
       if (
         (statement.endsWith(":") && UNSUPPORTED_BLOCK_PREFIX.test(statement)) ||
-        (parameters && parametersShadowKey(parameters, key)) ||
-        (screenIndent !== undefined && SCREEN_LOOP.exec(statement)?.[1] === key)
+        (parameters && parametersShadowKey(parameters, key))
       ) {
         excludedIndent = indent;
+        continue;
+      }
+
+      const loop = screen && SCREEN_LOOP.exec(statement);
+      if (screen && loop?.[1] === key && statement.endsWith(":")) {
+        excludedIndent = indent;
+        // At the screen's top level, a definitely nonempty loop also
+        // leaves its target bound for the statements that follow it.
+        const items = loop.groups?.items;
+        screen.loopBound =
+          indent === screen.bodyIndent &&
+          !!items &&
+          NONEMPTY_LITERAL_LIST.test(items.trim());
         continue;
       }
 
@@ -179,16 +219,15 @@ export function findVariableReferences(
         references.push({
           fileId,
           filePath,
+          contentHash,
           line: index + 1,
           kind: "condition",
         });
-      } else if (
-        screenIndent === undefined &&
-        ASSIGNMENT.exec(statement)?.[1] === key
-      ) {
+      } else if (!screen && ASSIGNMENT.exec(statement)?.[1] === key) {
         references.push({
           fileId,
           filePath,
+          contentHash,
           line: index + 1,
           kind: "assignment",
         });

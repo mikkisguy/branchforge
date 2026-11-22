@@ -24,6 +24,7 @@ const variable = {
 const reference: VariableReference = {
   fileId: "47fd0168-fa3e-4eb9-93b9-c50967dfe45a",
   filePath: "game/chapter.rpy",
+  contentHash: "revision",
   line: 12,
   kind: "condition",
 };
@@ -109,5 +110,20 @@ describe("DeleteVariableDialog", () => {
     );
     expect(confirm).toBeDisabled();
     expect(onDelete).not.toHaveBeenCalled();
+  });
+  it("offers updated locations when the selected revision can no longer be opened", async () => {
+    vi.mocked(variablesApi.listVariableReferences)
+      .mockResolvedValueOnce([reference])
+      .mockResolvedValueOnce([{ ...reference, line: 18, contentHash: "new" }]);
+    const { onClose, onOpenReference, user } = showDialog();
+    onOpenReference.mockResolvedValueOnce(false);
+
+    await user.click(
+      await screen.findByRole("button", { name: "game/chapter.rpy:12" })
+    );
+    expect(
+      await screen.findByRole("button", { name: "game/chapter.rpy:18" })
+    ).toBeVisible();
+    expect(onClose).not.toHaveBeenCalled();
   });
 });
