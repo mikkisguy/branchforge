@@ -12,8 +12,14 @@ import {
   RepositoryNotLinkedError,
 } from "../../middleware/error-handler.middleware.js";
 
+const GENERATED_PATH_CONFLICT_PREFIX =
+  "Conflict: verify ownership of this generated file path in GitLab and BranchForge before retrying: ";
+const GENERATED_PATH_CONFLICT_MESSAGE =
+  "Conflict: verify ownership of the generated file paths in GitLab and BranchForge before retrying.";
+
 // Safe exact messages that may be persisted or returned to clients.
 const SAFE_EXPORT_MESSAGES: readonly string[] = [
+  GENERATED_PATH_CONFLICT_MESSAGE,
   "Server restarted while sync was in progress",
   "A character cannot be excluded until its source can be preserved.",
   "Export failed. Link a GitLab repository in project settings, then try again.",
@@ -39,6 +45,7 @@ const GENERIC_SYNC_MESSAGE =
 // Preflight conflict message prefixes. The variable portion is the remote
 // path, which is a user-controlled project path and safe to echo.
 const PREFLIGHT_CONFLICT_PREFIXES: readonly string[] = [
+  GENERATED_PATH_CONFLICT_PREFIX,
   "Conflict: expected source file not found on the remote: ",
   "Conflict: remote file changed since the last sync: ",
   "Conflict: file already exists on the remote: ",
@@ -83,6 +90,18 @@ export function createPreflightFileExistsError(
   return new GitLabExportConflictError(
     remotePath,
     `Conflict: file already exists on the remote: ${remotePath}`
+  );
+}
+
+export function createGeneratedPathConflictError(
+  filePath: string
+): GitLabExportConflictError {
+  const message = GENERATED_PATH_CONFLICT_PREFIX + filePath;
+  return new GitLabExportConflictError(
+    filePath,
+    isSafeGitLabSyncErrorMessage(message, "EXPORT")
+      ? message
+      : GENERATED_PATH_CONFLICT_MESSAGE
   );
 }
 

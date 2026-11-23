@@ -24,6 +24,12 @@ describe("formatGitLabSyncError", () => {
     );
   });
 
+  it("preserves generated file ownership guidance", () => {
+    const message =
+      "Conflict: verify ownership of this generated file path in GitLab and BranchForge before retrying: game/branchforge_variables.rpy";
+    expect(formatGitLabSyncError(message, "export")).toBe(message);
+  });
+
   it.each(["export", "import"] as const)(
     "replaces internal error details for %s",
     (operation) => {

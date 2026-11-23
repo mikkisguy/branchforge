@@ -1,5 +1,6 @@
 /** Known safe public messages that may be rendered verbatim. */
 const SAFE_EXPORT_MESSAGES: readonly string[] = [
+  "Conflict: verify ownership of the generated file paths in GitLab and BranchForge before retrying.",
   "Server restarted while sync was in progress",
   "A character cannot be excluded until its source can be preserved.",
   "Export failed. Link a GitLab repository in project settings, then try again.",
@@ -16,6 +17,7 @@ const SAFE_IMPORT_MESSAGES: readonly string[] = [
 ];
 
 const PREFLIGHT_CONFLICT_PREFIXES: readonly string[] = [
+  "Conflict: verify ownership of this generated file path in GitLab and BranchForge before retrying: ",
   "Conflict: expected source file not found on the remote: ",
   "Conflict: remote file changed since the last sync: ",
   "Conflict: file already exists on the remote: ",
@@ -57,7 +59,7 @@ export function formatGitLabSyncError(
 
   if (!message?.trim()) return `${operation} failed. ${recovery}`;
 
-  // Explicitly known safe public messages (including the three preflight
+  // Explicitly known safe public messages (including the preflight
   // conflict templates) are rendered as-is. Anything else is replaced with
   // generic recovery guidance so stacks, query parameters, and upstream
   // bodies never reach the UI.

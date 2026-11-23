@@ -164,6 +164,15 @@ export interface BatchCommitAction {
   /** Source path for move actions. */
   previousPath?: string;
   content?: string;
+  /** Last modifying commit from the file metadata for a guarded update. */
+  lastCommitId?: string;
+}
+
+export class GitLabCommitRejectedError extends Error {
+  constructor(status: number, detail: string) {
+    super(`GitLab API error: ${status} - ${detail}`);
+    this.name = "GitLabCommitRejectedError";
+  }
 }
 
 function toGitlabCommitAction(
@@ -184,6 +193,9 @@ function toGitlabCommitAction(
     action: action.action,
     file_path: action.filePath,
     ...(action.content === undefined ? {} : { content: action.content }),
+    ...(action.action === "update" && action.lastCommitId
+      ? { last_commit_id: action.lastCommitId }
+      : {}),
   };
 }
 
@@ -262,6 +274,13 @@ export async function batchCommitFiles(
 
   if (!response.ok) {
     const errorText = await response.text();
+    if (
+      response.status >= 400 &&
+      response.status < 500 &&
+      response.status !== 408
+    ) {
+      throw new GitLabCommitRejectedError(response.status, errorText);
+    }
     throw new Error(`GitLab API error: ${response.status} - ${errorText}`);
   }
 
