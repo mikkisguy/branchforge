@@ -19,6 +19,10 @@ const GENERATED_PATH_CONFLICT_MESSAGE =
 
 export const GITLAB_EXPORT_ATTEMPT_UNCERTAIN =
   "BranchForge could not verify the previous GitLab push. Check the target branch and retry the same push, or contact your administrator.";
+export const GITLAB_EXPORT_HISTORY_IN_PROGRESS =
+  "GitLab push verification is still in progress. Retry the same branch to continue the search.";
+export const GITLAB_IMPORT_STALE_AFTER_EXPORT =
+  "A GitLab push completed while pull data was loading. Retry the pull to fetch the latest files.";
 export const GITLAB_IMPORT_PENDING_EXPORT =
   "Retry the previous GitLab push before pulling changes into this project.";
 export const GITLAB_EXPORT_ATTEMPT_CHANGED =
@@ -26,8 +30,10 @@ export const GITLAB_EXPORT_ATTEMPT_CHANGED =
 
 // Safe exact messages that may be persisted or returned to clients.
 const SAFE_EXPORT_MESSAGES: readonly string[] = [
+  "An operator confirmed the GitLab push did not apply. Retry the export.",
   GENERATED_PATH_CONFLICT_MESSAGE,
   GITLAB_EXPORT_ATTEMPT_UNCERTAIN,
+  GITLAB_EXPORT_HISTORY_IN_PROGRESS,
   GITLAB_EXPORT_ATTEMPT_CHANGED,
   "Server restarted while sync was in progress",
   "A character cannot be excluded until its source can be preserved.",
@@ -38,6 +44,7 @@ const SAFE_EXPORT_MESSAGES: readonly string[] = [
 
 const SAFE_IMPORT_MESSAGES: readonly string[] = [
   GITLAB_IMPORT_PENDING_EXPORT,
+  GITLAB_IMPORT_STALE_AFTER_EXPORT,
   "Server restarted while sync was in progress",
   "A character cannot be excluded until its source can be preserved.",
   "Import failed. Try again. If the problem persists, contact your administrator.",

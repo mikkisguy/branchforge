@@ -60,7 +60,10 @@ import {
 import { createProject, deleteProject } from "../projects.service.js";
 import { assertNoPendingStructuralOperations } from "../project-files-operations.service.js";
 import { lockProject } from "../project-files-operations.service.js";
-import { assertNoPendingExportAttempt } from "./gitlab-export-attempt.service.js";
+import {
+  assertNoPendingExportAttempt,
+  readExportGeneration,
+} from "./gitlab-export-attempt.service.js";
 import { promoteManagedDefaults } from "../managed-defaults.service.js";
 import { hasUnpushedLocalContent } from "../project-file-baseline.js";
 import {
@@ -71,6 +74,7 @@ import {
   GENERIC_IMPORT_MESSAGE,
   safeGitLabSyncErrorMessage,
   GITLAB_IMPORT_PENDING_EXPORT,
+  GITLAB_IMPORT_STALE_AFTER_EXPORT,
 } from "./gitlab-error.helpers.js";
 import type {
   DetectCharactersResponse,
@@ -276,6 +280,19 @@ export async function importFromGitlab(
     }
   }
 
+  const exportGeneration = await readExportGeneration(db, projectId);
+  const checkPullBaseline = async (tx: Transaction) => {
+    await assertNoPendingExportAttempt(
+      tx,
+      projectId,
+      GITLAB_IMPORT_PENDING_EXPORT
+    );
+    await assertNoPendingStructuralOperations(tx, projectId);
+    if ((await readExportGeneration(tx, projectId)) !== exportGeneration) {
+      throw new ConflictError(GITLAB_IMPORT_STALE_AFTER_EXPORT);
+    }
+  };
+
   // Create sync operation
   const operation = await createSyncOperation(projectId, "IMPORT", branch);
 
@@ -319,12 +336,7 @@ export async function importFromGitlab(
     if (rpyFiles.length === 0) {
       await db.transaction(async (tx) => {
         await lockProject(tx, projectId);
-        await assertNoPendingExportAttempt(
-          tx,
-          projectId,
-          GITLAB_IMPORT_PENDING_EXPORT
-        );
-        await assertNoPendingStructuralOperations(tx, projectId);
+        await checkPullBaseline(tx);
       });
       // No files to import - mark as completed and return a character review
       // based on the current pre-pull state.
@@ -469,12 +481,7 @@ export async function importFromGitlab(
     // and labels.
     await db.transaction(async (tx) => {
       await lockProject(tx, projectId);
-      await assertNoPendingExportAttempt(
-        tx,
-        projectId,
-        GITLAB_IMPORT_PENDING_EXPORT
-      );
-      await assertNoPendingStructuralOperations(tx, projectId);
+      await checkPullBaseline(tx);
 
       // Capture pre-pull character rows before any inserts so the review
       // reflects the state the user will see in the wizard.

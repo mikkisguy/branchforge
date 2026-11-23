@@ -1,0 +1,2 @@
+ALTER TABLE "gitlab_export_attempts" ADD COLUMN "verification" jsonb;--> statement-breakpoint
+CREATE UNIQUE INDEX "gitlab_export_attempts_operation_id_idx" ON "gitlab_export_attempts" USING btree ("operation_id");

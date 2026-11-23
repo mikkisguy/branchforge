@@ -65,6 +65,9 @@ pnpm db:validate
 pnpm db:studio
 ```
 
+For operator recovery of unresolved GitLab pushes, see
+[GitLab export recovery](docs/operations/gitlab-export-recovery.md).
+
 ### Security Scanning (CodeQL)
 
 **Policy:** When fixing a CodeQL / code-scanning alert (taint-flow queries like `request-forgery`, `sql-injection`, `prototype-pollution`, etc.), **verify the fix with the local CodeQL analyzer** before claiming success. Do not reason about what the analyzer models as a sanitizer/sink — run the query and get ground truth. For ordinary bugs, lint, typecheck, or feature work, use `pnpm test`/`typecheck`/`lint` instead — CodeQL is heavy (~30 s DB build + query eval) and wasteful for non-CodeQL problems.

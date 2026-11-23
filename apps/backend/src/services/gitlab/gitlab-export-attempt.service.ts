@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, count, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { getDb } from "../../db/index.js";
 import {
   gitlabExportAttempts,
@@ -20,6 +20,7 @@ import { lockProject } from "../project-files-operations.service.js";
 import {
   GITLAB_EXPORT_ATTEMPT_CHANGED,
   GITLAB_EXPORT_ATTEMPT_UNCERTAIN,
+  GITLAB_EXPORT_HISTORY_IN_PROGRESS,
 } from "./gitlab-error.helpers.js";
 import {
   assertGitlabRepositoryIdentity,
@@ -55,7 +56,30 @@ export async function assertNoPendingExportAttempt(
     .select({ id: gitlabExportAttempts.operationId })
     .from(gitlabExportAttempts)
     .where(eq(gitlabExportAttempts.projectId, projectId));
-  if (attempt) throw new ConflictError(message);
+  if (attempt) {
+    const conflict = new ConflictError(message);
+    conflict.userMessage = message;
+    throw conflict;
+  }
+}
+
+/** A completed receipt commits with the new remote file baselines. */
+export async function readExportGeneration(
+  db: Transaction | ReturnType<typeof getDb>,
+  projectId: string
+): Promise<number> {
+  const [row] = await db
+    .select({ generation: count() })
+    .from(gitlabSyncOperations)
+    .where(
+      and(
+        eq(gitlabSyncOperations.projectId, projectId),
+        eq(gitlabSyncOperations.operation, "EXPORT"),
+        eq(gitlabSyncOperations.status, "COMPLETED"),
+        isNotNull(gitlabSyncOperations.commitId)
+      )
+    );
+  return row.generation;
 }
 
 function attemptKey(attempt: Pick<Attempt, "projectId" | "operationId">) {
@@ -241,26 +265,35 @@ export async function captureExportPreimages(
     ),
     ...additionalPaths,
   ]);
-  return Promise.all(
-    [...paths].map(async (path) => {
-      const { content, lastCommitId } = await getFileContentWithMetadata(
-        projectId,
-        userId,
-        path,
-        revision,
-        undefined,
-        repository
-      );
-      return {
-        path,
-        hash: content === null ? null : calculateContentHash(content),
-        // GitLab's per-file guard accepts a real Git commit revision.
-        ...(lastCommitId && /^[a-f0-9]{40}$/i.test(lastCommitId)
-          ? { lastCommitId }
-          : {}),
-      };
-    })
-  );
+  const ordered = [...paths];
+  const results: Snapshot["before"] = [];
+  for (let index = 0; index < ordered.length; index += 5) {
+    const batch = await Promise.allSettled(
+      ordered.slice(index, index + 5).map(async (path) => {
+        const { content, lastCommitId } = await getFileContentWithMetadata(
+          projectId,
+          userId,
+          path,
+          revision,
+          undefined,
+          repository
+        );
+        return {
+          path,
+          hash: content === null ? null : calculateContentHash(content),
+          // GitLab's per-file guard accepts a real Git commit revision.
+          ...(lastCommitId && /^[a-f0-9]{40}$/i.test(lastCommitId)
+            ? { lastCommitId }
+            : {}),
+        };
+      })
+    );
+    for (const result of batch) {
+      if (result.status === "rejected") throw result.reason;
+      results.push(result.value);
+    }
+  }
+  return results;
 }
 
 export function guardExportActions(
@@ -323,7 +356,13 @@ export async function verifyExportAttempt(
     }
     throw error;
   }
-  let match: { id: string; parent: string } | undefined;
+  const head = revision;
+  const saved = attempt.verification;
+  let match: { id: string; parent: string } | null = null;
+  if (saved?.head === head && saved.receipt === attempt.commitId) {
+    revision = saved.next;
+    match = saved.match;
+  }
   for (let depth = 0; depth < HISTORY_SEARCH_LIMIT; depth++) {
     if (revision === attempt.baseRevision) break;
     const commit = await getExportCommit(
@@ -348,37 +387,81 @@ export async function verifyExportAttempt(
     revision = commit.parent_ids[0];
   }
 
-  if (!match || revision !== attempt.baseRevision) {
-    // A timeout, missing marker or changed ancestry does not prove rejection.
+  if (revision !== attempt.baseRevision) {
+    const progress = { head, next: revision, receipt: attempt.commitId, match };
+    // Progress belongs to one immutable chain and receipt.
+    await getDb()
+      .update(gitlabExportAttempts)
+      .set({ verification: progress })
+      .where(
+        and(
+          attemptKey(attempt),
+          attempt.commitId
+            ? eq(gitlabExportAttempts.commitId, attempt.commitId)
+            : isNull(gitlabExportAttempts.commitId),
+          saved
+            ? sql`${gitlabExportAttempts.verification} = ${JSON.stringify(saved)}::jsonb`
+            : isNull(gitlabExportAttempts.verification)
+        )
+      );
+    throw new Error(GITLAB_EXPORT_HISTORY_IN_PROGRESS);
+  }
+  if (!match) throw new Error(GITLAB_EXPORT_ATTEMPT_UNCERTAIN);
+  if (
+    !(await matchesRemote(
+      attempt,
+      userId,
+      match.parent,
+      attempt.snapshot.before
+    ))
+  ) {
     throw new Error(GITLAB_EXPORT_ATTEMPT_UNCERTAIN);
   }
-  const [before, after] = await Promise.all([
-    matchesRemote(attempt, userId, match.parent, attempt.snapshot.before),
-    matchesRemote(
+  if (
+    !(await matchesRemote(
       attempt,
       userId,
       match.id,
       reduceExpectedPaths(attempt.snapshot)
-    ),
-  ]);
-  if (!before || !after) throw new Error(GITLAB_EXPORT_ATTEMPT_UNCERTAIN);
+    ))
+  ) {
+    throw new Error(GITLAB_EXPORT_ATTEMPT_UNCERTAIN);
+  }
   return match.id;
 }
 
 export async function finalizeExportAttempt(
   attempt: Attempt,
   commitId: string
-): Promise<void> {
-  await getDb().transaction(async (tx) => {
+): Promise<"finalized" | "already-completed"> {
+  return getDb().transaction(async (tx) => {
     await lockProject(tx, attempt.projectId);
-    await checkRepository(tx, attempt);
     const [current] = await tx
       .select()
       .from(gitlabExportAttempts)
       .where(attemptKey(attempt))
       .for("update");
+    if (!current) {
+      const [original] = await tx
+        .select({
+          status: gitlabSyncOperations.status,
+          commitId: gitlabSyncOperations.commitId,
+        })
+        .from(gitlabSyncOperations)
+        .where(
+          and(
+            eq(gitlabSyncOperations.id, attempt.operationId),
+            eq(gitlabSyncOperations.projectId, attempt.projectId)
+          )
+        );
+      if (original?.status === "COMPLETED" && original.commitId === commitId) {
+        return "already-completed";
+      }
+      throw new Error(GITLAB_EXPORT_ATTEMPT_CHANGED);
+    }
+    await checkRepository(tx, attempt);
     if (
-      !current?.dispatchedAt ||
+      !current.dispatchedAt ||
       (current.commitId && current.commitId !== commitId)
     ) {
       throw new Error(GITLAB_EXPORT_ATTEMPT_CHANGED);
@@ -428,37 +511,7 @@ export async function finalizeExportAttempt(
       }
     }
 
-    // Match the captured versions in the write, so a later edit stays dirty.
-    if (snapshot.labels.length > 0) {
-      await tx.execute(sql`
-        update ${labels} as label
-        set last_synced_hash = captured.hash,
-            sync_status = 'SYNCED',
-            last_exported_at = now()
-        from jsonb_to_recordset(${JSON.stringify(snapshot.labels)}::jsonb)
-             as captured(id uuid, "fileId" uuid, hash text)
-        where label.id = captured.id
-          and label.project_file_id = captured."fileId"
-          and label.content_hash = captured.hash
-          and label.deleted_at is null
-      `);
-    }
-    if (snapshot.lines.length > 0) {
-      await tx.execute(sql`
-        update ${labelLines} as line
-        set last_synced_hash = captured.hash,
-            last_synced_at = now(),
-            is_dirty = false
-        from jsonb_to_recordset(${JSON.stringify(snapshot.lines)}::jsonb)
-             as captured(id uuid, "labelId" uuid, hash text)
-        join ${labels} as label on label.id = captured."labelId"
-        where line.id = captured.id
-          and line.label_id = captured."labelId"
-          and line.content_hash = captured.hash
-          and line.deleted_at is null
-          and label.deleted_at is null
-      `);
-    }
+    await advanceCapturedLabelBaselines(tx, snapshot);
     await tx
       .update(gitlabSyncOperations)
       .set({
@@ -469,5 +522,51 @@ export async function finalizeExportAttempt(
       })
       .where(eq(gitlabSyncOperations.id, attempt.operationId));
     await tx.delete(gitlabExportAttempts).where(attemptKey(attempt));
+    return "finalized";
   });
+}
+
+export async function advanceCapturedLabelBaselines(
+  tx: Transaction,
+  snapshot: Pick<Snapshot, "labels" | "lines">
+): Promise<void> {
+  // Match the captured versions in the write, so a later edit stays dirty.
+  if (snapshot.labels.length > 0) {
+    await tx.execute(sql`
+      update ${labels} as label
+      set last_synced_hash = captured.hash,
+          sync_status = 'SYNCED',
+          last_exported_at = now()
+      from jsonb_to_recordset(${JSON.stringify(snapshot.labels)}::jsonb)
+           as captured(id uuid, "fileId" uuid, hash text)
+      where label.id = captured.id
+        and label.project_file_id = captured."fileId"
+        and label.content_hash = captured.hash
+        and label.deleted_at is null
+    `);
+  }
+  if (snapshot.lines.length > 0) {
+    await tx.execute(sql`
+      update ${labelLines} as line
+      set last_synced_hash = captured.hash,
+          last_synced_at = now(),
+          is_dirty = false
+      from jsonb_to_recordset(${JSON.stringify(snapshot.lines)}::jsonb)
+           as captured(id uuid, "labelId" uuid, hash text)
+      join ${labels} as label on label.id = captured."labelId"
+      where line.id = captured.id
+        and line.label_id = captured."labelId"
+        and line.content_hash = captured.hash
+        and line.deleted_at is null
+        and label.deleted_at is null
+    `);
+  }
+}
+
+export async function validateNoopExportBaselines(
+  tx: Transaction,
+  projectId: string,
+  files: FileBaseline[]
+): Promise<void> {
+  await lockLocalBaselines(tx, projectId, files, true);
 }
