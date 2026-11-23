@@ -51,6 +51,18 @@ describe("formatGitLabSyncError", () => {
     }
   );
 
+  it("preserves export recovery guidance for an unverified attempt", () => {
+    const message =
+      "BranchForge could not verify the previous GitLab push. Check the target branch and retry the same push, or contact your administrator.";
+    expect(formatGitLabSyncError(message, "export")).toBe(message);
+  });
+
+  it("explains when a pending export prevents import", () => {
+    const message =
+      "Retry the previous GitLab push before pulling changes into this project.";
+    expect(formatGitLabSyncError(message, "import")).toBe(message);
+  });
+
   it("preserves neutral import failure guidance", () => {
     const message =
       "Import failed. Try again. If the problem persists, contact your administrator.";

@@ -19,6 +19,7 @@ import {
 } from "./gitlab-error.helpers.js";
 import type { GitLabExportConflictError } from "./gitlab-error.helpers.js";
 import type { BatchCommitAction } from "./gitlab-file.service.js";
+import type { GitlabRepositoryIdentity } from "./gitlab-repository.service.js";
 import { getFileContentWithMetadata } from "./gitlab-repository.service.js";
 
 interface SourceFile {
@@ -35,7 +36,8 @@ export async function buildGeneratedActions(
   generated: Awaited<ReturnType<typeof fetchSupportingFileSources>>,
   activeFiles: SourceFile[],
   occupiedPaths: ReadonlySet<string>,
-  excludedTags: ReadonlySet<string>
+  excludedTags: ReadonlySet<string>,
+  repository: GitlabRepositoryIdentity
 ): Promise<BatchCommitAction[]> {
   const sourceOwnedKeys = collectSourceOwnedRpySymbolKeys(
     activeFiles,
@@ -104,7 +106,9 @@ export async function buildGeneratedActions(
         projectId,
         userId,
         filePath,
-        branch
+        branch,
+        undefined,
+        repository
       );
 
       if (remote.content === null && !hasRows) return null;
@@ -186,7 +190,8 @@ export async function findGeneratedCommitConflict(
   projectId: string,
   userId: string,
   branch: string,
-  actions: BatchCommitAction[]
+  actions: BatchCommitAction[],
+  repository: GitlabRepositoryIdentity
 ): Promise<GitLabExportConflictError | undefined> {
   const conflicts = await Promise.allSettled(
     actions.map(async (action) => {
@@ -194,7 +199,9 @@ export async function findGeneratedCommitConflict(
         projectId,
         userId,
         action.filePath,
-        branch
+        branch,
+        undefined,
+        repository
       );
       if (action.action === "create" && remote.content !== null) {
         return createPreflightFileExistsError(action.filePath);
