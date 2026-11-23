@@ -26,6 +26,10 @@ import {
 } from "../services/gitlab-sync.service.js";
 import { importProjectFromGitLab } from "../services/gitlab.service.js";
 import {
+  GitLabEmptyImportError,
+  GitLabGeneratedImportError,
+} from "../services/gitlab/gitlab-error.helpers.js";
+import {
   exportToGitlabSchema,
   importFromGitlabSchema,
   importProjectSchema,
@@ -165,6 +169,17 @@ async function importProjectHandler(
     });
     await reply.status(202).send(result);
   } catch (err) {
+    if (err instanceof GitLabEmptyImportError) {
+      await reply.status(422).send({ error: err.message });
+      return;
+    }
+    if (err instanceof GitLabGeneratedImportError) {
+      await reply.status(409).send({
+        error: "GitLab declaration conflict",
+        message: err.message,
+      });
+      return;
+    }
     if (err instanceof ConflictError) {
       await reply.status(409).send({
         error: "Repository already linked",

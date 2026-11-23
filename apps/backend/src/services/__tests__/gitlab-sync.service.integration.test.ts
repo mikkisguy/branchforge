@@ -75,8 +75,13 @@ import {
 import { deleteVariable } from "../variables.service.js";
 import { statsService } from "../stats.service.js";
 import { getSyncOperation } from "../gitlab/gitlab-sync-ops.service.js";
+import { GitLabEmptyImportError } from "../gitlab/gitlab-error.helpers.js";
 
-import { getExportPreview } from "../export.service.js";
+import {
+  generateExport,
+  getExportForDownload,
+  getExportPreview,
+} from "../export.service.js";
 
 describe("GitLabSyncService (Integration)", () => {
   let db: ReturnType<typeof getDb>;
@@ -178,7 +183,7 @@ describe("GitLabSyncService (Integration)", () => {
     await db
       .delete(gitlabSyncOperations)
       .where(eq(gitlabSyncOperations.projectId, testProjectId));
-    await db.delete(projects).where(eq(projects.id, testProjectId));
+    await db.delete(projects).where(eq(projects.userId, testUserId));
     await db.delete(users).where(eq(users.id, testUserId));
   }
 
@@ -3543,7 +3548,374 @@ describe("GitLabSyncService (Integration)", () => {
     });
   });
 
+  describe("fresh GitLab project import", () => {
+    const branch = "chapter-two";
+    const variablePath = "game/branchforge_variables.rpy";
+    const statPath = "game/branchforge_stats.rpy";
+    const characterPath = "game/branchforge_definitions.rpy";
+    const scriptPath = "game/script.rpy";
+    const script = 'label start:\n    if met_sylvie:\n        s "Hello"\n';
+    const definition =
+      'define s = Character(\n    "Sylvie", what_color="#aabbcc", who_color="#9ab",\n) # retain style';
+
+    function importRemote(remote: Map<string, string>) {
+      vi.spyOn(gitlabRepoService, "getGitlabProject").mockResolvedValue({
+        id: 42,
+        name: "repo",
+        path_with_namespace: "test/repo",
+      });
+      vi.spyOn(gitlabRepoService, "listRpyFiles").mockImplementation(
+        async (_projectId, ref) => {
+          expect(ref).toBe(branch);
+          return [...remote.keys()].map((path) => ({
+            name: path.split("/").pop()!,
+            path,
+          }));
+        }
+      );
+      vi.spyOn(
+        gitlabRepoService,
+        "getFileContentWithMetadata"
+      ).mockImplementation(async (_projectId, _userId, path, ref) => {
+        expect(ref).toBe(branch);
+        return {
+          content: remote.get(path) ?? null,
+          lastCommitId: "fresh-remote",
+          contentSha256: null,
+          blobId: null,
+        };
+      });
+      vi.spyOn(rpyParserService, "parseRPYFileWithLabels").mockImplementation(
+        parseRealRPY
+      );
+      return gitlabService.importProjectFromGitLab(testUserId, {
+        projectName: "Fresh project",
+        gitlabProjectId: 42,
+        branch,
+        conflictResolution: "branchforge_wins",
+      });
+    }
+
+    async function zipSources(
+      projectId: string
+    ): Promise<Record<string, string>> {
+      const result = await generateExport(projectId, testUserId);
+      const { content } = await getExportForDownload(
+        result.id,
+        projectId,
+        testUserId
+      );
+      return JSON.parse(content);
+    }
+
+    it("recovers declarations from a real push, keeps them out of the tree and exports them to ZIP", async () => {
+      await setupExportRepository();
+      await db
+        .update(projectFiles)
+        .set({
+          content: script,
+          contentHash: calculateContentHash(script),
+          lastPushedContentHash: calculateContentHash(script),
+        })
+        .where(eq(projectFiles.id, testGitlabFileId));
+      await db.insert(variables).values({
+        projectId: testProjectId,
+        key: "met_sylvie",
+        authoredDefault: true,
+        category: "Story",
+      });
+      await db.insert(stats).values({
+        projectId: testProjectId,
+        key: "trust",
+        name: "Trust",
+        authoredDefault: "-1.25",
+      });
+      await db.insert(characters).values({
+        ...testCharacter,
+        name: "Sylvie",
+        displayName: "Sylvie",
+        color: "#99aabb",
+        sourceDefinition: {
+          declaration: definition,
+          name: "Sylvie",
+          nameType: "literal",
+          color: "#99aabb",
+        },
+      });
+      const remote = new Map([[scriptPath, script]]);
+      mockRemoteFiles((path) => remote.get(path) ?? null);
+      vi.spyOn(gitlabFileService, "batchCommitFiles").mockImplementation(
+        async (_projectId, _userId, _branch, _message, actions) => {
+          for (const action of actions)
+            remote.set(action.filePath, action.content!);
+          return "fresh-export";
+        }
+      );
+      expect(
+        await exportToGitlab(testProjectId, testUserId, testBranch)
+      ).toMatchObject({
+        status: "COMPLETED",
+      });
+      expect(remote.get(variablePath)).toContain("default met_sylvie = True");
+      expect(remote.get(statPath)).toContain("default trust = -1.25");
+      expect(remote.get(characterPath)).toContain(definition);
+      await gitlabRepoService.unlinkRepository(testProjectId, testUserId);
+
+      const { project, operation } = await importRemote(remote);
+      expect(operation.status).toBe("COMPLETED");
+      const [files, scenes, variableRows, statRows, characterRows] =
+        await Promise.all([
+          db
+            .select()
+            .from(projectFiles)
+            .where(eq(projectFiles.projectId, project.id)),
+          db
+            .select()
+            .from(labelsTable)
+            .where(eq(labelsTable.projectId, project.id)),
+          db
+            .select()
+            .from(variables)
+            .where(eq(variables.projectId, project.id)),
+          db.select().from(stats).where(eq(stats.projectId, project.id)),
+          db
+            .select()
+            .from(characters)
+            .where(eq(characters.projectId, project.id)),
+        ]);
+      expect(files.map((file) => file.filePath)).toEqual([scriptPath]);
+      expect(scenes.map((scene) => scene.labelName)).toEqual(["start"]);
+      expect(variableRows).toMatchObject([
+        { key: "met_sylvie", authoredDefault: true },
+      ]);
+      expect(statRows).toMatchObject([
+        { key: "trust", authoredDefault: "-1.25" },
+      ]);
+      expect(characterRows).toMatchObject([
+        { renpyTag: "s", sourceDefinition: { declaration: definition } },
+      ]);
+      const lines = await db
+        .select()
+        .from(labelLines)
+        .where(eq(labelLines.labelId, scenes[0].id));
+      expect(lines).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ speakerId: characterRows[0].id }),
+        ])
+      );
+
+      const zip = await zipSources(project.id);
+      expect(zip[variablePath]).toContain("default met_sylvie = True");
+      expect(zip[statPath]).toContain("default trust = -1.25");
+      expect(zip[characterPath]).toContain(definition);
+    });
+
+    it("keeps equivalent protected declarations in source and deduplicates ordinary managed declarations", async () => {
+      const owned =
+        "default trust = 01.50\ndefine s = Character('Sylvie', who_color='#99aabb', what_color = '#aabbcc')\n";
+      const { project, operation } = await importRemote(
+        new Map([
+          [scriptPath, "default met_sylvie = True # authored\n" + script],
+          ["game/screens.rpy", owned],
+          [
+            variablePath,
+            "default met_sylvie = True\ndefault met_sylvie = True",
+          ],
+          [statPath, "default trust = 1.5"],
+          [characterPath, definition],
+        ])
+      );
+      expect(operation.status).toBe("COMPLETED");
+      const zip = await zipSources(project.id);
+      expect(zip["game/screens.rpy"]).toBe(owned);
+      expect(zip[scriptPath]).not.toContain("default met_sylvie");
+      expect(
+        zip[variablePath].match(/default met_sylvie = True/g)
+      ).toHaveLength(1);
+      expect(zip[statPath]).toBeUndefined();
+      expect(zip[characterPath]).toBeUndefined();
+      expect(
+        await db.select().from(stats).where(eq(stats.projectId, project.id))
+      ).toEqual([]);
+      expect(
+        await db
+          .select()
+          .from(characters)
+          .where(eq(characters.projectId, project.id))
+      ).toEqual([]);
+    });
+
+    it.each([
+      [
+        "default met_sylvie = False\n" + script,
+        variablePath,
+        "# Variables\ndefault met_sylvie = True",
+        /"game\/branchforge_variables.rpy" line 2 and "game\/script.rpy" line 1/,
+      ],
+      [
+        script,
+        variablePath,
+        "default met_sylvie = True\ndefault met_sylvie = False",
+        /line 1 and "game\/branchforge_variables.rpy" line 2/,
+      ],
+      [
+        script,
+        characterPath,
+        definition + "\nlabel unexpected:\n    pass",
+        /"game\/branchforge_definitions.rpy" line 4/,
+      ],
+      [
+        script,
+        characterPath,
+        "define narrator = Character(None)",
+        /Excluded Ren’Py character.*line 1/,
+      ],
+      [
+        "default trust = 1\n" + script,
+        statPath,
+        "default trust = 1.0",
+        /"game\/branchforge_stats.rpy" line 1 and "game\/script.rpy" line 1/,
+      ],
+    ])(
+      "rejects ambiguous files without keeping a partial project (%#)",
+      async (ordinary, generatedPath, generated, diagnostic) => {
+        const remote = new Map([
+          [scriptPath, ordinary],
+          [generatedPath, generated],
+        ]);
+        await expect(importRemote(remote)).rejects.toThrow(diagnostic);
+        expect(
+          await db
+            .select()
+            .from(projects)
+            .where(eq(projects.userId, testUserId))
+        ).toMatchObject([{ id: testProjectId }]);
+        expect(remote.get(generatedPath)).toBe(generated);
+      }
+    );
+
+    it("reports a safe diagnostic and releases the repository when files are blank", async () => {
+      const remote = new Map([[scriptPath, " \n\t"]]);
+      await expect(importRemote(remote)).rejects.toThrow(
+        GitLabEmptyImportError
+      );
+      remote.set(scriptPath, script);
+      const { operation } = await importRemote(remote);
+      expect(operation.status).toBe("COMPLETED");
+    });
+
+    it("imports a branch containing only generated declarations", async () => {
+      const { project, operation } = await importRemote(
+        new Map([[variablePath, "default met_sylvie = True"]])
+      );
+      expect(operation.status).toBe("COMPLETED");
+      expect(
+        await db
+          .select()
+          .from(projectFiles)
+          .where(eq(projectFiles.projectId, project.id))
+      ).toEqual([]);
+      expect(
+        await db
+          .select()
+          .from(variables)
+          .where(eq(variables.projectId, project.id))
+      ).toMatchObject([{ key: "met_sylvie", authoredDefault: true }]);
+    });
+  });
+
   describe("importFromGitlab", () => {
+    it("ignores older generated files across pulls and after deleting the last managed variable", async () => {
+      const scriptPath = testGitlabFile.filePath;
+      const remote = new Map([
+        [scriptPath, testGitlabFile.content],
+        ["game/branchforge_variables.rpy", "default unused = False"],
+        ["game/branchforge_stats.rpy", "default trust = 0"],
+        ["game/branchforge_definitions.rpy", 'define s = Character("Older")'],
+        ["game/BranchForge_variables.rpy", "default unused = False"],
+      ]);
+      vi.spyOn(gitlabRepoService, "listRpyFiles").mockResolvedValue(
+        [...remote.keys()].map((path) => ({
+          name: path.split("/").pop()!,
+          path,
+        }))
+      );
+      const fetchFile = mockRemoteFiles((path) => remote.get(path) ?? null);
+      vi.spyOn(rpyParserService, "parseRPYFileWithLabels").mockImplementation(
+        parseRealRPY
+      );
+      const [variable] = await db
+        .insert(variables)
+        .values({
+          projectId: testProjectId,
+          key: "unused",
+          authoredDefault: true,
+          description: "Local metadata",
+        })
+        .returning();
+      const [stat] = await db
+        .insert(stats)
+        .values({
+          projectId: testProjectId,
+          key: "trust",
+          authoredDefault: "5",
+          name: "Local stat",
+        })
+        .returning();
+      const [character] = await db
+        .insert(characters)
+        .values({
+          ...testCharacter,
+          name: "Local name",
+          notes: "Local notes",
+        })
+        .returning();
+      const pull = () =>
+        importFromGitlab(testProjectId, testUserId, testBranch, "gitlab_wins");
+      expect(await pull()).toMatchObject({ status: "COMPLETED" });
+      const [file] = await db
+        .select()
+        .from(projectFiles)
+        .where(eq(projectFiles.id, testGitlabFileId));
+      const edited = file.content + "\n# pending local edit";
+      await updateFileContent(file.id, testUserId, edited, file.contentHash);
+      for (let i = 0; i < 2; i++) {
+        expect(await pull()).toMatchObject({ status: "COMPLETED" });
+      }
+      expect(
+        await db
+          .select()
+          .from(variables)
+          .where(eq(variables.projectId, testProjectId))
+      ).toEqual([variable]);
+      expect(
+        await db.select().from(stats).where(eq(stats.projectId, testProjectId))
+      ).toEqual([stat]);
+      expect(
+        await db
+          .select()
+          .from(characters)
+          .where(eq(characters.projectId, testProjectId))
+      ).toEqual([character]);
+      await deleteVariable(variable.id, testUserId);
+      expect(await pull()).toMatchObject({ status: "COMPLETED" });
+      expect(
+        await db
+          .select()
+          .from(variables)
+          .where(eq(variables.projectId, testProjectId))
+      ).toEqual([]);
+      expect(
+        await db
+          .select()
+          .from(projectFiles)
+          .where(eq(projectFiles.projectId, testProjectId))
+      ).toMatchObject([{ filePath: scriptPath, content: edited }]);
+      expect(fetchFile.mock.calls.map((call) => call[2])).toEqual(
+        Array(4).fill(scriptPath)
+      );
+    });
+
     it.each(["branchforge_wins", "gitlab_wins", "manual_review"] as const)(
       "keeps a default-only Script Mode save on an unchanged remote under %s",
       async (policy) => {

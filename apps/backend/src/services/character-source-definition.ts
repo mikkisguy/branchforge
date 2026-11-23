@@ -155,6 +155,8 @@ function parseAt(
 ): {
   definition: ParsedCharacterDefinition;
   next: number;
+  nameTokens: Token[];
+  options: Map<string, Token[]>;
 } | null {
   const prefix = tokens.slice(index, index + 5);
   if (
@@ -281,6 +283,8 @@ function parseAt(
       trailingComma,
     },
     next: closeIndex,
+    nameTokens: first,
+    options: kwargs,
   };
 }
 
@@ -314,6 +318,75 @@ export function parseCharacterDefinitions(
     }
   }
   return definitions;
+}
+
+function argumentSignature(tokens: Token[]) {
+  const operator = /^[!%&*+\-/:<=>@^|]$/;
+  const numberPart = /^[\d.]$/;
+  return tokens.map((token, index) => {
+    const previous = tokens[index - 1];
+    // Spaces can change the meaning of an operator, number, or string prefix.
+    const separated =
+      previous &&
+      previous.end !== token.start &&
+      ((operator.test(previous.text) && operator.test(token.text)) ||
+        (numberPart.test(previous.text) && numberPart.test(token.text)) ||
+        (previous.kind === "word" && token.kind === "string"));
+    const prefixed = previous?.kind === "word" && previous.end === token.start;
+    const decoded =
+      token.kind === "string" && !prefixed ? decodeString(token.text) : null;
+    return [
+      Boolean(separated),
+      token.kind,
+      decoded !== null,
+      decoded ?? token.text,
+    ];
+  });
+}
+
+function literalString(tokens: Token[]): string | null {
+  return tokens.length === 1 && tokens[0].kind === "string"
+    ? decodeString(tokens[0].text)
+    : null;
+}
+
+/** Compare layout-independent definitions, retaining evaluation order for expressions. */
+export function characterDeclarationSignature(
+  definition: ParsedCharacterDefinition
+): string {
+  const declaration = definition.sourceDefinition.declaration;
+  const tokens = tokenize(declaration);
+  const args = parseAt(declaration, tokens, 0);
+  if (!args) return declaration;
+
+  const options = [...args.options];
+  const allLiteral = options.every(([, value]) => {
+    const source = declaration.slice(value[0].start, value.at(-1)!.end);
+    return (
+      literalString(value) !== null ||
+      /^(?:True|False|None|-?\d+(?:\.\d+)?)$/.test(source)
+    );
+  });
+  if (allLiteral)
+    options.sort(([left], [right]) => left.localeCompare(right, "en"));
+
+  return JSON.stringify([
+    tokens[0].text,
+    argumentSignature(args.nameTokens),
+    options.map(([key, value]) => {
+      const color = literalString(value);
+      const simpleSpeakerColor =
+        (key === "who_color" || key === "color") &&
+        color !== null &&
+        /^#(?:[\da-f]{3}|[\da-f]{6})$/i.test(color);
+      return [
+        key,
+        simpleSpeakerColor
+          ? canonicalizeColor(color)
+          : argumentSignature(value),
+      ];
+    }),
+  ]);
 }
 
 function quoteName(name: string): string {

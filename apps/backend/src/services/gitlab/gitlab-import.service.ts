@@ -64,6 +64,10 @@ import {
   assertNoPendingExportAttempt,
   readExportGeneration,
 } from "./gitlab-export-attempt.service.js";
+import {
+  generatedDeclarationKind,
+  recoverGeneratedDeclarations,
+} from "./gitlab-generated-import.js";
 import { promoteManagedDefaults } from "../managed-defaults.service.js";
 import { hasUnpushedLocalContent } from "../project-file-baseline.js";
 import {
@@ -75,6 +79,9 @@ import {
   safeGitLabSyncErrorMessage,
   GITLAB_IMPORT_PENDING_EXPORT,
   GITLAB_IMPORT_STALE_AFTER_EXPORT,
+  GITLAB_IMPORT_EMPTY,
+  GitLabEmptyImportError,
+  GitLabGeneratedImportError,
 } from "./gitlab-error.helpers.js";
 import type {
   DetectCharactersResponse,
@@ -217,12 +224,19 @@ export async function importProjectFromGitLab(
     );
 
     // Import files
-    const operation = await importFromGitlab(
+    const operation = await runGitLabImport(
       newProject.id,
       userId,
       branch,
-      conflictResolution
+      conflictResolution,
+      "fresh-project"
     );
+    if (operation.status === "FAILED") {
+      if (operation.errorMessage === GITLAB_IMPORT_EMPTY) {
+        throw new GitLabEmptyImportError();
+      }
+      throw new Error(operation.errorMessage ?? GENERIC_IMPORT_MESSAGE);
+    }
 
     return {
       project: newProject,
@@ -250,6 +264,17 @@ export async function importFromGitlab(
   branch: string,
   conflictResolution: ConflictResolution
 ): Promise<SyncOperation> {
+  return runGitLabImport(projectId, userId, branch, conflictResolution, "pull");
+}
+
+async function runGitLabImport(
+  projectId: string,
+  userId: string,
+  branch: string,
+  conflictResolution: ConflictResolution,
+  mode: "fresh-project" | "pull"
+): Promise<SyncOperation> {
+  const freshProject = mode === "fresh-project";
   await requireProjectOwnership(projectId, userId);
 
   const db = getDb();
@@ -320,20 +345,12 @@ export async function importFromGitlab(
       });
     }
 
-    // List RPY files in the repository, excluding BranchForge-generated files
-    // (branchforge_variables.rpy, branchforge_stats.rpy,
-    // branchforge_definitions.rpy are auto-generated from management dialogs)
-    const GENERATED_FILE_NAMES = new Set([
-      "branchforge_variables.rpy",
-      "branchforge_stats.rpy",
-      "branchforge_definitions.rpy",
-    ]);
     const allRpyFiles = await listRpyFiles(projectId, branch, userId);
-    const rpyFiles = allRpyFiles.filter(
-      (f) => !GENERATED_FILE_NAMES.has(f.name)
+    const filesToFetch = allRpyFiles.filter(
+      (file) => freshProject || !generatedDeclarationKind(file.name)
     );
 
-    if (rpyFiles.length === 0) {
+    if (filesToFetch.length === 0) {
       await db.transaction(async (tx) => {
         await lockProject(tx, projectId);
         await checkPullBaseline(tx);
@@ -373,7 +390,7 @@ export async function importFromGitlab(
     // concurrency limit. All fetches must succeed before any DB write.
     const limiter = new ConcurrencyLimiter(5);
     const fileFetchResults = await Promise.allSettled(
-      rpyFiles.map((file) =>
+      filesToFetch.map((file) =>
         limiter.run(async () => {
           const metadata = await getFileContentWithMetadata(
             projectId,
@@ -381,7 +398,13 @@ export async function importFromGitlab(
             file.path,
             branch
           );
-          return { file, metadata };
+          const kind = freshProject
+            ? generatedDeclarationKind(file.name)
+            : undefined;
+          if (kind && metadata.content === null) {
+            throw new Error("A generated file disappeared during import");
+          }
+          return { file, metadata, kind };
         })
       )
     );
@@ -398,7 +421,7 @@ export async function importFromGitlab(
       logErrorShared("gitlab_sync.file_fetch_failed", {
         projectId,
         failedCount: fetchFailures.length,
-        totalFiles: rpyFiles.length,
+        totalFiles: filesToFetch.length,
         error: rawErrorMessage,
       });
       const errorMessage = GENERIC_IMPORT_MESSAGE;
@@ -416,7 +439,7 @@ export async function importFromGitlab(
     // Parse and prepare every file before opening the write transaction so a
     // parse failure never leaves a partial DB write behind.
     type PreparedFile = {
-      file: (typeof rpyFiles)[0];
+      file: (typeof filesToFetch)[0];
       content: string;
       cleanedContent: string;
       parsed: ParsedRPYFileWithLabels;
@@ -426,13 +449,19 @@ export async function importFromGitlab(
       remoteRevision: string | null;
     };
     const preparedFiles: PreparedFile[] = [];
+    const generatedFiles: Parameters<typeof recoverGeneratedDeclarations>[0] =
+      [];
 
     for (const result of fileFetchResults) {
       if (result.status !== "fulfilled") {
         continue;
       }
-      const { file, metadata } = result.value;
+      const { file, metadata, kind } = result.value;
       const content = metadata.content;
+      if (kind && content !== null) {
+        generatedFiles.push({ path: file.path, content, kind });
+        continue;
+      }
       if (!content) {
         continue;
       }
@@ -456,19 +485,33 @@ export async function importFromGitlab(
       });
     }
 
-    if (preparedFiles.length === 0) {
-      const errorMessage =
-        "No importable content found in the fetched files. Each file was either empty or contained only whitespace.";
+    if (
+      generatedFiles.length === 0 &&
+      (preparedFiles.length === 0 ||
+        (freshProject && preparedFiles.every(({ content }) => !content.trim())))
+    ) {
       await updateSyncOperation(operation.id, {
         status: "FAILED",
-        errorMessage,
+        errorMessage: GITLAB_IMPORT_EMPTY,
       });
       return {
         ...operation,
         status: "FAILED",
-        errorMessage,
+        errorMessage: GITLAB_IMPORT_EMPTY,
       };
     }
+
+    const recovered = generatedFiles.length
+      ? recoverGeneratedDeclarations(
+          generatedFiles,
+          preparedFiles.map(({ file, content, cleanedContent }) => ({
+            path: file.path,
+            content,
+            cleanedContent,
+          })),
+          excludedTags
+        )
+      : undefined;
 
     // Character review and auto-promotion state. Populated inside the locked
     // transaction against pre-pull rows so the response is transient and
@@ -504,7 +547,9 @@ export async function importFromGitlab(
         existingRows.map((row) => [row.filePath, row])
       );
 
-      const defaultsByKey = new Map<string, DetectedDefaultStatement>();
+      const defaultsByKey = new Map<string, DetectedDefaultStatement>(
+        recovered?.defaults.map((item) => [item.key, item])
+      );
 
       const filesForLabels: Array<{
         prepared: PreparedFile;
@@ -634,14 +679,21 @@ export async function importFromGitlab(
           ...prepared.symbols.variables,
           ...prepared.symbols.stats,
         ]) {
-          if (!defaultsByKey.has(item.key)) defaultsByKey.set(item.key, item);
+          if (
+            !recovered?.sourceOwnedKeys.has(item.key) &&
+            !defaultsByKey.has(item.key)
+          ) {
+            defaultsByKey.set(item.key, item);
+          }
         }
       }
 
       // Parse accepted remote content with the enhanced character parser and
       // deduplicate by first tag in source order.
-      const seenTags = new Set<string>();
-      const acceptedDetectedCharacters: DetectedCharacter[] = [];
+      const seenTags = new Set(recovered?.sourceOwnedKeys);
+      const acceptedDetectedCharacters: DetectedCharacter[] = [
+        ...(recovered?.characters ?? []),
+      ];
       for (const prepared of acceptedForCharacterReview) {
         const fileCharacters = characterParserService.parseWithExclusions(
           prepared.content,
@@ -893,6 +945,10 @@ export async function importFromGitlab(
       status: "FAILED",
       errorMessage,
     });
+
+    // The new-project coordinator removes the partial project. The route
+    // surfaces the specific diagnostic directly so the same repo can be retried.
+    if (error instanceof GitLabGeneratedImportError) throw error;
 
     return {
       ...operation,
