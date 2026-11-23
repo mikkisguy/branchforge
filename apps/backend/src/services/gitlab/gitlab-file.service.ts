@@ -18,9 +18,11 @@ import { logError, LogEventType } from "../../lib/logger.js";
 import { getDecryptedToken } from "./gitlab-integration.service.js";
 import {
   getRepositoryLink,
+  assertGitlabRepositoryIdentity,
   getBranchCommitSha,
   _listFilesWithAuth,
 } from "./gitlab-repository.service.js";
+import type { GitlabRepositoryIdentity } from "./gitlab-repository.service.js";
 import { fetchWithTimeout } from "./gitlab-api.client.js";
 
 /**
@@ -175,6 +177,9 @@ export class GitLabCommitRejectedError extends Error {
   }
 }
 
+/** Preparation failed before making the remote commit request. */
+export class GitLabCommitNotSentError extends Error {}
+
 function toGitlabCommitAction(
   action: BatchCommitAction
 ): Record<string, unknown> {
@@ -184,10 +189,15 @@ function toGitlabCommitAction(
       previous_path: action.previousPath ?? action.filePath,
       file_path: action.filePath,
       ...(action.content === undefined ? {} : { content: action.content }),
+      ...(action.lastCommitId ? { last_commit_id: action.lastCommitId } : {}),
     };
   }
   if (action.action === "delete") {
-    return { action: "delete", file_path: action.filePath };
+    return {
+      action: "delete",
+      file_path: action.filePath,
+      ...(action.lastCommitId ? { last_commit_id: action.lastCommitId } : {}),
+    };
   }
   return {
     action: action.action,
@@ -220,48 +230,83 @@ export async function batchCommitFiles(
   branch: string,
   commitMessage: string,
   actions: ReadonlyArray<BatchCommitAction>,
-  gitlabUrl?: string
+  gitlabUrl?: string,
+  prepared?: {
+    repository: GitlabRepositoryIdentity;
+    baseRevision: string;
+    branchExisted: boolean;
+    verifyMovedReceipt: (commitId: string) => Promise<void>;
+  }
 ): Promise<string | null> {
-  await requireProjectOwnership(projectId, userId);
+  const request = await (async () => {
+    await requireProjectOwnership(projectId, userId);
 
-  const repoLink = await getRepositoryLink(projectId);
-  if (!repoLink) {
-    throw new RepositoryNotLinkedError();
-  }
-
-  const token = await getDecryptedToken(userId);
-  const url = validateGitLabUrl(gitlabUrl || repoLink.gitlabUrl || undefined);
-
-  const apiUrl = new URL(
-    `/api/v4/projects/${repoLink.gitlabProjectId}/repository/commits`,
-    url
-  );
-
-  // Determine whether the branch exists yet (new branches need start_branch)
-  let branchExists = false;
-
-  try {
-    await getBranchCommitSha(projectId, userId, branch, gitlabUrl);
-    branchExists = true;
-  } catch (err) {
-    if (err instanceof NotFoundError) {
-      // Branch doesn't exist yet — will be created from start_branch
-    } else {
-      throw err;
+    const repoLink = await getRepositoryLink(projectId);
+    if (!repoLink) {
+      throw new RepositoryNotLinkedError();
     }
-  }
 
-  // Build the request body
-  const body: Record<string, unknown> = {
-    branch,
-    commit_message: commitMessage,
-    actions: actions.map(toGitlabCommitAction),
-  };
+    if (prepared) assertGitlabRepositoryIdentity(prepared.repository, repoLink);
+    const token = await getDecryptedToken(userId);
+    const url = validateGitLabUrl(gitlabUrl || repoLink.gitlabUrl || undefined);
 
-  // For new branches, provide start_branch (default branch of the repo)
-  if (!branchExists) {
-    body.start_branch = repoLink.defaultBranch || "main";
-  }
+    const apiUrl = new URL(
+      `/api/v4/projects/${repoLink.gitlabProjectId}/repository/commits`,
+      url
+    );
+
+    let branchExists = false;
+    try {
+      const head = await getBranchCommitSha(
+        projectId,
+        userId,
+        branch,
+        gitlabUrl,
+        prepared?.repository
+      );
+      if (
+        prepared &&
+        (!prepared.branchExisted || head !== prepared.baseRevision)
+      ) {
+        throw new GitLabCommitRejectedError(
+          409,
+          "Target branch changed before submission"
+        );
+      }
+      branchExists = true;
+    } catch (error) {
+      if (!(error instanceof NotFoundError)) throw error;
+      if (prepared?.branchExisted) {
+        throw new GitLabCommitRejectedError(
+          409,
+          "Target branch disappeared before submission"
+        );
+      }
+    }
+
+    // Build the request body
+    const body: Record<string, unknown> = {
+      branch,
+      commit_message: commitMessage,
+      actions: actions.map(toGitlabCommitAction),
+    };
+
+    // For new branches, provide start_branch (default branch of the repo)
+    if (!branchExists) {
+      if (prepared) body.start_sha = prepared.baseRevision;
+      else body.start_branch = repoLink.defaultBranch || "main";
+    }
+
+    return { apiUrl, token, body };
+  })().catch((error: unknown) => {
+    if (prepared && !(error instanceof GitLabCommitRejectedError)) {
+      throw new GitLabCommitNotSentError("GitLab commit preparation failed", {
+        cause: error,
+      });
+    }
+    throw error;
+  });
+  const { apiUrl, token, body } = request;
 
   const response = await fetchWithTimeout(apiUrl.toString(), {
     method: "POST",
@@ -284,13 +329,23 @@ export async function batchCommitFiles(
     throw new Error(`GitLab API error: ${response.status} - ${errorText}`);
   }
 
-  // GitLab returns the created commit object; store/return the actual id.
+  // A receipt whose parent is the preflight revision establishes that the
+  // ordered atomic GitLab request ran against the exact checked tree.
+  let commit: { id?: string; parent_ids?: string[] };
   try {
-    const commit = (await response.json()) as { id?: string };
-    return commit.id ?? null;
+    commit = (await response.json()) as typeof commit;
   } catch {
     return null;
   }
+  if (!commit.id) return null;
+  if (
+    prepared &&
+    (commit.parent_ids?.length !== 1 ||
+      commit.parent_ids[0] !== prepared.baseRevision)
+  ) {
+    await prepared.verifyMovedReceipt(commit.id);
+  }
+  return commit.id;
 }
 
 /**

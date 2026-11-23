@@ -60,6 +60,7 @@ import {
 import { createProject, deleteProject } from "../projects.service.js";
 import { assertNoPendingStructuralOperations } from "../project-files-operations.service.js";
 import { lockProject } from "../project-files-operations.service.js";
+import { assertNoPendingExportAttempt } from "./gitlab-export-attempt.service.js";
 import { promoteManagedDefaults } from "../managed-defaults.service.js";
 import { hasUnpushedLocalContent } from "../project-file-baseline.js";
 import {
@@ -69,6 +70,7 @@ import {
 import {
   GENERIC_IMPORT_MESSAGE,
   safeGitLabSyncErrorMessage,
+  GITLAB_IMPORT_PENDING_EXPORT,
 } from "./gitlab-error.helpers.js";
 import type {
   DetectCharactersResponse,
@@ -248,7 +250,13 @@ export async function importFromGitlab(
 
   const db = getDb();
 
-  // Pull guard (pre-check): import/pull is blocked iff any structural
+  await assertNoPendingExportAttempt(
+    db,
+    projectId,
+    GITLAB_IMPORT_PENDING_EXPORT
+  );
+
+  // Structural pull guard (pre-check): import/pull is blocked iff any structural
   // CREATE/RENAME/DELETE exists. Ordinary autosaved content edits do not
   // block pull. The authoritative check runs again under the project lock
   // inside the write transaction below.
@@ -309,6 +317,15 @@ export async function importFromGitlab(
     );
 
     if (rpyFiles.length === 0) {
+      await db.transaction(async (tx) => {
+        await lockProject(tx, projectId);
+        await assertNoPendingExportAttempt(
+          tx,
+          projectId,
+          GITLAB_IMPORT_PENDING_EXPORT
+        );
+        await assertNoPendingStructuralOperations(tx, projectId);
+      });
       // No files to import - mark as completed and return a character review
       // based on the current pre-pull state.
       const prePullCharacters = await db
@@ -452,6 +469,11 @@ export async function importFromGitlab(
     // and labels.
     await db.transaction(async (tx) => {
       await lockProject(tx, projectId);
+      await assertNoPendingExportAttempt(
+        tx,
+        projectId,
+        GITLAB_IMPORT_PENDING_EXPORT
+      );
       await assertNoPendingStructuralOperations(tx, projectId);
 
       // Capture pre-pull character rows before any inserts so the review

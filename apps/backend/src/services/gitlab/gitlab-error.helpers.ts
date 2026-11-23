@@ -17,9 +17,18 @@ const GENERATED_PATH_CONFLICT_PREFIX =
 const GENERATED_PATH_CONFLICT_MESSAGE =
   "Conflict: verify ownership of the generated file paths in GitLab and BranchForge before retrying.";
 
+export const GITLAB_EXPORT_ATTEMPT_UNCERTAIN =
+  "BranchForge could not verify the previous GitLab push. Check the target branch and retry the same push, or contact your administrator.";
+export const GITLAB_IMPORT_PENDING_EXPORT =
+  "Retry the previous GitLab push before pulling changes into this project.";
+export const GITLAB_EXPORT_ATTEMPT_CHANGED =
+  "The previous GitLab push no longer matches this repository, branch, or pending file operations. Review the pending changes before retrying.";
+
 // Safe exact messages that may be persisted or returned to clients.
 const SAFE_EXPORT_MESSAGES: readonly string[] = [
   GENERATED_PATH_CONFLICT_MESSAGE,
+  GITLAB_EXPORT_ATTEMPT_UNCERTAIN,
+  GITLAB_EXPORT_ATTEMPT_CHANGED,
   "Server restarted while sync was in progress",
   "A character cannot be excluded until its source can be preserved.",
   "Export failed. Link a GitLab repository in project settings, then try again.",
@@ -28,6 +37,7 @@ const SAFE_EXPORT_MESSAGES: readonly string[] = [
 ];
 
 const SAFE_IMPORT_MESSAGES: readonly string[] = [
+  GITLAB_IMPORT_PENDING_EXPORT,
   "Server restarted while sync was in progress",
   "A character cannot be excluded until its source can be preserved.",
   "Import failed. Try again. If the problem persists, contact your administrator.",

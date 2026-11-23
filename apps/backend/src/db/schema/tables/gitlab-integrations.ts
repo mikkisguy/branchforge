@@ -11,6 +11,8 @@ import {
   text,
   timestamp,
   integer,
+  boolean,
+  jsonb,
   index,
   unique,
   uniqueIndex,
@@ -129,6 +131,60 @@ export const gitlabSyncOperations = pgTable(
     index("gitlab_sync_operations_status_idx").on(table.status),
   ]
 );
+
+export interface GitlabExportAttemptSnapshot {
+  version: 1;
+  actions: Array<{
+    action: "create" | "update" | "move" | "delete";
+    filePath: string;
+    previousPath?: string;
+    content?: string;
+    lastCommitId?: string;
+  }>;
+  before: Array<{ path: string; hash: string | null; lastCommitId?: string }>;
+  files: Array<{
+    id: string;
+    path: string;
+    pushedHash: string;
+    content: string;
+    changedRemote: boolean;
+    previousRemotePath: string | null;
+    previousRemoteBranch: string | null;
+    previousRemoteRevision: string | null;
+    previousRemoteHash: string | null;
+    previousPushedHash: string | null;
+    pending?: {
+      id: string;
+      operation: "CREATE" | "RENAME" | "DELETE";
+      remoteBasePath: string;
+      localPath: string;
+      updatedAt: string;
+    };
+  }>;
+  labels: Array<{ id: string; fileId: string; hash: string }>;
+  lines: Array<{ id: string; labelId: string; hash: string }>;
+}
+
+/** One unresolved outbound GitLab batch per project. */
+export const gitlabExportAttempts = pgTable("gitlab_export_attempts", {
+  projectId: uuid("project_id")
+    .primaryKey()
+    .references(() => projects.id, { onDelete: "cascade" }),
+  operationId: uuid("operation_id")
+    .notNull()
+    .references(() => gitlabSyncOperations.id, { onDelete: "cascade" }),
+  repositoryLinkId: uuid("repository_link_id").notNull(),
+  gitlabProjectId: integer("gitlab_project_id").notNull(),
+  gitlabOrigin: text("gitlab_origin").notNull(),
+  branch: text("branch").notNull(),
+  baseRevision: text("base_revision").notNull(),
+  branchExisted: boolean("branch_existed").notNull(),
+  message: text("message").notNull(),
+  snapshot: jsonb("snapshot").$type<GitlabExportAttemptSnapshot>().notNull(),
+  startedAt: timestamp("started_at").defaultNow().notNull(),
+  dispatchedAt: timestamp("dispatched_at"),
+  commitId: text("commit_id"),
+});
 
 // Types
 export type GitlabIntegration = typeof gitlabIntegrations.$inferSelect;

@@ -21,6 +21,7 @@ import {
   getGitlabIntegration,
 } from "./gitlab-integration.service.js";
 import { fetchWithTimeout } from "./gitlab-api.client.js";
+import { GITLAB_EXPORT_ATTEMPT_CHANGED } from "./gitlab-error.helpers.js";
 import type {
   GitlabBranch,
   GitlabFile,
@@ -270,6 +271,66 @@ export async function getRepositoryLink(projectId: string) {
  * @param userId - The user ID
  * @returns Array of repository links
  */
+export interface GitlabRepositoryIdentity {
+  repositoryLinkId: string;
+  gitlabProjectId: number;
+  gitlabOrigin: string;
+}
+
+export function gitlabRepositoryIdentity(
+  link: NonNullable<Awaited<ReturnType<typeof getRepositoryLink>>>
+): GitlabRepositoryIdentity {
+  return {
+    repositoryLinkId: link.id,
+    gitlabProjectId: link.gitlabProjectId,
+    gitlabOrigin: new URL(validateGitLabUrl(link.gitlabUrl || undefined))
+      .origin,
+  };
+}
+
+export function assertGitlabRepositoryIdentity(
+  expected: GitlabRepositoryIdentity,
+  link: NonNullable<Awaited<ReturnType<typeof getRepositoryLink>>>
+): void {
+  const actual = gitlabRepositoryIdentity(link);
+  if (
+    expected.repositoryLinkId !== actual.repositoryLinkId ||
+    expected.gitlabProjectId !== actual.gitlabProjectId ||
+    expected.gitlabOrigin !== actual.gitlabOrigin
+  ) {
+    throw new Error(GITLAB_EXPORT_ATTEMPT_CHANGED);
+  }
+}
+
+export async function getExportCommit(
+  projectId: string,
+  userId: string,
+  repository: GitlabRepositoryIdentity,
+  revision: string
+): Promise<{ id: string; message: string; parent_ids: string[] }> {
+  await requireProjectOwnership(projectId, userId);
+  const link = await getRepositoryLink(projectId);
+  if (!link) throw new RepositoryNotLinkedError();
+  assertGitlabRepositoryIdentity(repository, link);
+  const url = validateGitLabUrl(link.gitlabUrl || undefined);
+  const apiUrl = new URL(
+    `/api/v4/projects/${link.gitlabProjectId}/repository/commits/${encodeURIComponent(revision)}`,
+    url
+  );
+  const token = await getDecryptedToken(userId);
+  const response = await fetchWithTimeout(apiUrl.toString(), {
+    headers: { "PRIVATE-TOKEN": token },
+  });
+  if (!response.ok) {
+    throw new Error(`GitLab commit verification failed: ${response.status}`);
+  }
+  return (await response.json()) as {
+    id: string;
+    message: string;
+    parent_ids: string[];
+  };
+}
+
 export async function listRepositoryLinks(userId: string) {
   const db = getDb();
   const result = await db
@@ -363,7 +424,8 @@ export async function getBranchCommitSha(
   projectId: string,
   userId: string,
   branch: string,
-  gitlabUrl?: string
+  gitlabUrl?: string,
+  expectedRepository?: GitlabRepositoryIdentity
 ): Promise<string> {
   await requireProjectOwnership(projectId, userId);
 
@@ -372,6 +434,8 @@ export async function getBranchCommitSha(
     throw new RepositoryNotLinkedError();
   }
 
+  if (expectedRepository)
+    assertGitlabRepositoryIdentity(expectedRepository, repoLink);
   const token = await getDecryptedToken(userId);
   const url = validateGitLabUrl(gitlabUrl || repoLink.gitlabUrl || undefined);
 
@@ -577,7 +641,8 @@ export async function getFileContentWithMetadata(
   userId: string,
   filePath: string,
   branch: string,
-  gitlabUrl?: string
+  gitlabUrl?: string,
+  expectedRepository?: GitlabRepositoryIdentity
 ): Promise<GitlabFileContentWithMetadata> {
   await requireProjectOwnership(projectId, userId);
 
@@ -586,6 +651,8 @@ export async function getFileContentWithMetadata(
     throw new RepositoryNotLinkedError();
   }
 
+  if (expectedRepository)
+    assertGitlabRepositoryIdentity(expectedRepository, repoLink);
   const token = await getDecryptedToken(userId);
   const url = validateGitLabUrl(gitlabUrl || repoLink.gitlabUrl || undefined);
 

@@ -18,6 +18,7 @@ import {
   labels,
   labelLines,
   projectFilePendingOperations,
+  gitlabExportAttempts,
   projects,
   userSettings,
   projectSettings,
@@ -285,6 +286,22 @@ async function assertDirectoryPrefixStable(
 // ============================================================================
 // Pending operation collapse
 // ============================================================================
+
+/** Called under the project lock before an undo can remove dispatched state. */
+async function assertExportAllowsUndo(
+  tx: Transaction,
+  projectId: string
+): Promise<void> {
+  const [attempt] = await tx
+    .select({ id: gitlabExportAttempts.operationId })
+    .from(gitlabExportAttempts)
+    .where(eq(gitlabExportAttempts.projectId, projectId));
+  if (attempt) {
+    throw new ConflictError(
+      "Retry the previous GitLab push before undoing or discarding file changes."
+    );
+  }
+}
 
 async function getPendingOperation(
   tx: Transaction,
@@ -922,6 +939,7 @@ export async function deleteProjectFile(
     const hardDeleted = lockedFile.source === "ZIP" || isPendingCreate;
 
     if (hardDeleted) {
+      if (isPendingCreate) await assertExportAllowsUndo(tx, file.projectId);
       if (pending) {
         // CREATE → delete cancels the operation entirely.
         await tx
@@ -1090,6 +1108,7 @@ export async function reverseOneOperation(
 
   return await db.transaction(async (tx) => {
     await lockProject(tx, file.projectId);
+    await assertExportAllowsUndo(tx, file.projectId);
     await lockFilesByIds(tx, [fileId]);
     const [lockedFile] = await tx
       .select()
@@ -1163,6 +1182,7 @@ export async function discardAllOperations(
 
   return await db.transaction(async (tx) => {
     await lockProject(tx, projectId);
+    await assertExportAllowsUndo(tx, projectId);
 
     // Lock all files with pending operations in deterministic ID order.
     const pendingFiles = await tx
