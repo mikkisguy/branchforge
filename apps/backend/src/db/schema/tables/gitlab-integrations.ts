@@ -165,26 +165,43 @@ export interface GitlabExportAttemptSnapshot {
   lines: Array<{ id: string; labelId: string; hash: string }>;
 }
 
+export interface GitlabExportVerificationProgress {
+  head: string;
+  next: string;
+  receipt: string | null;
+  match: { id: string; parent: string } | null;
+}
+
 /** One unresolved outbound GitLab batch per project. */
-export const gitlabExportAttempts = pgTable("gitlab_export_attempts", {
-  projectId: uuid("project_id")
-    .primaryKey()
-    .references(() => projects.id, { onDelete: "cascade" }),
-  operationId: uuid("operation_id")
-    .notNull()
-    .references(() => gitlabSyncOperations.id, { onDelete: "cascade" }),
-  repositoryLinkId: uuid("repository_link_id").notNull(),
-  gitlabProjectId: integer("gitlab_project_id").notNull(),
-  gitlabOrigin: text("gitlab_origin").notNull(),
-  branch: text("branch").notNull(),
-  baseRevision: text("base_revision").notNull(),
-  branchExisted: boolean("branch_existed").notNull(),
-  message: text("message").notNull(),
-  snapshot: jsonb("snapshot").$type<GitlabExportAttemptSnapshot>().notNull(),
-  startedAt: timestamp("started_at").defaultNow().notNull(),
-  dispatchedAt: timestamp("dispatched_at"),
-  commitId: text("commit_id"),
-});
+export const gitlabExportAttempts = pgTable(
+  "gitlab_export_attempts",
+  {
+    projectId: uuid("project_id")
+      .primaryKey()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    operationId: uuid("operation_id")
+      .notNull()
+      .references(() => gitlabSyncOperations.id, { onDelete: "cascade" }),
+    repositoryLinkId: uuid("repository_link_id").notNull(),
+    gitlabProjectId: integer("gitlab_project_id").notNull(),
+    gitlabOrigin: text("gitlab_origin").notNull(),
+    branch: text("branch").notNull(),
+    baseRevision: text("base_revision").notNull(),
+    branchExisted: boolean("branch_existed").notNull(),
+    message: text("message").notNull(),
+    snapshot: jsonb("snapshot").$type<GitlabExportAttemptSnapshot>().notNull(),
+    startedAt: timestamp("started_at").defaultNow().notNull(),
+    dispatchedAt: timestamp("dispatched_at"),
+    verification:
+      jsonb("verification").$type<GitlabExportVerificationProgress>(),
+    commitId: text("commit_id"),
+  },
+  (table) => [
+    uniqueIndex("gitlab_export_attempts_operation_id_idx").on(
+      table.operationId
+    ),
+  ]
+);
 
 // Types
 export type GitlabIntegration = typeof gitlabIntegrations.$inferSelect;
