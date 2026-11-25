@@ -32,6 +32,10 @@ import * as gitlabSyncService from "../../services/gitlab-sync.service.js";
 import * as rateLimiter from "../../services/rate-limiter.service.js";
 import * as db from "../../db/index.js";
 import {
+  GitLabEmptyImportError,
+  GitLabGeneratedImportError,
+} from "../../services/gitlab/gitlab-error.helpers.js";
+import {
   NotFoundError,
   ForbiddenError,
   ValidationError,
@@ -544,6 +548,56 @@ describe("GitLab Routes (Integration)", () => {
 
       expect(response.statusCode).toBe(400);
     });
+  });
+
+  it("surfaces generated declaration conflicts from fresh imports", async () => {
+    vi.mocked(rateLimiter.checkRateLimit).mockReturnValue({
+      allowed: true,
+      retryAfter: 0,
+    });
+    const message =
+      'Conflicting Ren’Py declarations at "game/branchforge_variables.rpy" line 8 and "game/script.rpy" line 1. Resolve them in GitLab, then retry the import.';
+    vi.mocked(gitlabService.importProjectFromGitLab).mockRejectedValue(
+      new GitLabGeneratedImportError(message)
+    );
+    const response = await fastify.inject({
+      method: "POST",
+      url: "/api/gitlab/import-project",
+      payload: {
+        projectName: "Fresh import",
+        gitlabProjectId: 42,
+        gitlabProjectName: "test/repo",
+        branch: "chapter-two",
+        conflictResolution: "branchforge_wins",
+      },
+    });
+    expect(response.statusCode).toBe(409);
+    expect(response.json()).toEqual({
+      error: "GitLab declaration conflict",
+      message,
+    });
+  });
+
+  it("surfaces the empty-file diagnostic from fresh imports", async () => {
+    vi.mocked(rateLimiter.checkRateLimit).mockReturnValue({
+      allowed: true,
+      retryAfter: 0,
+    });
+    const error = new GitLabEmptyImportError();
+    vi.mocked(gitlabService.importProjectFromGitLab).mockRejectedValue(error);
+    const response = await fastify.inject({
+      method: "POST",
+      url: "/api/gitlab/import-project",
+      payload: {
+        projectName: "Fresh import",
+        gitlabProjectId: 42,
+        gitlabProjectName: "test/repo",
+        branch: "chapter-two",
+        conflictResolution: "branchforge_wins",
+      },
+    });
+    expect(response.statusCode).toBe(422);
+    expect(response.json()).toEqual({ error: error.message });
   });
 
   describe("POST /api/gitlab/import", () => {

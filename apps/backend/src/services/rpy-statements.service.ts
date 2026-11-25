@@ -125,7 +125,9 @@ export function collectSourceOwnedRpyDeclarations(
   return new Set(collectGlobalDeclarationLines(content).values());
 }
 
-function collectGlobalDeclarationLines(content: string): Map<number, string> {
+export function collectGlobalDeclarationLines(
+  content: string
+): Map<number, string> {
   const names = new Map<number, string>();
   const lines = content.replace(/^\uFEFF/, "").split("\n");
   let quote: string | null = null;
@@ -443,24 +445,10 @@ function extractRpySymbols(
     // We do not try to handle multi-line `default` statements because
     // they are exceedingly rare in practice and would require
     // statement-level (not just paren) tracking.
-    const defaultMatch =
+    const detected =
       (excludedTags === undefined || globalLines.has(i)) &&
-      trimmed.match(/^default\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=/);
-    if (defaultMatch) {
-      const key = defaultMatch[1];
-      const valueStart = defaultMatch[0].length;
-      const commentStart = trimmed.indexOf("#", valueStart);
-      // Only bare booleans and numbers can be managed, so a hash inside
-      // a quoted string or other expression cannot change its classification.
-      const rawValue = trimmed.slice(
-        valueStart,
-        commentStart === -1 ? undefined : commentStart
-      );
-      const detected = classifyDefaultStatement(
-        key,
-        rawValue,
-        legacyNotices !== undefined
-      );
+      parseRpyDefaultLine(trimmed, legacyNotices !== undefined);
+    if (detected) {
       // Only `variable` (True/False) and `stat` (numeric) are
       // promoted into the database. `unknown` defaults — quoted
       // strings, identifiers, function calls — are left in the
@@ -469,19 +457,14 @@ function extractRpySymbols(
       // store, and on the next export the user's file would be
       // missing a line it had before. The strip is conservative:
       // when in doubt, preserve.
-      // The trailing comment must fit on a single line as well.
-      if (
-        detected.kind === "unknown" ||
-        (commentStart !== -1 &&
-          /[\n\r\u2028\u2029]/.test(trimmed.slice(commentStart + 1)))
-      ) {
+      if (detected.kind === "unknown") {
         output.push(line);
         i += 1;
         continue;
       }
       const bucket = detected.kind === "variable" ? variablesByKey : statsByKey;
-      if (!bucket.has(key)) {
-        bucket.set(key, detected);
+      if (!bucket.has(detected.key)) {
+        bucket.set(detected.key, detected);
       }
       strippedSomething = true;
       i += 1;
@@ -665,6 +648,29 @@ function extractColorFromOptions(options: string): string {
  * - integer / decimal number -> stat
  * - anything else -> unknown (preserved verbatim, not stored)
  */
+export function parseRpyDefaultLine(
+  line: string,
+  legacy = false
+): DetectedDefaultStatement | null {
+  const match = /^default\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=/.exec(line);
+  if (!match) return null;
+  const valueStart = match[0].length;
+  const commentStart = line.indexOf("#", valueStart);
+  if (
+    commentStart !== -1 &&
+    /[\n\r\u2028\u2029]/.test(line.slice(commentStart + 1))
+  ) {
+    return null;
+  }
+  // Only bare literals are managed, so a hash inside an expression
+  // cannot cause it to be classified as a managed default.
+  return classifyDefaultStatement(
+    match[1],
+    line.slice(valueStart, commentStart === -1 ? undefined : commentStart),
+    legacy
+  );
+}
+
 function classifyDefaultStatement(
   key: string,
   rawValue: string,
