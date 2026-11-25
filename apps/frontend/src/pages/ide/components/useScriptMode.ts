@@ -16,8 +16,7 @@ import { useTextUndo } from "@/hooks/useTextUndo";
 import type { LabelTitleMap } from "@/lib/codemirror/label-title-decoration";
 import type { SourceOrigin, VariableReference } from "@branchforge/shared";
 import { useScriptModeData } from "./useScriptModeData";
-import { useExportPreview } from "@/hooks/useExportPreview";
-import { GENERATED_PREVIEW_BASENAMES } from "@/lib/generated-preview-files";
+import { useGeneratedScriptPreview } from "./useGeneratedScriptPreview";
 import type { ProjectFileNode } from "@/hooks/useProjectFiles";
 
 function getContainingFolder(filePath: string): string | null {
@@ -70,25 +69,14 @@ export function useScriptMode({
     };
   }, []);
 
-  const [generatedFileName, setGeneratedFileName] = useState<string | null>(
-    null
-  );
-  const previewQuery = useExportPreview(projectId);
-  const previewFile = previewQuery.data?.files.find(
-    (file) => file.fileName === generatedFileName
-  );
-  const generatedContent =
-    previewFile && !previewFile.isEmpty ? previewFile.content : null;
-  const generatedPreview = generatedFileName
-    ? {
-        fileName: generatedFileName,
-        content: generatedContent,
-        emptyReason:
-          generatedContent === null && previewQuery.data
-            ? (previewFile?.emptyReason ?? "No managed declarations to export")
-            : null,
-      }
-    : null;
+  const {
+    generatedFileName,
+    setGeneratedFileName,
+    generatedFiles,
+    generatedPreview,
+    generatedPreviewError,
+    handleGeneratedFileSelect,
+  } = useGeneratedScriptPreview(projectId, setActiveLabelId, showErrorToast);
   const isGeneratedPreview = !!generatedPreview;
   const {
     fileSaveStatus,
@@ -122,19 +110,6 @@ export function useScriptMode({
 
   const hasPendingSave =
     !!currentEditFileId && (isFileDirty || fileSaveStatus === "error");
-
-  const handleGeneratedFileSelect = useCallback(
-    (fileName: string) => {
-      const file = previewQuery.data?.files.find(
-        (f) => f.fileName === fileName
-      );
-      if (!file || file.isEmpty) return;
-
-      setGeneratedFileName(fileName);
-      setActiveLabelId(null);
-    },
-    [previewQuery.data, setActiveLabelId]
-  );
 
   const handleNoTabsRemaining = useCallback(() => {
     void clearEditorState();
@@ -236,7 +211,7 @@ export function useScriptMode({
     return () => {
       cancelled = true;
     };
-  }, [pendingSelectFileId, projectFiles, selectFileTab]);
+  }, [pendingSelectFileId, projectFiles, selectFileTab, setGeneratedFileName]);
 
   const { resetRefreshState } = useScriptModeRefresh({
     projectId,
@@ -256,7 +231,12 @@ export function useScriptMode({
     setFoldersToExpand([]);
     setPendingSelectFileId(null);
     setShowCreateFileDialog(false);
-  }, [clearEditorState, clearTabsState, resetRefreshState]);
+  }, [
+    clearEditorState,
+    clearTabsState,
+    resetRefreshState,
+    setGeneratedFileName,
+  ]);
 
   const setSkipSave = useCallback(
     (value: boolean) => {
@@ -451,7 +431,7 @@ export function useScriptMode({
       setGeneratedFileName(null);
       void selectFileTab(fileId);
     },
-    [selectFileTab]
+    [selectFileTab, setGeneratedFileName]
   );
 
   const handleSelectFileTab = useCallback(
@@ -459,7 +439,7 @@ export function useScriptMode({
       setGeneratedFileName(null);
       await selectFileTab(fileId);
     },
-    [selectFileTab]
+    [selectFileTab, setGeneratedFileName]
   );
 
   const handleGitLabSceneSelect = useCallback(
@@ -468,7 +448,7 @@ export function useScriptMode({
       setReferenceLocation(null);
       setActiveLabelId(sceneId);
     },
-    [setActiveLabelId]
+    [setActiveLabelId, setGeneratedFileName]
   );
 
   const handleOpenVariableReference = useCallback(
@@ -509,6 +489,7 @@ export function useScriptMode({
       triggerFileSave,
       refreshFiles,
       selectFileTab,
+      setGeneratedFileName,
       runEditorTransition,
     ]
   );
@@ -540,40 +521,6 @@ export function useScriptMode({
 
   const saveConflict = activeProjectFile ? hasSaveConflict : undefined;
   const onSaveRequest = activeProjectFile ? retryFileSave : undefined;
-
-  const generatedFiles = useMemo(
-    () =>
-      GENERATED_PREVIEW_BASENAMES.map((fileName) => {
-        const file = previewQuery.data?.files.find(
-          (entry) => entry.fileName === fileName
-        );
-        return (
-          file ?? {
-            fileName,
-            isEmpty: true,
-            emptyReason: previewQuery.isError
-              ? "Failed to load generated preview"
-              : previewQuery.data
-                ? "No managed declarations to export"
-                : "Loading generated preview…",
-          }
-        );
-      }),
-    [previewQuery.data, previewQuery.isError]
-  );
-
-  const previewErrorShownRef = useRef(false);
-  useEffect(() => {
-    if (previewQuery.isError) {
-      if (!previewErrorShownRef.current && !generatedFileName) {
-        showErrorToast("Failed to load generated preview", "Preview Error");
-      }
-      previewErrorShownRef.current = true;
-      return;
-    }
-    // Allow a later failure to toast again after recovery.
-    previewErrorShownRef.current = false;
-  }, [generatedFileName, previewQuery.isError, showErrorToast]);
 
   return {
     isLoadingLabels: data.isLoadingLabels,
@@ -623,9 +570,7 @@ export function useScriptMode({
     generatedFiles,
     generatedPreview,
     onGeneratedFileSelect: handleGeneratedFileSelect,
-    generatedPreviewError: previewQuery.isError
-      ? { retry: previewQuery.refetch, isRetrying: previewQuery.isFetching }
-      : null,
+    generatedPreviewError,
     showCreateFileDialog,
     handleOpenCreateFileDialog,
     handleCreateFileDialogOpenChange,
