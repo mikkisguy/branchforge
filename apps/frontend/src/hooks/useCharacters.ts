@@ -5,6 +5,7 @@
  * Characters are NPCs and love interests in the visual novel.
  */
 
+import { invalidateGeneratedFiles } from "@/lib/generated-preview-files";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { charactersApi, type UpdateCharacterBody } from "@/lib/api/characters";
 import { characterKeys, flowKeys } from "@/lib/query-keys";
@@ -93,7 +94,7 @@ export function useCharacters(
     mutationFn: async (input: CreateCharacterInput) => {
       return charactersApi.createCharacter(projectId, input);
     },
-    onSuccess: () => {
+    onSuccess: ({ projectId }) => {
       // Invalidate and refetch characters list
       // Also invalidate the flow graph: the new character becomes an
       // option in the Character filter.
@@ -103,6 +104,7 @@ export function useCharacters(
       queryClient.invalidateQueries({
         queryKey: flowKeys.graph(projectId),
       });
+      void invalidateGeneratedFiles(queryClient, projectId);
       toast.success("Character created successfully", "Success");
     },
     onError: (error: Error) => {
@@ -121,7 +123,7 @@ export function useCharacters(
     }) => {
       return charactersApi.updateCharacter(characterId, input);
     },
-    onSuccess: () => {
+    onSuccess: ({ projectId }) => {
       // Invalidate and refetch characters list
       // Also invalidate the flow graph: rename / recolour shows up on
       // the filter row and the speaker chip inside the node.
@@ -131,6 +133,7 @@ export function useCharacters(
       queryClient.invalidateQueries({
         queryKey: flowKeys.graph(projectId),
       });
+      void invalidateGeneratedFiles(queryClient, projectId);
       toast.success("Character updated successfully", "Success");
     },
     onError: (error: Error) => {
@@ -140,10 +143,15 @@ export function useCharacters(
 
   // Delete character mutation
   const deleteCharacterMutation = useMutation({
-    mutationFn: async (characterId: string) => {
+    mutationFn: async ({
+      characterId,
+    }: {
+      projectId: string;
+      characterId: string;
+    }) => {
       await charactersApi.deleteCharacter(characterId);
     },
-    onSuccess: () => {
+    onSuccess: (_result, { projectId }) => {
       // Invalidate and refetch characters list
       // Also invalidate the flow graph: the character is no longer
       // available as a filter, and the speaker-derived characterIds
@@ -154,6 +162,7 @@ export function useCharacters(
       queryClient.invalidateQueries({
         queryKey: flowKeys.graph(projectId),
       });
+      void invalidateGeneratedFiles(queryClient, projectId);
       toast.success("Character deleted successfully", "Success");
     },
     onError: (error: Error) => {
@@ -231,7 +240,7 @@ export function useCharacters(
 
   // Delete character method
   const deleteCharacter = async (characterId: string): Promise<void> => {
-    return deleteCharacterMutation.mutateAsync(characterId);
+    return deleteCharacterMutation.mutateAsync({ projectId, characterId });
   };
 
   // Upload avatar method

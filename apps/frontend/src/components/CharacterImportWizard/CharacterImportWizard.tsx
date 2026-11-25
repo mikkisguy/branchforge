@@ -1,3 +1,4 @@
+import { invalidateGeneratedFiles } from "@/lib/generated-preview-files";
 import { useMemo, useReducer, useCallback, useId } from "react";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -140,6 +141,7 @@ export function CharacterImportWizard({
         error(`${result.unmatched.length} speaker(s) could not be matched`);
       }
       await Promise.all([
+        invalidateGeneratedFiles(queryClient, projectId),
         queryClient.invalidateQueries({
           queryKey: labelKeys.scoped(projectId),
         }),

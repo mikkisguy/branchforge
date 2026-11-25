@@ -17,6 +17,7 @@ import type { LabelTitleMap } from "@/lib/codemirror/label-title-decoration";
 import type { SourceOrigin, VariableReference } from "@branchforge/shared";
 import { useScriptModeData } from "./useScriptModeData";
 import { useExportPreview } from "@/hooks/useExportPreview";
+import { GENERATED_PREVIEW_BASENAMES } from "@/lib/generated-preview-files";
 import type { ProjectFileNode } from "@/hooks/useProjectFiles";
 
 function getContainingFolder(filePath: string): string | null {
@@ -69,14 +70,26 @@ export function useScriptMode({
     };
   }, []);
 
-  const [generatedPreviewFileName, setGeneratedPreviewFileName] = useState<
-    string | null
-  >(null);
+  const [generatedFileName, setGeneratedFileName] = useState<string | null>(
+    null
+  );
   const previewQuery = useExportPreview(projectId);
-  const generatedPreview =
-    previewQuery.data?.files.find(
-      (file) => file.fileName === generatedPreviewFileName
-    ) ?? null;
+  const previewFile = previewQuery.data?.files.find(
+    (file) => file.fileName === generatedFileName
+  );
+  const generatedContent =
+    previewFile && !previewFile.isEmpty ? previewFile.content : null;
+  const generatedPreview = generatedFileName
+    ? {
+        fileName: generatedFileName,
+        content: generatedContent,
+        emptyReason:
+          generatedContent === null && previewQuery.data
+            ? (previewFile?.emptyReason ?? "No managed declarations to export")
+            : null,
+      }
+    : null;
+  const isGeneratedPreview = !!generatedPreview;
   const {
     fileSaveStatus,
     isFileDirty,
@@ -111,34 +124,16 @@ export function useScriptMode({
     !!currentEditFileId && (isFileDirty || fileSaveStatus === "error");
 
   const handleGeneratedFileSelect = useCallback(
-    async (fileName: string) => {
-      if (!previewQuery.data) return;
-
-      const file = previewQuery.data.files.find((f) => f.fileName === fileName);
+    (fileName: string) => {
+      const file = previewQuery.data?.files.find(
+        (f) => f.fileName === fileName
+      );
       if (!file || file.isEmpty) return;
 
-      // If there's a dirty save pending, save before switching
-      if (hasPendingSave) {
-        const saved = await triggerFileSave();
-        if (!saved) {
-          showErrorToast(
-            "Could not save changes before preview. Please resolve conflicts and try again.",
-            "Save failed"
-          );
-          return;
-        }
-      }
-
-      setGeneratedPreviewFileName(file.fileName);
+      setGeneratedFileName(fileName);
       setActiveLabelId(null);
     },
-    [
-      previewQuery.data,
-      hasPendingSave,
-      triggerFileSave,
-      showErrorToast,
-      setActiveLabelId,
-    ]
+    [previewQuery.data, setActiveLabelId]
   );
 
   const handleNoTabsRemaining = useCallback(() => {
@@ -146,7 +141,6 @@ export function useScriptMode({
     setActiveLabelId(null);
     setScrollToLine(null);
     setReferenceLocation(null);
-    setGeneratedPreviewFileName(null);
   }, [clearEditorState, setActiveLabelId]);
 
   const handleFileActivated = useCallback(() => {
@@ -237,7 +231,7 @@ export function useScriptMode({
       }
       pendingSelectionIdRef.current = null;
       setPendingSelectFileId(null);
-      setGeneratedPreviewFileName(null);
+      setGeneratedFileName(null);
     })();
     return () => {
       cancelled = true;
@@ -258,7 +252,7 @@ export function useScriptMode({
     void clearEditorState();
     setScrollToLine(null);
     setReferenceLocation(null);
-    setGeneratedPreviewFileName(null);
+    setGeneratedFileName(null);
     setFoldersToExpand([]);
     setPendingSelectFileId(null);
     setShowCreateFileDialog(false);
@@ -341,18 +335,12 @@ export function useScriptMode({
     };
   }, [activeProjectFile, currentEditFileId, switchToFile, selectFileTab]);
 
-  const {
-    editableFileContent,
-    activeFileContent,
-    activeGeneratedFileId,
-    generatedFileName,
-    isGeneratedPreview,
-  } = useScriptDocument({
+  const editableFileContent = useScriptDocument({
     projectName,
     activeProjectFile,
     currentEditFileId,
     editedFileContent,
-    generatedPreview,
+    generatedFileName,
     isFileDirty,
     isHydrated,
     onDocumentChange,
@@ -460,7 +448,7 @@ export function useScriptMode({
 
   const handleGitLabFileSelect = useCallback(
     (fileId: string) => {
-      setGeneratedPreviewFileName(null);
+      setGeneratedFileName(null);
       void selectFileTab(fileId);
     },
     [selectFileTab]
@@ -468,7 +456,7 @@ export function useScriptMode({
 
   const handleSelectFileTab = useCallback(
     async (fileId: string) => {
-      setGeneratedPreviewFileName(null);
+      setGeneratedFileName(null);
       await selectFileTab(fileId);
     },
     [selectFileTab]
@@ -476,7 +464,7 @@ export function useScriptMode({
 
   const handleGitLabSceneSelect = useCallback(
     (sceneId: string) => {
-      setGeneratedPreviewFileName(null);
+      setGeneratedFileName(null);
       setReferenceLocation(null);
       setActiveLabelId(sceneId);
     },
@@ -507,7 +495,7 @@ export function useScriptMode({
               return;
             }
 
-            setGeneratedPreviewFileName(null);
+            setGeneratedFileName(null);
             setReferenceLocation({ fileId, line });
             resolve(true);
           } catch (error) {
@@ -553,66 +541,39 @@ export function useScriptMode({
   const saveConflict = activeProjectFile ? hasSaveConflict : undefined;
   const onSaveRequest = activeProjectFile ? retryFileSave : undefined;
 
-  // Always expose the three generated files so the filetree section is
-  // visible even while the preview request is in flight.
-  const generatedFiles = useMemo(() => {
-    if (previewQuery.isError) {
-      return [
-        {
-          fileName: "branchforge_variables.rpy",
-          isEmpty: true,
-          emptyReason: "Failed to load generated preview",
-        },
-        {
-          fileName: "branchforge_stats.rpy",
-          isEmpty: true,
-          emptyReason: "Failed to load generated preview",
-        },
-        {
-          fileName: "branchforge_definitions.rpy",
-          isEmpty: true,
-          emptyReason: "Failed to load generated preview",
-        },
-      ];
-    }
-    if (previewQuery.data?.files?.length) {
-      return previewQuery.data.files.map((f) => ({
-        fileName: f.fileName,
-        isEmpty: f.isEmpty,
-        emptyReason: f.emptyReason,
-      }));
-    }
-    return [
-      {
-        fileName: "branchforge_variables.rpy",
-        isEmpty: true,
-        emptyReason: "Loading generated preview…",
-      },
-      {
-        fileName: "branchforge_stats.rpy",
-        isEmpty: true,
-        emptyReason: "Loading generated preview…",
-      },
-      {
-        fileName: "branchforge_definitions.rpy",
-        isEmpty: true,
-        emptyReason: "Loading generated preview…",
-      },
-    ];
-  }, [previewQuery.data, previewQuery.isError]);
+  const generatedFiles = useMemo(
+    () =>
+      GENERATED_PREVIEW_BASENAMES.map((fileName) => {
+        const file = previewQuery.data?.files.find(
+          (entry) => entry.fileName === fileName
+        );
+        return (
+          file ?? {
+            fileName,
+            isEmpty: true,
+            emptyReason: previewQuery.isError
+              ? "Failed to load generated preview"
+              : previewQuery.data
+                ? "No managed declarations to export"
+                : "Loading generated preview…",
+          }
+        );
+      }),
+    [previewQuery.data, previewQuery.isError]
+  );
 
   const previewErrorShownRef = useRef(false);
   useEffect(() => {
     if (previewQuery.isError) {
-      if (!previewErrorShownRef.current) {
-        previewErrorShownRef.current = true;
+      if (!previewErrorShownRef.current && !generatedFileName) {
         showErrorToast("Failed to load generated preview", "Preview Error");
       }
+      previewErrorShownRef.current = true;
       return;
     }
     // Allow a later failure to toast again after recovery.
     previewErrorShownRef.current = false;
-  }, [previewQuery.isError, showErrorToast]);
+  }, [generatedFileName, previewQuery.isError, showErrorToast]);
 
   return {
     isLoadingLabels: data.isLoadingLabels,
@@ -632,7 +593,7 @@ export function useScriptMode({
     editorRef: data.editorRef,
     activeFileId,
     activeProjectFile,
-    activeFileContent,
+    editableFileContent,
     tabItems,
     handleSelectFileTab,
     handleCloseFileTab,
@@ -660,10 +621,11 @@ export function useScriptMode({
     saveConflict,
     // Generated preview
     generatedFiles,
-    activeGeneratedFileId,
+    generatedPreview,
     onGeneratedFileSelect: handleGeneratedFileSelect,
-    isGeneratedPreview,
-    generatedFileName,
+    generatedPreviewError: previewQuery.isError
+      ? { retry: previewQuery.refetch, isRetrying: previewQuery.isFetching }
+      : null,
     showCreateFileDialog,
     handleOpenCreateFileDialog,
     handleCreateFileDialogOpenChange,

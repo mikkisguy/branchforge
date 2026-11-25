@@ -125,7 +125,9 @@ describe("useZipImportFilesDialog", () => {
     await act(async () => {
       await result.current.handleImport();
     });
-    expect(previewQuery).toHaveBeenCalledTimes(2);
+    expect(
+      queryClient.getQueryState(exportKeys.preview("proj-1"))?.isInvalidated
+    ).toBe(true);
     expect(result.current.showCharacterWizard).toBe(true);
     expect(result.current.detectedCharacters?.existingTags).toEqual(["old"]);
     expect(result.current.detectedCharacters?.characters[0].tag).toBe("new");

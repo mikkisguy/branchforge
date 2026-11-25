@@ -453,11 +453,15 @@ export const projectFilesApi = {
   /**
    * Get export preview (generated file contents) for a project
    */
-  async getExportPreview(projectId: string): Promise<ExportPreviewResponse> {
+  async getExportPreview(
+    projectId: string,
+    signal?: AbortSignal
+  ): Promise<ExportPreviewResponse> {
     validateRequired(projectId, "Project ID");
 
     return request<ExportPreviewResponse>(
-      `/projects/${projectId}/export-preview`
+      `/projects/${projectId}/export-preview`,
+      { signal }
     );
   },
 

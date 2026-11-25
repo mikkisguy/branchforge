@@ -72,7 +72,7 @@ interface ScriptModeEditorLayoutProps {
   activeLabelId: string | null;
   activeLabel: LabelDetail | undefined;
   activeProjectFile: ProjectFileNode | null;
-  activeFileContent: string;
+  editableFileContent: string;
   scrollToLine: number | { line: number } | null;
   initialExpandedFolders: string[];
   foldersToExpand?: string[];
@@ -103,10 +103,13 @@ interface ScriptModeEditorLayoutProps {
   projectVisibility?: UserRole;
   onOpenZipImportDialog?: () => void;
   generatedFiles?: GeneratedFileInfo[];
-  activeGeneratedFileId?: string | null;
   onGeneratedFileSelect?: (fileName: string) => void;
-  isGeneratedPreview?: boolean;
-  generatedFileName?: string;
+  generatedPreview?: {
+    fileName: string;
+    content: string | null;
+    emptyReason: string | null;
+  } | null;
+  generatedPreviewError?: { retry: () => void; isRetrying: boolean } | null;
   /** Owner-only rename/delete actions for file rows (undefined hides them). */
   fileActions?: ProjectFileTreeFileActions;
 }
@@ -120,7 +123,7 @@ export function ScriptModeEditorLayout({
   activeLabelId,
   activeLabel,
   activeProjectFile,
-  activeFileContent,
+  editableFileContent,
   scrollToLine,
   initialExpandedFolders,
   foldersToExpand,
@@ -151,10 +154,9 @@ export function ScriptModeEditorLayout({
   projectVisibility,
   onOpenZipImportDialog,
   generatedFiles,
-  activeGeneratedFileId,
   onGeneratedFileSelect,
-  isGeneratedPreview = false,
-  generatedFileName,
+  generatedPreview,
+  generatedPreviewError,
   fileActions,
 }: ScriptModeEditorLayoutProps) {
   const leftPanelRaw = useWorkspacePanel(SCRIPT_LEFT_PANEL);
@@ -281,27 +283,43 @@ export function ScriptModeEditorLayout({
     useState<ScriptEditorStatus>({
       cursorPosition: { line: 1, col: 1 },
       selectionInfo: null,
-      totalLines: activeFileContent.split("\n").length,
+      totalLines: editableFileContent.split("\n").length,
     });
 
-  const hasActiveEditor = Boolean(
-    (isGeneratedPreview && generatedFileName) || activeProjectFile
-  );
+  const isGeneratedPreview = !!generatedPreview;
+  const hasActiveEditor = generatedPreview
+    ? generatedPreview.content !== null
+    : !!activeProjectFile;
 
-  const editorContent =
-    isGeneratedPreview && generatedFileName ? (
-      <>
-        <div className="shrink-0 border-b border-border/40 bg-muted/10 px-4 py-1.5 text-xs italic text-muted-foreground">
-          Read-only preview · {generatedFileName}
+  const editorContent = generatedPreview ? (
+    <>
+      <div className="shrink-0 border-b border-border/40 bg-muted/10 px-4 py-1.5 text-xs italic text-muted-foreground">
+        Read-only preview · {generatedPreview.fileName}
+      </div>
+      {generatedPreviewError && (
+        <div className="flex shrink-0 items-center gap-3 border-b border-border/40 px-4 py-2 text-sm">
+          <p role="alert" className="text-destructive">
+            Failed to refresh generated preview.
+            {generatedPreview.content !== null &&
+              " Showing the last successful preview."}
+          </p>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={generatedPreviewError.isRetrying}
+            onClick={() => void generatedPreviewError.retry()}
+          >
+            {generatedPreviewError.isRetrying ? "Retrying…" : "Retry"}
+          </Button>
         </div>
+      )}
+      {generatedPreview.content !== null ? (
         <div className="min-h-0 flex-1">
           <ScriptEditor
-            content={activeFileContent}
+            content={generatedPreview.content}
             readOnly
-            onChange={undefined}
             isFocusMode={isFocusMode}
-            saveStatus="saved"
-            saveConflict={false}
             labelTitles={labelTitles}
             lineWrap={lineWrap}
             onLineWrapChange={handleLineWrapChange}
@@ -311,49 +329,56 @@ export function ScriptModeEditorLayout({
             onStatusChange={setScriptEditorStatus}
           />
         </div>
-      </>
-    ) : activeProjectFile ? (
-      <ScriptEditor
-        ref={editorRef}
-        content={activeFileContent}
-        scrollToLine={scrollToLine}
-        onChange={onContentChange}
-        isFocusMode={isFocusMode}
-        saveStatus={saveStatus}
-        saveConflict={saveConflict}
-        onSaveRequest={onSaveRequest}
-        labelTitles={labelTitles}
-        lineWrap={lineWrap}
-        onLineWrapChange={handleLineWrapChange}
-        showOverlays={showOverlays}
-        onShowOverlaysChange={setShowOverlays}
-        projectId={projectId}
-        onStatusChange={setScriptEditorStatus}
-      />
-    ) : activeLabel ? (
-      <div className="flex h-full flex-col items-center justify-center gap-3 text-muted-foreground">
-        <div className="flex items-center gap-2 text-destructive">
-          <X size={16} />
-          <span className="font-medium">Scene not found</span>
-        </div>
-        <p className="max-w-md text-center text-sm">
-          The file containing this scene could not be found. It may have been
-          deleted or there was an error loading the project files.
-        </p>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={onRefreshFiles}
-        >
-          Refresh files
-        </Button>
+      ) : (
+        !generatedPreviewError && (
+          <div className="flex flex-1 items-center justify-center px-4 text-center text-sm text-muted-foreground">
+            {generatedPreview.emptyReason ?? "Loading generated preview…"}
+          </div>
+        )
+      )}
+    </>
+  ) : activeProjectFile ? (
+    <ScriptEditor
+      ref={editorRef}
+      content={editableFileContent}
+      scrollToLine={scrollToLine}
+      onChange={onContentChange}
+      isFocusMode={isFocusMode}
+      saveStatus={saveStatus}
+      saveConflict={saveConflict}
+      onSaveRequest={onSaveRequest}
+      labelTitles={labelTitles}
+      lineWrap={lineWrap}
+      onLineWrapChange={handleLineWrapChange}
+      showOverlays={showOverlays}
+      onShowOverlaysChange={setShowOverlays}
+      projectId={projectId}
+      onStatusChange={setScriptEditorStatus}
+    />
+  ) : activeLabel ? (
+    <div className="flex h-full flex-col items-center justify-center gap-3 text-muted-foreground">
+      <div className="flex items-center gap-2 text-destructive">
+        <X size={16} />
+        <span className="font-medium">Scene not found</span>
       </div>
-    ) : (
-      <div className="flex h-full items-center justify-center text-muted-foreground">
-        Select a file or scene to view its content
-      </div>
-    );
+      <p className="max-w-md text-center text-sm">
+        The file containing this scene could not be found. It may have been
+        deleted or there was an error loading the project files.
+      </p>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={onRefreshFiles}
+      >
+        Refresh files
+      </Button>
+    </div>
+  ) : (
+    <div className="flex h-full items-center justify-center text-muted-foreground">
+      Select a file or scene to view its content
+    </div>
+  );
 
   return (
     <>
@@ -405,7 +430,7 @@ export function ScriptModeEditorLayout({
                     initialExpandedFolders={initialExpandedFolders}
                     foldersToExpand={foldersToExpand}
                     generatedFiles={generatedFiles}
-                    activeGeneratedFileId={activeGeneratedFileId}
+                    activeGeneratedFileId={generatedPreview?.fileName}
                     onGeneratedFileSelect={onGeneratedFileSelect}
                     fileActions={fileActions}
                   />
@@ -445,7 +470,7 @@ export function ScriptModeEditorLayout({
                     onRedo={onRedo}
                   />
                 </div>
-                {saveStatus ? (
+                {!isGeneratedPreview && saveStatus ? (
                   <SaveIndicator
                     saveStatus={saveStatus}
                     displayMode="compact"
@@ -504,7 +529,7 @@ export function ScriptModeEditorLayout({
             }
             focusChrome={
               <div className="pointer-events-auto fixed top-2 right-2 z-[100] flex items-center gap-2">
-                {saveStatus === "saving" && (
+                {!isGeneratedPreview && saveStatus === "saving" && (
                   <span className="flex size-8 items-center justify-center rounded-full bg-card/80 shadow-sm backdrop-blur-sm">
                     <SaveIndicator
                       saveStatus={saveStatus}
@@ -512,14 +537,15 @@ export function ScriptModeEditorLayout({
                     />
                   </span>
                 )}
-                {(saveStatus === "error" || saveConflict) && (
-                  <SaveIndicator
-                    saveStatus={saveStatus}
-                    displayMode="compact"
-                    saveConflict={saveConflict}
-                    onRetry={onSaveRequest}
-                  />
-                )}
+                {!isGeneratedPreview &&
+                  (saveStatus === "error" || saveConflict) && (
+                    <SaveIndicator
+                      saveStatus={saveStatus}
+                      displayMode="compact"
+                      saveConflict={saveConflict}
+                      onRetry={onSaveRequest}
+                    />
+                  )}
                 <FocusModeToggle
                   ref={focusToggleRef}
                   isFocusMode={isFocusMode}

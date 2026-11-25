@@ -13,7 +13,7 @@ interface ScriptDocumentProps extends Pick<
   activeProjectFile: ProjectFileNode | null;
   currentEditFileId: string | null;
   editedFileContent: string;
-  generatedPreview: { fileName: string; content: string } | null;
+  generatedFileName: string | null;
   isFileDirty: boolean;
   isHydrated: boolean;
 }
@@ -23,13 +23,11 @@ export function useScriptDocument({
   activeProjectFile,
   currentEditFileId,
   editedFileContent,
-  generatedPreview,
+  generatedFileName,
   isFileDirty,
   isHydrated,
   onDocumentChange,
 }: ScriptDocumentProps) {
-  const generatedFileName = generatedPreview?.fileName;
-
   useWorkspaceDocument(
     onDocumentChange,
     activeProjectFile?.id ?? null,
@@ -38,19 +36,10 @@ export function useScriptDocument({
   useWorkspaceTitle(
     projectName,
     generatedFileName ?? activeProjectFile?.filePath.split("/").pop(),
-    isFileDirty
+    !generatedFileName && isFileDirty
   );
 
-  const editableFileContent =
-    activeProjectFile && currentEditFileId === activeProjectFile.id
-      ? editedFileContent
-      : (activeProjectFile?.content ?? "");
-
-  return {
-    editableFileContent,
-    activeFileContent: generatedPreview?.content ?? editableFileContent,
-    activeGeneratedFileId: generatedFileName ?? null,
-    generatedFileName,
-    isGeneratedPreview: !!generatedPreview,
-  };
+  return activeProjectFile && currentEditFileId === activeProjectFile.id
+    ? editedFileContent
+    : (activeProjectFile?.content ?? "");
 }

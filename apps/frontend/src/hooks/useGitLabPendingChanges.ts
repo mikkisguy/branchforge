@@ -8,6 +8,7 @@
  * and keeps project file / label caches in sync after every reversal.
  */
 
+import { invalidateGeneratedFiles } from "@/lib/generated-preview-files";
 import { useCallback } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { gitlabApi } from "@/lib/api/gitlab";
@@ -52,6 +53,7 @@ export function refetchAfterPendingChangeSync(
   void queryClient.invalidateQueries({
     queryKey: labelKeys.scoped(projectId),
   });
+  void invalidateGeneratedFiles(queryClient, projectId);
 }
 
 export function useGitLabPendingChanges(

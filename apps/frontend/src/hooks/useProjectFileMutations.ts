@@ -11,12 +11,12 @@
  * `setQueriesData` updates them all consistently.
  */
 
+import { invalidateGeneratedFiles } from "@/lib/generated-preview-files";
 import { useCallback } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { projectFilesApi } from "@/lib/api/project-files";
 import type { ProjectFileNode } from "@/lib/api/project-files";
 import {
-  exportKeys,
   flowKeys,
   gitlabKeys,
   labelKeys,
@@ -91,9 +91,7 @@ export function useProjectFileMutations(
       void queryClient.invalidateQueries({
         queryKey: flowKeys.graph(operationProjectId),
       });
-      void queryClient.invalidateQueries({
-        queryKey: exportKeys.preview(operationProjectId),
-      });
+      void invalidateGeneratedFiles(queryClient, operationProjectId);
       void queryClient.invalidateQueries({
         queryKey: gitlabKeys.pendingChanges(operationProjectId),
       });
@@ -137,9 +135,7 @@ export function useProjectFileMutations(
       void queryClient.invalidateQueries({
         queryKey: flowKeys.graph(operationProjectId),
       });
-      void queryClient.invalidateQueries({
-        queryKey: exportKeys.preview(operationProjectId),
-      });
+      void invalidateGeneratedFiles(queryClient, operationProjectId);
       void queryClient.invalidateQueries({
         queryKey: gitlabKeys.pendingChanges(operationProjectId),
       });

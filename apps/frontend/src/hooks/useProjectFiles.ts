@@ -5,6 +5,7 @@
  * Unified hook for all file sources (GitLab, zip, etc.).
  */
 
+import { invalidateGeneratedFiles } from "@/lib/generated-preview-files";
 import { useCallback, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { projectFilesApi } from "@/lib/api/project-files";
@@ -17,7 +18,6 @@ import {
   characterKeys,
   variableKeys,
   statKeys,
-  exportKeys,
 } from "@/lib/query-keys";
 import type { SourceOrigin } from "@branchforge/shared";
 
@@ -96,6 +96,8 @@ export function useProjectFiles(
       content,
       expectedContentHash,
     }: {
+      projectId: string | undefined;
+      source: SourceOrigin | undefined;
       fileId: string;
       content: string;
       expectedContentHash?: string;
@@ -104,7 +106,7 @@ export function useProjectFiles(
         expectedContentHash,
       });
     },
-    onSuccess: (result) => {
+    onSuccess: (result, { projectId, source }) => {
       // Failed/conflicting responses must not invalidate as successful
       // authored changes.
       if (!result.success) return;
@@ -113,8 +115,8 @@ export function useProjectFiles(
       if (projectId) {
         queryClient.invalidateQueries({ queryKey: characterKeys.all });
         queryClient.invalidateQueries({
-          queryKey: options?.source
-            ? projectFilesKeys.listsWithSource(projectId, options.source)
+          queryKey: source
+            ? projectFilesKeys.listsWithSource(projectId, source)
             : projectFilesKeys.lists(projectId),
         });
         if (result.generatedFilesChanged) {
@@ -124,9 +126,7 @@ export function useProjectFiles(
           queryClient.invalidateQueries({
             queryKey: statKeys.lists(projectId),
           });
-          queryClient.invalidateQueries({
-            queryKey: exportKeys.preview(projectId),
-          });
+          void invalidateGeneratedFiles(queryClient, projectId);
         }
       }
     },
@@ -199,6 +199,8 @@ export function useProjectFiles(
   >(
     async (fileId, content, updateOptions) => {
       const result = await updateFileMutation.mutateAsync({
+        projectId,
+        source: sourceFilter,
         fileId,
         content,
         expectedContentHash: updateOptions?.expectedContentHash,
@@ -217,7 +219,7 @@ export function useProjectFiles(
         conflict: result.conflict,
       };
     },
-    [updateFileMutation]
+    [projectId, sourceFilter, updateFileMutation]
   );
 
   const createFile = useCallback<UseProjectFilesReturn["createFile"]>(

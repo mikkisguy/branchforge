@@ -17,6 +17,7 @@ import {
   statKeys,
   exportKeys,
 } from "@/lib/query-keys";
+import { invalidateGeneratedFiles } from "@/lib/generated-preview-files";
 import { createTestQueryClient } from "@/test/query-client";
 
 vi.mock("@/lib/api/project-files", () => ({
@@ -200,6 +201,46 @@ describe("useProjectFiles", () => {
     expect(projectFilesApi.getExportPreview).toHaveBeenCalledTimes(
       requestCount
     );
+  });
+
+  it("refetches an invalidated inactive preview on mount with the app defaults", async () => {
+    queryClient = createTestQueryClient({ queries: { refetchOnMount: false } });
+    const projectId = "project-1";
+    const previewKey = exportKeys.preview(projectId);
+    queryClient.setQueryData(previewKey, { files: [] });
+    vi.mocked(projectFilesApi.getExportPreview).mockResolvedValue({
+      files: [],
+    });
+
+    await invalidateGeneratedFiles(queryClient, projectId);
+    expect(queryClient.getQueryState(previewKey)?.isInvalidated).toBe(true);
+    expect(projectFilesApi.getExportPreview).not.toHaveBeenCalled();
+
+    renderHook(() => useExportPreview(projectId), { wrapper });
+    await waitFor(() => {
+      expect(projectFilesApi.getExportPreview).toHaveBeenCalledOnce();
+      expect(queryClient.getQueryState(previewKey)?.isInvalidated).toBe(false);
+    });
+  });
+
+  it("restarts an in-flight first preview load after generated files change", async () => {
+    const projectId = "project-1";
+    const getPreview = vi.mocked(projectFilesApi.getExportPreview);
+    getPreview
+      .mockImplementationOnce(() => new Promise(() => {}))
+      .mockResolvedValueOnce({ files: [] });
+    const { result } = renderHook(() => useExportPreview(projectId), {
+      wrapper,
+    });
+
+    expect(getPreview).toHaveBeenCalledOnce();
+    await act(async () => {
+      await invalidateGeneratedFiles(queryClient, projectId);
+    });
+
+    expect(getPreview).toHaveBeenCalledTimes(2);
+    expect(getPreview.mock.calls[0][1]?.aborted).toBe(true);
+    await waitFor(() => expect(result.current.data).toEqual({ files: [] }));
   });
 
   it("does not invalidate generated data when the save conflicts", async () => {

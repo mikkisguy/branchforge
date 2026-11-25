@@ -5,6 +5,7 @@
  * Uses TanStack Query for polling instead of manual AbortController management.
  */
 
+import { invalidateGeneratedFiles } from "@/lib/generated-preview-files";
 import { useState, useCallback, useEffect, useRef } from "react";
 import {
   useMutation,
@@ -19,7 +20,6 @@ import {
 } from "@/lib/api/gitlab";
 import {
   characterKeys,
-  exportKeys,
   gitlabKeys,
   labelKeys,
   projectFilesKeys,
@@ -219,9 +219,7 @@ export function useGitLabSync(): UseGitLabSyncReturn {
       if (op.status === "COMPLETED" && projectId) {
         invalidateProjectCaches(projectId);
         if (op.operation === "IMPORT") {
-          void queryClient.refetchQueries({
-            queryKey: exportKeys.preview(projectId),
-          });
+          void invalidateGeneratedFiles(queryClient, projectId);
         }
       }
     },

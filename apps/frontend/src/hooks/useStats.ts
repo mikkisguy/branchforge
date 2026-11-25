@@ -1,3 +1,4 @@
+import { invalidateGeneratedFiles } from "@/lib/generated-preview-files";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { statsApi } from "@/lib/api/stats";
 import { statKeys } from "@/lib/query-keys";
@@ -56,11 +57,12 @@ export function useStats(projectId: string): UseStatsReturn {
   const createStatMutation = useMutation({
     mutationFn: async (input: CreateStatBody) =>
       statsApi.createStat(projectId, input),
-    onSuccess: () => {
+    onSuccess: ({ projectId }) => {
       queryClient.invalidateQueries({ queryKey: statKeys.lists(projectId) });
       queryClient.invalidateQueries({
         queryKey: statKeys.progression(projectId),
       });
+      void invalidateGeneratedFiles(queryClient, projectId);
       toast.success("Stat created successfully", "Success");
     },
     onError: (error: Error) => {
@@ -76,11 +78,12 @@ export function useStats(projectId: string): UseStatsReturn {
       statId: string;
       input: UpdateStatBody;
     }) => statsApi.updateStat(statId, input),
-    onSuccess: () => {
+    onSuccess: ({ projectId }) => {
       queryClient.invalidateQueries({ queryKey: statKeys.lists(projectId) });
       queryClient.invalidateQueries({
         queryKey: statKeys.progression(projectId),
       });
+      void invalidateGeneratedFiles(queryClient, projectId);
       toast.success("Stat updated successfully", "Success");
     },
     onError: (error: Error) => {
@@ -89,12 +92,14 @@ export function useStats(projectId: string): UseStatsReturn {
   });
 
   const deleteStatMutation = useMutation({
-    mutationFn: async (statId: string) => statsApi.deleteStat(statId),
-    onSuccess: () => {
+    mutationFn: async ({ statId }: { projectId: string; statId: string }) =>
+      statsApi.deleteStat(statId),
+    onSuccess: (_result, { projectId }) => {
       queryClient.invalidateQueries({ queryKey: statKeys.lists(projectId) });
       queryClient.invalidateQueries({
         queryKey: statKeys.progression(projectId),
       });
+      void invalidateGeneratedFiles(queryClient, projectId);
       toast.success("Stat deleted successfully", "Success");
     },
     onError: (error: Error) => {
@@ -117,6 +122,7 @@ export function useStats(projectId: string): UseStatsReturn {
     createStat: (input) => createStatMutation.mutateAsync(input),
     updateStat: (statId, input) =>
       updateStatMutation.mutateAsync({ statId, input }),
-    deleteStat: (statId) => deleteStatMutation.mutateAsync(statId),
+    deleteStat: (statId) =>
+      deleteStatMutation.mutateAsync({ projectId, statId }),
   };
 }
