@@ -502,7 +502,12 @@ async function runGitLabImport(
       : undefined;
 
     const hasOrdinaryContent = freshProject
-      ? preparedFiles.some(({ content }) => content.trim())
+      ? preparedFiles.some(({ content }) =>
+          content.split(/\r\n?|\n/).some((line) => {
+            const trimmed = line.trim();
+            return trimmed.length > 0 && !trimmed.startsWith("#");
+          })
+        )
       : preparedFiles.length > 0;
     if (
       !hasOrdinaryContent &&

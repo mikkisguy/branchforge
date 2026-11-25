@@ -3802,6 +3802,9 @@ describe("GitLabSyncService (Integration)", () => {
 
     it.each([
       new Map([[scriptPath, " \n\t"]]),
+      new Map([
+        [scriptPath, "\uFEFF# Script placeholder\r\n  # More notes\r\n"],
+      ]),
       new Map([[variablePath, "# Generated header only\n"]]),
       new Map([
         [scriptPath, ""],
@@ -3831,6 +3834,23 @@ describe("GitLabSyncService (Integration)", () => {
       expect(
         gitlabRepoService.getFileContentWithMetadata
       ).not.toHaveBeenCalled();
+    });
+
+    it("preserves ordinary comments when generated declarations make the import valid", async () => {
+      const content = "# Notes for the next chapter\n";
+      const { project, operation } = await importRemote(
+        new Map([
+          [scriptPath, content],
+          [variablePath, "default met_sylvie = True"],
+        ])
+      );
+      expect(operation.status).toBe("COMPLETED");
+      expect(
+        await db
+          .select()
+          .from(projectFiles)
+          .where(eq(projectFiles.projectId, project.id))
+      ).toMatchObject([{ filePath: scriptPath, content }]);
     });
 
     it("imports and exports a branch containing only generated declarations", async () => {
