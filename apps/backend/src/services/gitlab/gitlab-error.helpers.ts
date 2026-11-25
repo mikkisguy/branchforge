@@ -29,13 +29,15 @@ export const GITLAB_EXPORT_ATTEMPT_CHANGED =
   "The previous GitLab push no longer matches this repository, branch, or pending file operations. Review the pending changes before retrying.";
 export const GITLAB_IMPORT_EMPTY =
   "No importable content found in the fetched files. Each file was either empty or contained only whitespace.";
+export const GITLAB_FRESH_IMPORT_EMPTY =
+  "No importable Ren’Py source or managed declarations were found on the selected GitLab branch.";
 
 /** Fresh-import diagnostic built from repository paths and line numbers only. */
 export class GitLabGeneratedImportError extends Error {}
 
 export class GitLabEmptyImportError extends Error {
   constructor() {
-    super(GITLAB_IMPORT_EMPTY);
+    super(GITLAB_FRESH_IMPORT_EMPTY);
   }
 }
 
@@ -61,6 +63,7 @@ const SAFE_IMPORT_MESSAGES: readonly string[] = [
   "Import failed. Try again. If the problem persists, contact your administrator.",
   "Push or discard your structural file changes before pulling from GitLab",
   GITLAB_IMPORT_EMPTY,
+  GITLAB_FRESH_IMPORT_EMPTY,
 ];
 
 const GENERIC_EXPORT_MESSAGE =

@@ -1031,11 +1031,6 @@ describe("ExportService", () => {
       // Files query returns [] — nothing in queue, falls back to []
       resolveQueue.push([]);
 
-      // The files query triggers await mockDb, which dequeues []
-      // (queue has one element: [])
-      // After that, labels query would also trigger await mockDb,
-      // but the function throws NotFoundError before reaching it.
-
       await expect(generateExport(PROJECT_ID, USER_ID)).rejects.toThrow(
         NotFoundError
       );

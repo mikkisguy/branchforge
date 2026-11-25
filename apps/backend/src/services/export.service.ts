@@ -230,10 +230,6 @@ export async function generateExport(
       and(eq(projectFiles.projectId, projectId), isNull(projectFiles.deletedAt))
     );
 
-  if (files.length === 0) {
-    throw new NotFoundError("Project files");
-  }
-
   // Fetch all labels with conditions/effects for STORY files in this project
   const projectLabels = await db
     .select({
@@ -360,7 +356,9 @@ export async function generateExport(
   // branchforge_*.rpy files must be placed alongside the project
   // files so Ren'Py picks them up at launch — placing them at
   // the archive root is silently ignored. See issue #244.
-  const fileDirPrefix = computeCommonDirectoryPrefix(sanitizedPaths);
+  // A declaration-only project has no source path to use as a template.
+  const fileDirPrefix =
+    files.length === 0 ? "game/" : computeCommonDirectoryPrefix(sanitizedPaths);
 
   // Generate additional RPY files
   if (filteredVariables.length > 0) {
@@ -380,6 +378,10 @@ export async function generateExport(
           nameType: normalizeCharacterNameType(c.nameType),
         }))
       );
+  }
+
+  if (files.length === 0 && Object.keys(patchedFiles).length === 0) {
+    throw new NotFoundError("Project files");
   }
 
   // Serialize all files into a single JSON blob for storage

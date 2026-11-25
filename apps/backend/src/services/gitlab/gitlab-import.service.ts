@@ -80,6 +80,7 @@ import {
   GITLAB_IMPORT_PENDING_EXPORT,
   GITLAB_IMPORT_STALE_AFTER_EXPORT,
   GITLAB_IMPORT_EMPTY,
+  GITLAB_FRESH_IMPORT_EMPTY,
   GitLabEmptyImportError,
   GitLabGeneratedImportError,
 } from "./gitlab-error.helpers.js";
@@ -232,7 +233,7 @@ export async function importProjectFromGitLab(
       "fresh-project"
     );
     if (operation.status === "FAILED") {
-      if (operation.errorMessage === GITLAB_IMPORT_EMPTY) {
+      if (operation.errorMessage === GITLAB_FRESH_IMPORT_EMPTY) {
         throw new GitLabEmptyImportError();
       }
       throw new Error(operation.errorMessage ?? GENERIC_IMPORT_MESSAGE);
@@ -333,7 +334,8 @@ async function runGitLabImport(
     const excludedTags = buildExcludedTags(settings ?? null);
     const narratorTags = settings?.narratorCharacterTags || [];
 
-    // Get the commit SHA for this branch at import time (non-fatal — metadata only)
+    // Fresh imports must read scripts and generated declarations from the same
+    // snapshot. Routine pulls still use the SHA only as optional metadata.
     let importCommitSha: string | null = null;
     try {
       importCommitSha = await getBranchCommitSha(projectId, userId, branch);
@@ -345,12 +347,14 @@ async function runGitLabImport(
       });
     }
 
-    const allRpyFiles = await listRpyFiles(projectId, branch, userId);
+    const importRef = freshProject ? importCommitSha : branch;
+    if (!importRef) throw new Error("Could not resolve the GitLab import ref");
+    const allRpyFiles = await listRpyFiles(projectId, importRef, userId);
     const filesToFetch = allRpyFiles.filter(
       (file) => freshProject || !generatedDeclarationKind(file.name)
     );
 
-    if (filesToFetch.length === 0) {
+    if (!freshProject && filesToFetch.length === 0) {
       await db.transaction(async (tx) => {
         await lockProject(tx, projectId);
         await checkPullBaseline(tx);
@@ -396,13 +400,13 @@ async function runGitLabImport(
             projectId,
             userId,
             file.path,
-            branch
+            importRef
           );
           const kind = freshProject
             ? generatedDeclarationKind(file.name)
             : undefined;
-          if (kind && metadata.content === null) {
-            throw new Error("A generated file disappeared during import");
+          if (freshProject && metadata.content === null) {
+            throw new Error("A listed GitLab file could not be read");
           }
           return { file, metadata, kind };
         })
@@ -485,22 +489,6 @@ async function runGitLabImport(
       });
     }
 
-    if (
-      generatedFiles.length === 0 &&
-      (preparedFiles.length === 0 ||
-        (freshProject && preparedFiles.every(({ content }) => !content.trim())))
-    ) {
-      await updateSyncOperation(operation.id, {
-        status: "FAILED",
-        errorMessage: GITLAB_IMPORT_EMPTY,
-      });
-      return {
-        ...operation,
-        status: "FAILED",
-        errorMessage: GITLAB_IMPORT_EMPTY,
-      };
-    }
-
     const recovered = generatedFiles.length
       ? recoverGeneratedDeclarations(
           generatedFiles,
@@ -512,6 +500,28 @@ async function runGitLabImport(
           excludedTags
         )
       : undefined;
+
+    const hasOrdinaryContent = freshProject
+      ? preparedFiles.some(({ content }) => content.trim())
+      : preparedFiles.length > 0;
+    if (
+      !hasOrdinaryContent &&
+      !recovered?.defaults.length &&
+      !recovered?.characters.length
+    ) {
+      const errorMessage = freshProject
+        ? GITLAB_FRESH_IMPORT_EMPTY
+        : GITLAB_IMPORT_EMPTY;
+      await updateSyncOperation(operation.id, {
+        status: "FAILED",
+        errorMessage,
+      });
+      return {
+        ...operation,
+        status: "FAILED",
+        errorMessage,
+      };
+    }
 
     // Character review and auto-promotion state. Populated inside the locked
     // transaction against pre-pull rows so the response is transient and

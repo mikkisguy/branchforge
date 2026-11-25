@@ -3550,6 +3550,7 @@ describe("GitLabSyncService (Integration)", () => {
 
   describe("fresh GitLab project import", () => {
     const branch = "chapter-two";
+    const snapshot = "existing-sha";
     const variablePath = "game/branchforge_variables.rpy";
     const statPath = "game/branchforge_stats.rpy";
     const characterPath = "game/branchforge_definitions.rpy";
@@ -3566,7 +3567,7 @@ describe("GitLabSyncService (Integration)", () => {
       });
       vi.spyOn(gitlabRepoService, "listRpyFiles").mockImplementation(
         async (_projectId, ref) => {
-          expect(ref).toBe(branch);
+          expect(ref).toBe(snapshot);
           return [...remote.keys()].map((path) => ({
             name: path.split("/").pop()!,
             path,
@@ -3577,7 +3578,7 @@ describe("GitLabSyncService (Integration)", () => {
         gitlabRepoService,
         "getFileContentWithMetadata"
       ).mockImplementation(async (_projectId, _userId, path, ref) => {
-        expect(ref).toBe(branch);
+        expect(ref).toBe(snapshot);
         return {
           content: remote.get(path) ?? null,
           lastCommitId: "fresh-remote",
@@ -3662,7 +3663,12 @@ describe("GitLabSyncService (Integration)", () => {
       await gitlabRepoService.unlinkRepository(testProjectId, testUserId);
 
       const { project, operation } = await importRemote(remote);
-      expect(operation.status).toBe("COMPLETED");
+      expect(gitlabRepoService.getBranchCommitSha).toHaveBeenCalledWith(
+        project.id,
+        testUserId,
+        branch
+      );
+      expect(operation).toMatchObject({ status: "COMPLETED", branch });
       const [files, scenes, variableRows, statRows, characterRows] =
         await Promise.all([
           db
@@ -3794,19 +3800,46 @@ describe("GitLabSyncService (Integration)", () => {
       }
     );
 
-    it("reports a safe diagnostic and releases the repository when files are blank", async () => {
-      const remote = new Map([[scriptPath, " \n\t"]]);
-      await expect(importRemote(remote)).rejects.toThrow(
-        GitLabEmptyImportError
+    it.each([
+      new Map([[scriptPath, " \n\t"]]),
+      new Map([[variablePath, "# Generated header only\n"]]),
+      new Map([
+        [scriptPath, ""],
+        [variablePath, " \n\t"],
+      ]),
+      new Map<string, string>(),
+    ])(
+      "reports a safe diagnostic and releases the repository for empty imports (%#)",
+      async (remote) => {
+        await expect(importRemote(remote)).rejects.toThrow(
+          GitLabEmptyImportError
+        );
+        remote.set(scriptPath, script);
+        const { operation } = await importRemote(remote);
+        expect(operation.status).toBe("COMPLETED");
+      }
+    );
+
+    it("fails without reading files if the branch cannot be pinned", async () => {
+      vi.mocked(gitlabRepoService.getBranchCommitSha).mockRejectedValueOnce(
+        new Error("Could not resolve branch")
       );
-      remote.set(scriptPath, script);
-      const { operation } = await importRemote(remote);
-      expect(operation.status).toBe("COMPLETED");
+      await expect(
+        importRemote(new Map([[scriptPath, script]]))
+      ).rejects.toThrow("Import failed.");
+      expect(gitlabRepoService.listRpyFiles).not.toHaveBeenCalled();
+      expect(
+        gitlabRepoService.getFileContentWithMetadata
+      ).not.toHaveBeenCalled();
     });
 
-    it("imports a branch containing only generated declarations", async () => {
+    it("imports and exports a branch containing only generated declarations", async () => {
       const { project, operation } = await importRemote(
-        new Map([[variablePath, "default met_sylvie = True"]])
+        new Map([
+          [variablePath, "default met_sylvie = True"],
+          [statPath, "default trust = -1.25"],
+          [characterPath, definition],
+        ])
       );
       expect(operation.status).toBe("COMPLETED");
       expect(
@@ -3821,6 +3854,13 @@ describe("GitLabSyncService (Integration)", () => {
           .from(variables)
           .where(eq(variables.projectId, project.id))
       ).toMatchObject([{ key: "met_sylvie", authoredDefault: true }]);
+      const zip = await zipSources(project.id);
+      expect(Object.keys(zip).sort()).toEqual(
+        [characterPath, statPath, variablePath].sort()
+      );
+      expect(zip[variablePath]).toContain("default met_sylvie = True");
+      expect(zip[statPath]).toContain("default trust = -1.25");
+      expect(zip[characterPath]).toContain(definition);
     });
   });
 
