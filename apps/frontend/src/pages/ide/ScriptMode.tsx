@@ -46,7 +46,7 @@ export function ScriptMode({
     editorRef,
     activeFileId,
     activeProjectFile,
-    activeFileContent,
+    editableFileContent,
     tabItems,
     handleSelectFileTab,
     handleCloseFileTab,
@@ -71,10 +71,9 @@ export function ScriptMode({
     primaryFileSourceType,
     saveConflict,
     generatedFiles,
-    activeGeneratedFileId,
+    generatedPreview,
+    generatedPreviewError,
     onGeneratedFileSelect,
-    isGeneratedPreview,
-    generatedFileName,
     showCreateFileDialog,
     handleOpenCreateFileDialog,
     handleCreateFileDialogOpenChange,
@@ -161,7 +160,7 @@ export function ScriptMode({
 
   if (
     !projectFiles.length &&
-    !isGeneratedPreview &&
+    !generatedPreview &&
     !generatedFiles.some((file) => !file.isEmpty)
   ) {
     return (
@@ -199,7 +198,7 @@ export function ScriptMode({
           activeLabelId={activeLabelId}
           activeLabel={activeLabel}
           activeProjectFile={activeProjectFile}
-          activeFileContent={activeFileContent}
+          editableFileContent={editableFileContent}
           scrollToLine={scrollToLine}
           initialExpandedFolders={initialExpandedFolders}
           foldersToExpand={foldersToExpand}
@@ -230,10 +229,9 @@ export function ScriptMode({
           projectVisibility={currentProject?.visibility}
           onOpenZipImportDialog={() => setShowZipImportDialog(true)}
           generatedFiles={generatedFiles}
-          activeGeneratedFileId={activeGeneratedFileId}
           onGeneratedFileSelect={onGeneratedFileSelect}
-          isGeneratedPreview={isGeneratedPreview}
-          generatedFileName={generatedFileName}
+          generatedPreview={generatedPreview}
+          generatedPreviewError={generatedPreviewError}
           fileActions={fileRowActions}
         />
       </div>

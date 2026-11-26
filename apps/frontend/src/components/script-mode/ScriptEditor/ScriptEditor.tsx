@@ -250,6 +250,7 @@ export const ScriptEditor = function ScriptEditor({
           height="100%"
           className="h-full w-full min-w-0"
           editable={!readOnly}
+          readOnly={readOnly}
           extensions={extensions}
           onChange={onChange}
           onCreateEditor={handleCreateEditorWithPreviews}

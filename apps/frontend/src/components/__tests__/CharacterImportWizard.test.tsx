@@ -11,6 +11,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { exportKeys } from "@/lib/query-keys";
 import { CharacterImportWizard } from "@/components/CharacterImportWizard";
 import type { DetectedCharacter, CharacterConflict } from "@branchforge/shared";
 
@@ -69,6 +70,7 @@ function renderWizard(
   const onComplete = vi.fn();
 
   return {
+    queryClient,
     onOpenChange,
     onComplete,
     ...render(
@@ -299,7 +301,9 @@ describe("CharacterImportWizard — nameType warnings (issue #138)", () => {
       }),
     ];
 
-    renderWizard(chars);
+    const { queryClient } = renderWizard(chars);
+    const previewKey = exportKeys.preview("proj-1");
+    queryClient.setQueryData(previewKey, { files: [] });
 
     const displayNameInput = screen.getByDisplayValue("boss_name");
     await user.clear(displayNameInput);
@@ -311,6 +315,7 @@ describe("CharacterImportWizard — nameType warnings (issue #138)", () => {
     await user.click(importButton);
 
     expect(mockImport).toHaveBeenCalledTimes(1);
+    expect(queryClient.getQueryState(previewKey)?.isInvalidated).toBe(true);
     const [projectId, payload] = mockImport.mock.calls[0];
     expect(projectId).toBe("proj-1");
     expect(payload.characters).toEqual([

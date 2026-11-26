@@ -7,8 +7,10 @@ export function useExportPreview(projectId?: string) {
     queryKey: projectId
       ? exportKeys.preview(projectId)
       : ([...exportKeys.all, "preview"] as const),
-    queryFn: () => projectFilesApi.getExportPreview(projectId!),
+    queryFn: ({ signal }) =>
+      projectFilesApi.getExportPreview(projectId!, signal),
     enabled: !!projectId,
+    refetchOnMount: true,
     staleTime: 60_000,
     retry: 1,
   });

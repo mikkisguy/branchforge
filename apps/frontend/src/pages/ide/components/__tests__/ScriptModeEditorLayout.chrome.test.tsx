@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen } from "@testing-library/react";
-import type { ReactNode } from "react";
+import { fireEvent, render, screen } from "@testing-library/react";
+import type { ComponentProps, ReactNode } from "react";
 import { ScriptModeEditorLayout } from "../ScriptModeEditorLayout";
 import type { FocusModeState } from "@/hooks/useFocusModeState";
 import type { SaveStatus } from "@/hooks/useAutosave";
@@ -32,7 +32,20 @@ vi.mock("@/hooks/useWorkspacePanel", () => ({
 }));
 
 vi.mock("@/components/script-mode", () => ({
-  ScriptEditor: () => <div>Script editor</div>,
+  ScriptEditor: ({
+    content,
+    readOnly,
+  }: {
+    content: string;
+    readOnly?: boolean;
+  }) => (
+    <textarea
+      aria-label="Script editor"
+      value={content}
+      readOnly={readOnly}
+      onChange={() => {}}
+    />
+  ),
   ScriptReferencePanel: () => <div>Reference panel</div>,
   StatusBar: ({ className }: { className?: string }) => (
     <div data-testid={className ? "mobile-status-bar" : "desktop-status-bar"}>
@@ -72,8 +85,14 @@ function createFocusModeState(isFocusMode: boolean): FocusModeState {
   };
 }
 
-function renderLayout(isFocusMode: boolean, saveStatus?: SaveStatus) {
-  return render(
+type LayoutProps = ComponentProps<typeof ScriptModeEditorLayout>;
+
+function layout(
+  isFocusMode: boolean,
+  saveStatus?: SaveStatus,
+  overrides?: Partial<LayoutProps>
+) {
+  return (
     <div className="h-96">
       <ScriptModeEditorLayout
         projectFiles={[]}
@@ -81,7 +100,7 @@ function renderLayout(isFocusMode: boolean, saveStatus?: SaveStatus) {
         activeLabelId={null}
         activeLabel={undefined}
         activeProjectFile={null}
-        activeFileContent=""
+        editableFileContent=""
         scrollToLine={null}
         onOpenVariableReference={async () => true}
         onBeforeVariableDelete={async () => true}
@@ -102,10 +121,73 @@ function renderLayout(isFocusMode: boolean, saveStatus?: SaveStatus) {
         onUndo={vi.fn()}
         onRedo={vi.fn()}
         saveStatus={saveStatus}
+        {...overrides}
       />
     </div>
   );
 }
+
+function renderLayout(isFocusMode: boolean, saveStatus?: SaveStatus) {
+  return render(layout(isFocusMode, saveStatus));
+}
+
+describe("ScriptModeEditorLayout generated preview", () => {
+  it("refreshes the open read-only editor and shows retry and empty states", () => {
+    const preview = {
+      fileName: "branchforge_variables.rpy",
+      content: "default original_flag = False",
+      emptyReason: null,
+    };
+    const { rerender } = render(
+      layout(false, "error", {
+        editableFileContent: "unsaved dialogue",
+        generatedPreview: preview,
+      })
+    );
+
+    const editor = screen.getByRole("textbox", { name: "Script editor" });
+    expect(editor).toHaveAttribute("readonly");
+    expect(editor).toHaveValue("default original_flag = False");
+
+    const updated = { ...preview, content: "default renamed_flag = False" };
+    rerender(layout(false, "error", { generatedPreview: updated }));
+    expect(screen.getByRole("textbox", { name: "Script editor" })).toBe(editor);
+    expect(editor).toHaveValue("default renamed_flag = False");
+
+    const retry = vi.fn();
+    rerender(
+      layout(false, "error", {
+        generatedPreview: updated,
+        generatedPreviewError: { retry, isRetrying: false },
+      })
+    );
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Failed to refresh generated preview"
+    );
+    expect(editor).toHaveValue("default renamed_flag = False");
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(retry).toHaveBeenCalledOnce();
+
+    rerender(
+      layout(false, "error", {
+        editableFileContent: "unsaved dialogue",
+        generatedPreview: {
+          ...preview,
+          content: null,
+          emptyReason: "No managed variable defaults to export",
+        },
+      })
+    );
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+    expect(
+      screen.getByText("No managed variable defaults to export")
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Read-only preview · branchforge_variables.rpy")
+    ).toBeInTheDocument();
+  });
+});
 
 describe("ScriptModeEditorLayout chrome", () => {
   beforeEach(() => {

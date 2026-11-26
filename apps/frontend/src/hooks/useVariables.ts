@@ -5,10 +5,11 @@
  * Variables are boolean variables used in conditional branching.
  */
 
+import { invalidateGeneratedFiles } from "@/lib/generated-preview-files";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { variablesApi, type UpdateVariableBody } from "@/lib/api/variables";
 import { ApiRequestError } from "@/lib/api/client";
-import { exportKeys, variableKeys } from "@/lib/query-keys";
+import { variableKeys } from "@/lib/query-keys";
 import { useToast } from "@/contexts/ToastContext";
 import type { Variable } from "@branchforge/shared";
 
@@ -71,11 +72,12 @@ export function useVariables(projectId: string): UseVariablesReturn {
     mutationFn: async (input: CreateVariableInput) => {
       return variablesApi.createVariable(projectId, input);
     },
-    onSuccess: () => {
+    onSuccess: ({ projectId }) => {
       // Invalidate and refetch variables list
       queryClient.invalidateQueries({
         queryKey: variableKeys.lists(projectId),
       });
+      void invalidateGeneratedFiles(queryClient, projectId);
       toast.success("Variable created successfully", "Success");
     },
     onError: (error: Error) => {
@@ -94,11 +96,12 @@ export function useVariables(projectId: string): UseVariablesReturn {
     }) => {
       return variablesApi.updateVariable(variableId, input);
     },
-    onSuccess: () => {
+    onSuccess: ({ projectId }) => {
       // Invalidate and refetch variables list
       queryClient.invalidateQueries({
         queryKey: variableKeys.lists(projectId),
       });
+      void invalidateGeneratedFiles(queryClient, projectId);
       toast.success("Variable updated successfully", "Success");
     },
     onError: (error: Error) => {
@@ -108,17 +111,20 @@ export function useVariables(projectId: string): UseVariablesReturn {
 
   // Delete variable mutation
   const deleteVariableMutation = useMutation({
-    mutationFn: async (variableId: string) => {
+    mutationFn: async ({
+      variableId,
+    }: {
+      projectId: string;
+      variableId: string;
+    }) => {
       await variablesApi.deleteVariable(variableId);
     },
-    onSuccess: () => {
+    onSuccess: (_result, { projectId }) => {
       // Invalidate and refetch variables list
       queryClient.invalidateQueries({
         queryKey: variableKeys.lists(projectId),
       });
-      queryClient.invalidateQueries({
-        queryKey: exportKeys.preview(projectId),
-      });
+      void invalidateGeneratedFiles(queryClient, projectId);
       toast.success("Variable deleted successfully", "Success");
     },
     onError: (error: Error) => {
@@ -144,7 +150,7 @@ export function useVariables(projectId: string): UseVariablesReturn {
 
   // Delete variable method
   const deleteVariable = async (variableId: string): Promise<void> => {
-    return deleteVariableMutation.mutateAsync(variableId);
+    return deleteVariableMutation.mutateAsync({ projectId, variableId });
   };
 
   return {

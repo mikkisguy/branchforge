@@ -1,3 +1,20 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { ReactNode } from "react";
+import { useCharacters } from "@/hooks/useCharacters";
+import { useStats } from "@/hooks/useStats";
+import { useExportPreview } from "@/hooks/useExportPreview";
+import { useVariables } from "@/hooks/useVariables";
+import { charactersApi } from "@/lib/api/characters";
+import { statsApi } from "@/lib/api/stats";
+import { projectFilesApi } from "@/lib/api/project-files";
+import { variablesApi } from "@/lib/api/variables";
+import type {
+  Character,
+  ExportPreviewResponse,
+  GeneratedExportPreviewFile,
+  Stat,
+  Variable,
+} from "@branchforge/shared";
 import type { RunEditorTransition } from "@/hooks/useGuardedEditorTabClose";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { useEffect, useRef } from "react";
@@ -15,20 +32,16 @@ const resetCreateFileError = vi.fn();
 
 const previewState = vi.hoisted(() => ({
   isError: false,
-  data: null as null | {
-    files: Array<{
-      fileName: string;
-      content: string;
-      isEmpty: boolean;
-      emptyReason: string | null;
-    }>;
-  },
+  refetch: vi.fn(),
+  data: undefined as ExportPreviewResponse | undefined,
 }));
 
 const editorState = vi.hoisted(() => ({
   isFileDirty: false,
   fileSaveStatus: "idle" as "idle" | "error" | "saving" | "saved",
   triggerFileSave: vi.fn(async () => true),
+  editedFileContent: "label start:\n    return",
+  setEditedFileContent: vi.fn(),
 }));
 
 const scriptFilesState = vi.hoisted(() => ({
@@ -95,10 +108,12 @@ vi.mock("@/hooks/useFileEditor", () => ({
     get isFileDirty() {
       return editorState.isFileDirty;
     },
-    editedFileContent: "label start:\n    return",
+    get editedFileContent() {
+      return editorState.editedFileContent;
+    },
     currentEditFileId: "file-1",
     hasSaveConflict: false,
-    setEditedFileContent: vi.fn(),
+    setEditedFileContent: editorState.setEditedFileContent,
     triggerFileSave: editorState.triggerFileSave,
     retryFileSave: vi.fn(),
     switchToFile: vi.fn(async () => true),
@@ -175,26 +190,68 @@ vi.mock("@/hooks/useTextUndo", () => ({
 }));
 
 vi.mock("@/hooks/useExportPreview", () => ({
-  useExportPreview: () => ({
+  useExportPreview: vi.fn(),
+}));
+
+vi.mock("@/lib/api/project-files", () => ({
+  projectFilesApi: { getExportPreview: vi.fn() },
+}));
+
+vi.mock("@/lib/api/characters", () => ({
+  charactersApi: {
+    listCharacters: vi.fn(),
+    createCharacter: vi.fn(),
+    updateCharacter: vi.fn(),
+    deleteCharacter: vi.fn(),
+  },
+}));
+
+vi.mock("@/lib/api/stats", () => ({
+  statsApi: {
+    listStats: vi.fn(),
+    getProgression: vi.fn(),
+    createStat: vi.fn(),
+    updateStat: vi.fn(),
+    deleteStat: vi.fn(),
+  },
+}));
+
+vi.mock("@/lib/api/variables", () => ({
+  variablesApi: { listVariables: vi.fn(), updateVariable: vi.fn() },
+}));
+
+vi.mock("@/contexts/ToastContext", () => ({
+  useToast: () => ({ success: vi.fn(), error: vi.fn() }),
+}));
+
+function mockPreviewQuery() {
+  const state = {
+    refetch: previewState.refetch,
+    isFetching: false,
     get isError() {
       return previewState.isError;
     },
     get data() {
       return previewState.data;
     },
-  }),
-}));
+  };
+  vi.mocked(useExportPreview).mockReturnValue(
+    state as unknown as ReturnType<typeof useExportPreview>
+  );
+}
 
 import { useScriptMode } from "../useScriptMode";
 
-const previewFiles = [
+const previewFiles: GeneratedExportPreviewFile[] = [
   {
+    kind: "definitions",
     fileName: "branchforge_definitions.rpy",
     content: 'define e = Character("Eileen")',
     isEmpty: false,
     emptyReason: null,
   },
   {
+    kind: "variables",
     fileName: "branchforge_variables.rpy",
     content: "",
     isEmpty: true,
@@ -205,6 +262,7 @@ const previewFiles = [
 describe("useScriptMode generated preview lifecycle", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockPreviewQuery();
     scriptFilesState.projectFiles = [
       {
         id: "file-1",
@@ -222,6 +280,7 @@ describe("useScriptMode generated preview lifecycle", () => {
     previewState.isError = false;
     previewState.data = { files: previewFiles };
     editorState.isFileDirty = false;
+    editorState.editedFileContent = "label start:\n    return";
     editorState.fileSaveStatus = "idle";
     editorState.triggerFileSave.mockResolvedValue(true);
   });
@@ -248,7 +307,7 @@ describe("useScriptMode generated preview lifecycle", () => {
     expect(selectFileTab).toHaveBeenCalledWith("file-1", {
       refreshedFile: scriptFilesState.projectFiles[0],
     });
-    expect(result.current.isGeneratedPreview).toBe(false);
+    expect(result.current.generatedPreview).toBeNull();
     expect(result.current.scrollToLine).toMatchObject({ line: 2 });
   });
 
@@ -292,78 +351,297 @@ describe("useScriptMode generated preview lifecycle", () => {
       );
     });
 
-    expect(result.current.isGeneratedPreview).toBe(true);
-    expect(result.current.activeGeneratedFileId).toBe(
+    expect(result.current.generatedPreview).not.toBeNull();
+    expect(result.current.generatedPreview?.fileName).toBe(
       "branchforge_definitions.rpy"
     );
-    expect(result.current.activeFileContent).toContain("Character");
+    expect(result.current.generatedPreview?.content).toContain("Character");
     expect(result.current.canUndo).toBe(false);
     expect(result.current.canRedo).toBe(false);
     expect(setActiveLabelId).toHaveBeenCalledWith(null);
   });
 
-  it("updates an open generated preview when the query refreshes", async () => {
+  it("updates an open generated preview after a variable edit", async () => {
+    const projectId = "project-1";
     const fileName = "branchforge_variables.rpy";
-    const first = {
+    const file: GeneratedExportPreviewFile = {
       fileName,
-      content: "default flag = False",
+      kind: "variables",
+      content: "# Old category\ndefault met_eileen = False",
       isEmpty: false,
       emptyReason: null,
     };
-    previewState.data = { files: [first] };
+    const variable: Variable = {
+      id: "variable-1",
+      projectId,
+      key: "met_eileen",
+      description: null,
+      category: "Old category",
+      createdAt: "",
+    };
+    vi.mocked(variablesApi.listVariables).mockResolvedValue([variable]);
+    vi.mocked(variablesApi.updateVariable).mockResolvedValue({
+      ...variable,
+      category: "New category",
+    });
+    vi.mocked(projectFilesApi.getExportPreview)
+      .mockResolvedValueOnce({ files: [file] })
+      .mockResolvedValueOnce({
+        files: [
+          { ...file, content: "# New category\ndefault met_eileen = False" },
+        ],
+      });
+    const actual = await vi.importActual<
+      typeof import("@/hooks/useExportPreview")
+    >("@/hooks/useExportPreview");
+    vi.mocked(useExportPreview).mockImplementation(actual.useExportPreview);
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false, refetchOnMount: false } },
+    });
+    const { result, unmount } = renderHook(
+      () => ({
+        script: useScriptMode({ runEditorTransition, projectId }),
+        variables: useVariables(projectId),
+      }),
+      {
+        wrapper: ({ children }: { children: ReactNode }) => (
+          <QueryClientProvider client={queryClient}>
+            {children}
+          </QueryClientProvider>
+        ),
+      }
+    );
+    await waitFor(() => {
+      expect(result.current.script.generatedFiles).toContainEqual(file);
+    });
+
+    act(() => result.current.script.onGeneratedFileSelect(fileName));
+    expect(result.current.script.generatedPreview?.content).toBe(file.content);
+
+    await act(async () => {
+      await result.current.variables.updateVariable(variable.id, {
+        category: "New category",
+      });
+    });
+    await waitFor(() => {
+      expect(result.current.script.generatedPreview).toMatchObject({
+        fileName,
+        content: "# New category\ndefault met_eileen = False",
+      });
+    });
+    expect(result.current.script.activeFileId).toBe("file-1");
+    expect(projectFilesApi.getExportPreview).toHaveBeenCalledTimes(2);
+    unmount();
+    queryClient.clear();
+  });
+
+  it.each(["stats", "definitions"] as const)(
+    "refreshes the open %s preview after create, edit, and delete",
+    async (kind) => {
+      const projectId = "project-1";
+      const fileName = `branchforge_${kind}.rpy`;
+      const stat: Stat = {
+        id: "stat-1",
+        projectId,
+        characterId: null,
+        key: "trust",
+        name: "Trust",
+        minValue: 0,
+        maxValue: 100,
+        description: null,
+        createdAt: "",
+        updatedAt: "",
+      };
+      const character: Character = {
+        id: "character-1",
+        projectId,
+        name: "Eileen",
+        displayName: "Eileen",
+        nameType: "literal",
+        renpyTag: "e",
+        color: "#ffffff",
+        avatarUrl: null,
+        isLoveInterest: false,
+        isNarrator: false,
+        notes: null,
+        createdAt: "",
+        updatedAt: "",
+      };
+      vi.mocked(statsApi.listStats).mockResolvedValue([]);
+      vi.mocked(statsApi.getProgression).mockResolvedValue([]);
+      vi.mocked(statsApi.createStat).mockResolvedValue(stat);
+      vi.mocked(statsApi.updateStat).mockResolvedValue({
+        ...stat,
+        name: "Confidence",
+      });
+      vi.mocked(statsApi.deleteStat).mockResolvedValue(undefined);
+      vi.mocked(charactersApi.listCharacters).mockResolvedValue([]);
+      vi.mocked(charactersApi.createCharacter).mockResolvedValue(character);
+      vi.mocked(charactersApi.updateCharacter).mockResolvedValue({
+        ...character,
+        name: "Eve",
+      });
+      vi.mocked(charactersApi.deleteCharacter).mockResolvedValue(undefined);
+
+      const contents =
+        kind === "stats"
+          ? [
+              "default energy = 0",
+              "default energy = 0\n# Trust\ndefault trust = 0",
+              "default energy = 0\n# Confidence\ndefault trust = 0",
+              "# Confidence\ndefault trust = 0",
+            ]
+          : [
+              'define a = Character("Alice")',
+              'define a = Character("Alice")\ndefine e = Character("Eileen")',
+              'define a = Character("Alice")\ndefine e = Character("Eve")',
+              'define e = Character("Eve")',
+            ];
+      const emptyReason = "No managed declarations to export";
+      const previewApi = vi.mocked(projectFilesApi.getExportPreview);
+      for (const content of contents) {
+        previewApi.mockResolvedValueOnce({
+          files: [
+            { kind, fileName, content, isEmpty: false, emptyReason: null },
+          ],
+        });
+      }
+      previewApi.mockResolvedValueOnce({
+        files: [{ kind, fileName, content: "", isEmpty: true, emptyReason }],
+      });
+
+      const actual = await vi.importActual<
+        typeof import("@/hooks/useExportPreview")
+      >("@/hooks/useExportPreview");
+      vi.mocked(useExportPreview).mockImplementation(actual.useExportPreview);
+      const queryClient = new QueryClient({
+        defaultOptions: { queries: { retry: false, refetchOnMount: false } },
+      });
+      const { result, unmount } = renderHook(
+        () => ({
+          script: useScriptMode({ runEditorTransition, projectId }),
+          stats: useStats(projectId),
+          characters: useCharacters(projectId),
+        }),
+        {
+          wrapper: ({ children }: { children: ReactNode }) => (
+            <QueryClientProvider client={queryClient}>
+              {children}
+            </QueryClientProvider>
+          ),
+        }
+      );
+
+      await waitFor(() =>
+        expect(result.current.script.generatedFiles).toContainEqual(
+          expect.objectContaining({ fileName, isEmpty: false })
+        )
+      );
+      act(() => result.current.script.onGeneratedFileSelect(fileName));
+      expect(result.current.script.generatedPreview?.content).toBe(contents[0]);
+
+      await act(async () => {
+        if (kind === "stats") {
+          await result.current.stats.createStat({
+            key: stat.key,
+            name: stat.name,
+          });
+        } else {
+          await result.current.characters.createCharacter({
+            name: character.name,
+            displayName: character.displayName,
+            renpyTag: character.renpyTag,
+            color: character.color,
+          });
+        }
+      });
+      await waitFor(() =>
+        expect(result.current.script.generatedPreview).toMatchObject({
+          fileName,
+          content: contents[1],
+        })
+      );
+
+      await act(async () => {
+        if (kind === "stats") {
+          await result.current.stats.updateStat(stat.id, {
+            name: "Confidence",
+          });
+        } else {
+          await result.current.characters.updateCharacter(character.id, {
+            name: "Eve",
+          });
+        }
+      });
+      await waitFor(() =>
+        expect(result.current.script.generatedPreview).toMatchObject({
+          fileName,
+          content: contents[2],
+        })
+      );
+
+      const deleteEntry = (id: string) =>
+        kind === "stats"
+          ? result.current.stats.deleteStat(id)
+          : result.current.characters.deleteCharacter(id);
+      await act(() => deleteEntry("existing-entry"));
+      await waitFor(() =>
+        expect(result.current.script.generatedPreview?.content).toBe(
+          contents[3]
+        )
+      );
+
+      await act(() => deleteEntry(kind === "stats" ? stat.id : character.id));
+      await waitFor(() =>
+        expect(result.current.script.generatedPreview).toEqual({
+          fileName,
+          content: null,
+          emptyReason,
+        })
+      );
+      expect(result.current.script.activeFileId).toBe("file-1");
+      expect(previewApi).toHaveBeenCalledTimes(5);
+      unmount();
+      queryClient.clear();
+    }
+  );
+
+  it("preserves the selection across a failed refresh and an absent file without touching the editable buffer", async () => {
+    editorState.isFileDirty = true;
+    editorState.fileSaveStatus = "error";
+    editorState.editedFileContent = 'label start:\n    "Unsaved dialogue"';
+    selectFileTab.mockResolvedValueOnce(true);
+    const fileName = "branchforge_definitions.rpy";
     const { result, rerender } = renderHook(() =>
       useScriptMode({ runEditorTransition, projectId: "project-1" })
     );
-    await act(async () => {
-      await result.current.onGeneratedFileSelect!(fileName);
-    });
-    expect(result.current.activeFileContent).toContain("default flag = False");
 
-    previewState.data = {
-      files: [{ ...first, content: "default flag = True" }],
-    };
+    act(() => result.current.onGeneratedFileSelect(fileName));
+    previewState.isError = true;
     rerender();
-    expect(result.current.activeGeneratedFileId).toBe(fileName);
-    expect(result.current.activeFileContent).toContain("default flag = True");
-  });
 
-  it("saves dirty content before switching to generated preview", async () => {
-    editorState.isFileDirty = true;
-    editorState.triggerFileSave.mockResolvedValueOnce(true);
+    expect(result.current.generatedPreview?.fileName).toBe(fileName);
+    expect(result.current.generatedPreview?.content).toContain("Eileen");
+    act(() => result.current.generatedPreviewError?.retry());
+    expect(previewState.refetch).toHaveBeenCalledOnce();
 
-    const { result } = renderHook(() =>
-      useScriptMode({ runEditorTransition, projectId: "project-1" })
-    );
-
-    await act(async () => {
-      await result.current.onGeneratedFileSelect!(
-        "branchforge_definitions.rpy"
-      );
+    previewState.isError = false;
+    previewState.data = { files: [] };
+    rerender();
+    expect(result.current.generatedPreview).toEqual({
+      fileName,
+      content: null,
+      emptyReason: "No managed declarations to export",
     });
+    expect(result.current.generatedPreviewError).toBeNull();
+    expect(result.current.activeFileId).toBe("file-1");
+    expect(result.current.editableFileContent).toContain("Unsaved dialogue");
 
-    expect(editorState.triggerFileSave).toHaveBeenCalledTimes(1);
-    expect(result.current.isGeneratedPreview).toBe(true);
-  });
-
-  it("aborts preview switch when dirty save fails", async () => {
-    editorState.isFileDirty = true;
-    editorState.triggerFileSave.mockResolvedValueOnce(false);
-
-    const { result } = renderHook(() =>
-      useScriptMode({ runEditorTransition, projectId: "project-1" })
-    );
-
-    await act(async () => {
-      await result.current.onGeneratedFileSelect!(
-        "branchforge_definitions.rpy"
-      );
-    });
-
-    expect(result.current.isGeneratedPreview).toBe(false);
-    expect(showErrorToast).toHaveBeenCalledWith(
-      "Could not save changes before preview. Please resolve conflicts and try again.",
-      "Save failed"
-    );
+    await act(async () => result.current.handleSelectFileTab("file-1"));
+    expect(result.current.generatedPreview).toBeNull();
+    expect(result.current.editableFileContent).toContain("Unsaved dialogue");
+    expect(editorState.triggerFileSave).not.toHaveBeenCalled();
+    expect(editorState.setEditedFileContent).not.toHaveBeenCalled();
   });
 
   it("clears generated preview when selecting a real file tab", async () => {
@@ -376,13 +654,13 @@ describe("useScriptMode generated preview lifecycle", () => {
         "branchforge_definitions.rpy"
       );
     });
-    expect(result.current.isGeneratedPreview).toBe(true);
+    expect(result.current.generatedPreview).not.toBeNull();
 
     await act(async () => {
       await result.current.handleSelectFileTab("file-1");
     });
 
-    expect(result.current.isGeneratedPreview).toBe(false);
+    expect(result.current.generatedPreview).toBeNull();
     expect(selectFileTab).toHaveBeenCalledWith("file-1");
   });
 
@@ -401,7 +679,7 @@ describe("useScriptMode generated preview lifecycle", () => {
       result.current.handleGitLabSceneSelect("label-1");
     });
 
-    expect(result.current.isGeneratedPreview).toBe(false);
+    expect(result.current.generatedPreview).toBeNull();
     expect(setActiveLabelId).toHaveBeenCalledWith("label-1");
   });
 
@@ -441,6 +719,7 @@ describe("useScriptMode generated preview lifecycle", () => {
 describe("useScriptMode create file", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockPreviewQuery();
     scriptFilesState.projectFiles = [
       {
         id: "file-1",
@@ -515,7 +794,7 @@ describe("useScriptMode create file", () => {
         "branchforge_definitions.rpy"
       );
     });
-    expect(result.current.isGeneratedPreview).toBe(true);
+    expect(result.current.generatedPreview).not.toBeNull();
 
     await act(async () => {
       await result.current.handleCreateFile("chapters/new_scene.rpy");
@@ -539,7 +818,7 @@ describe("useScriptMode create file", () => {
     rerender();
 
     await waitFor(() => {
-      expect(result.current.isGeneratedPreview).toBe(false);
+      expect(result.current.generatedPreview).toBeNull();
       expect(selectFileTab).toHaveBeenCalledWith("file-new");
     });
   });
@@ -607,7 +886,7 @@ describe("useScriptMode create file", () => {
         "branchforge_definitions.rpy"
       );
     });
-    expect(result.current.isGeneratedPreview).toBe(true);
+    expect(result.current.generatedPreview).not.toBeNull();
 
     await act(async () => {
       await result.current.handleCreateFile("chapters/new_scene.rpy");
@@ -658,7 +937,7 @@ describe("useScriptMode create file", () => {
         "branchforge_definitions.rpy"
       );
     });
-    expect(result.current.isGeneratedPreview).toBe(true);
+    expect(result.current.generatedPreview).not.toBeNull();
 
     await act(async () => {
       await result.current.handleCreateFile("chapters/new_scene.rpy");
@@ -687,8 +966,8 @@ describe("useScriptMode create file", () => {
     await waitFor(() => {
       expect(selectFileTab).toHaveBeenCalledWith("file-new");
     });
-    expect(result.current.isGeneratedPreview).toBe(true);
-    expect(result.current.generatedFileName).toBe(
+    expect(result.current.generatedPreview).not.toBeNull();
+    expect(result.current.generatedPreview?.fileName).toBe(
       "branchforge_definitions.rpy"
     );
   });

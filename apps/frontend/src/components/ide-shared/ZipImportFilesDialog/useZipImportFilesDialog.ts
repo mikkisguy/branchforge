@@ -6,9 +6,10 @@
  */
 
 import { useReducer, useCallback, useRef, useEffect } from "react";
+import { invalidateGeneratedFiles } from "@/lib/generated-preview-files";
 import { useToast } from "@/contexts/ToastContext";
 import { useLabels } from "@/hooks/useLabels";
-import { projectFilesKeys, characterKeys, exportKeys } from "@/lib/query-keys";
+import { projectFilesKeys, characterKeys } from "@/lib/query-keys";
 import { useQueryClient } from "@tanstack/react-query";
 import { charactersApi } from "@/lib/api/characters";
 import { projectFilesApi } from "@/lib/api/project-files";
@@ -123,6 +124,10 @@ export function useZipImportFilesDialog(
       });
 
       if (result.success) {
+        const refreshGeneratedFiles = invalidateGeneratedFiles(
+          queryClient,
+          projectId
+        );
         if (currentImportId !== importIdRef.current) return;
 
         try {
@@ -140,9 +145,7 @@ export function useZipImportFilesDialog(
             queryClient.refetchQueries({
               queryKey: characterKeys.lists(projectId),
             }),
-            queryClient.refetchQueries({
-              queryKey: exportKeys.preview(projectId),
-            }),
+            refreshGeneratedFiles,
           ]);
         } catch (cacheError) {
           console.error("Failed to refresh cache after import:", cacheError);

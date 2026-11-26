@@ -294,7 +294,7 @@ describe("useGitLabSync", () => {
       );
     });
 
-    it("refreshes the generated preview after import completes", async () => {
+    it("invalidates the generated preview after import completes", async () => {
       const previewQuery = vi.fn().mockResolvedValue({ files: [] });
       await queryClient.fetchQuery({
         queryKey: exportKeys.preview("project-1"),
@@ -334,7 +334,10 @@ describe("useGitLabSync", () => {
 
       expect(result.current.state.operation?.status).toBe("COMPLETED");
       expect(result.current.state.progress).toBe(100);
-      expect(previewQuery).toHaveBeenCalledTimes(2);
+      expect(
+        queryClient.getQueryState(exportKeys.preview("project-1"))
+          ?.isInvalidated
+      ).toBe(true);
     });
 
     it("should handle import errors", async () => {
