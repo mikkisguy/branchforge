@@ -28,9 +28,11 @@ import * as files from "../gitlab/gitlab-file.service.js";
 import * as apiClient from "../gitlab/gitlab-api.client.js";
 import * as integration from "../gitlab/gitlab-integration.service.js";
 import * as preservation from "../character-source-preservation.service.js";
+import * as exportAttempts from "../gitlab/gitlab-export-attempt.service.js";
 import * as syncOperations from "../gitlab/gitlab-sync-ops.service.js";
 import { charactersService } from "../characters.service.js";
 import { createVariable, updateVariable } from "../variables.service.js";
+import { generateVariablesFile } from "../rpy-generator.service.js";
 import { statsService } from "../stats.service.js";
 import { lockProject } from "../project-files-operations.service.js";
 import {
@@ -571,6 +573,44 @@ describe("exact GitLab export review", () => {
     });
     const commitSpy = mockCommit();
 
+    await expect(
+      exportToGitlab(projectId, userId, "main", undefined, review.reviewToken)
+    ).rejects.toThrow(/Refresh the review/);
+    expect(commitSpy).not.toHaveBeenCalled();
+  });
+
+  it("requires a fresh review when the repository changes before locked admission", async () => {
+    const review = await reviewGitlabExport(projectId, userId, "main");
+    const prepare = exportAttempts.prepareExportAttempt;
+    vi.spyOn(exportAttempts, "prepareExportAttempt").mockImplementationOnce(
+      async (...args) => {
+        await db
+          .update(gitlabRepositories)
+          .set({ gitlabProjectId: 43 })
+          .where(eq(gitlabRepositories.projectId, projectId));
+        return prepare(...args);
+      }
+    );
+    const commitSpy = mockCommit();
+
+    await expect(
+      exportToGitlab(projectId, userId, "main", undefined, review.reviewToken)
+    ).rejects.toThrow(/Refresh the review/);
+
+    expect(commitSpy).not.toHaveBeenCalled();
+    expect((await snapshot()).attempts).toEqual([]);
+  });
+
+  it("keeps the accepted receipt and reports recovery when the repository changes after dispatch", async () => {
+    const review = await reviewGitlabExport(projectId, userId, "main");
+    vi.spyOn(files, "batchCommitFiles").mockImplementationOnce(async () => {
+      await db
+        .update(gitlabRepositories)
+        .set({ gitlabProjectId: 43 })
+        .where(eq(gitlabRepositories.projectId, projectId));
+      return commit;
+    });
+
     const result = await exportToGitlab(
       projectId,
       userId,
@@ -579,8 +619,15 @@ describe("exact GitLab export review", () => {
       review.reviewToken
     );
 
-    expect(result.status).toBe("FAILED");
-    expect(commitSpy).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      status: "FAILED",
+      errorMessage: expect.stringContaining(
+        "The previous GitLab push no longer matches this repository"
+      ),
+    });
+    expect((await snapshot()).attempts).toMatchObject([
+      { commitId: commit, gitlabProjectId: 42 },
+    ]);
   });
 
   it("leaves maintenance, content, pending operations and history unchanged, then dispatches exactly the reviewed batch", async () => {
@@ -607,7 +654,7 @@ describe("exact GitLab export review", () => {
     });
   });
 
-  it("includes generated-only changes while leaving legacy default promotion read-only", async () => {
+  it("reviews source rewrites and generated files without promoting legacy defaults", async () => {
     const source = `default has_key = True\n${original}`;
     await db
       .update(projectFiles)
@@ -638,6 +685,160 @@ describe("exact GitLab export review", () => {
     expect(result.status, result.errorMessage ?? undefined).toBe("COMPLETED");
     expect(summaries(commitSpy.mock.calls[0][4])).toEqual(review.actions);
   });
+
+  it("releases database transactions before GitLab reads during review and no-op confirmation", async () => {
+    await db
+      .update(projectFiles)
+      .set({
+        content: original,
+        contentHash: calculateContentHash(original),
+        lastPushedContentHash: "stale",
+      })
+      .where(eq(projectFiles.id, fileId));
+    const lookup = vi.mocked(repository.getBranchCommitSha);
+    lookup.mockImplementation(async () => {
+      const result = await db.execute<{ held: boolean }>(sql`
+        select exists (
+          select 1 from pg_stat_activity
+          where datname = current_database() and state = 'idle in transaction'
+        ) as held
+      `);
+      expect(result.rows[0]?.held).toBe(false);
+      return head;
+    });
+
+    const review = await reviewGitlabExport(projectId, userId, "main");
+    expect(review.actions).toEqual([]);
+    const result = await exportToGitlab(
+      projectId,
+      userId,
+      "main",
+      undefined,
+      review.reviewToken
+    );
+
+    expect(result).toMatchObject({ status: "COMPLETED", noChanges: true });
+    expect(lookup).toHaveBeenCalledTimes(3);
+  });
+
+  it("reviews and dispatches only the generated file for a variable-only change", async () => {
+    await db
+      .update(projectFiles)
+      .set({
+        content: original,
+        contentHash: calculateContentHash(original),
+      })
+      .where(eq(projectFiles.id, fileId));
+    await db
+      .insert(variables)
+      .values({ projectId, key: "has_key", authoredDefault: true });
+    const commitSpy = mockCommit();
+    const review = await reviewGitlabExport(projectId, userId, "main");
+    expect(review.actions).toEqual([
+      { action: "create", filePath: "game/branchforge_variables.rpy" },
+    ]);
+
+    const result = await exportToGitlab(
+      projectId,
+      userId,
+      "main",
+      undefined,
+      review.reviewToken
+    );
+
+    expect(result.status).toBe("COMPLETED");
+    expect(summaries(commitSpy.mock.calls[0][4])).toEqual(review.actions);
+  });
+
+  it.each(["generated content", "generated revision", "unrelated file"])(
+    "verifies moved receipts when a %s changes after confirmation",
+    async (change) => {
+      const path = "game/branchforge_variables.rpy";
+      const variable = { key: "has_key", authoredDefault: true };
+      const content = generateVariablesFile([variable]);
+      const parent = "d".repeat(40);
+      await db.insert(variables).values({ projectId, ...variable });
+      remote.set(path, { content, revision });
+      const review = await reviewGitlabExport(projectId, userId, "main");
+      expect(review.actions).toEqual([
+        { action: "update", filePath: "game/script.rpy" },
+      ]);
+
+      vi.spyOn(integration, "getDecryptedToken").mockResolvedValue(
+        "test-token"
+      );
+      vi.spyOn(repository, "getExportCommit").mockImplementation(
+        async (_p, _u, _repo, ref) => ({
+          id: ref,
+          message: "",
+          parent_ids: [ref === commit ? parent : base],
+        })
+      );
+      const read = vi.mocked(repository.getFileContentWithMetadata);
+      const fallback = read.getMockImplementation()!;
+      read.mockImplementation(async (...args) => {
+        const filePath = args[2];
+        const ref = args[3];
+        if (ref === parent || ref === commit) {
+          if (filePath === path && change !== "unrelated file") {
+            return {
+              content:
+                change === "generated content"
+                  ? content.replace("True", "False")
+                  : content,
+              lastCommitId: parent,
+              contentSha256: null,
+              blobId: null,
+            };
+          }
+          if (filePath === "game/script.rpy" && ref === commit) {
+            return {
+              content: edited,
+              lastCommitId: commit,
+              contentSha256: null,
+              blobId: null,
+            };
+          }
+          if (filePath === "game/unrelated.rpy") {
+            return {
+              content: "# unrelated edit",
+              lastCommitId: parent,
+              contentSha256: null,
+              blobId: null,
+            };
+          }
+        }
+        return fallback(...args);
+      });
+      vi.spyOn(apiClient, "fetchWithTimeout").mockImplementationOnce(
+        async () => {
+          head = commit;
+          return Response.json(
+            { id: commit, parent_ids: [parent] },
+            { status: 201 }
+          );
+        }
+      );
+
+      const result = await exportToGitlab(
+        projectId,
+        userId,
+        "main",
+        undefined,
+        review.reviewToken
+      );
+
+      expect(result.status).toBe(
+        change === "unrelated file" ? "COMPLETED" : "FAILED"
+      );
+      const attempts = await db
+        .select()
+        .from(gitlabExportAttempts)
+        .where(eq(gitlabExportAttempts.projectId, projectId));
+      if (change === "unrelated file") expect(attempts).toHaveLength(0);
+      else expect(attempts).toMatchObject([{ commitId: commit }]);
+    }
+  );
 
   it("includes moves in the ordered committed batch", async () => {
     await renameProjectFile(fileId, userId, "game/renamed.rpy");

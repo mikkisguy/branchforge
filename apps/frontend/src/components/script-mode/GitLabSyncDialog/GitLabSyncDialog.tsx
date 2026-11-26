@@ -229,7 +229,6 @@ export function GitLabSyncDialog({
     if (!result) {
       if (operationType === "import") void pendingChanges.refetch();
       else {
-        reset();
         setReviewNotice(
           "The push was not confirmed. Refresh the review and confirm again."
         );

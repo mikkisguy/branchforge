@@ -22,9 +22,11 @@ const {
   mockExport,
   mockPending,
   mockSyncState,
+  useRealSync,
   errorToast,
   successToast,
 } = vi.hoisted(() => ({
+  useRealSync: { current: false },
   mockImport: vi.fn(),
   mockExport: vi.fn(),
   successToast: vi.fn(),
@@ -42,14 +44,21 @@ vi.mock("@/lib/api/characters", () => ({
   charactersApi: { detectCharacters: vi.fn(), importCharacters: vi.fn() },
 }));
 
-vi.mock("@/hooks/useGitLabSync", () => ({
-  useGitLabSync: () => ({
+vi.mock("@/hooks/useGitLabSync", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/hooks/useGitLabSync")>();
+  const useMockSync = () => ({
     state: mockSyncState,
     exportToGitlab: mockExport,
     importFromGitlab: mockImport,
     reset: vi.fn(),
-  }),
-}));
+  });
+  return {
+    useGitLabSync: () => {
+      const useSync = useRealSync.current ? actual.useGitLabSync : useMockSync;
+      return useSync();
+    },
+  };
+});
 
 vi.mock("@/hooks/useGitLabPendingChanges", () => ({
   useGitLabPendingChanges: mockPending,
@@ -90,6 +99,7 @@ function reviewFor(
 }
 
 beforeEach(() => {
+  useRealSync.current = false;
   vi.spyOn(gitlabApi, "reviewGitlabExport")
     .mockReset()
     .mockImplementation(async (_projectId, branch) => reviewFor(branch));
@@ -566,6 +576,28 @@ describe("exact export review", () => {
     await waitFor(() => expect(button).toBeEnabled());
     fireEvent.click(button);
     await waitFor(() => expect(mockExport).toHaveBeenCalledTimes(2));
+  });
+
+  it("keeps the real sync hook's confirmation error visible after refreshing", async () => {
+    useRealSync.current = true;
+    const failure = "The GitLab token no longer has push permission.";
+    const submit = vi
+      .spyOn(gitlabApi, "exportToGitlab")
+      .mockRejectedValueOnce(new Error(failure));
+    renderReview();
+
+    const button = await screen.findByRole("button", {
+      name: "Export to main",
+    });
+    await waitFor(() => expect(button).toBeEnabled());
+    fireEvent.click(button);
+
+    expect(await screen.findByText(failure)).toBeInTheDocument();
+    await waitFor(() =>
+      expect(gitlabApi.reviewGitlabExport).toHaveBeenCalledTimes(2)
+    );
+    expect(screen.getByText(failure)).toBeInTheDocument();
+    expect(submit).toHaveBeenCalledOnce();
   });
 
   it("exposes explicit recovery after a reopened dialog cannot review a pending export", async () => {

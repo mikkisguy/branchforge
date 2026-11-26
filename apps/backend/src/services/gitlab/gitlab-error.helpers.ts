@@ -36,6 +36,11 @@ export const GITLAB_IMPORT_PENDING_EXPORT =
   "Retry the previous GitLab push before pulling changes into this project.";
 export const GITLAB_EXPORT_ATTEMPT_CHANGED =
   "The previous GitLab push no longer matches this repository, branch, or pending file operations. Review the pending changes before retrying.";
+export class GitLabRepositoryChangedError extends Error {
+  constructor() {
+    super(GITLAB_EXPORT_ATTEMPT_CHANGED);
+  }
+}
 export const GITLAB_IMPORT_EMPTY =
   "No importable content found in the fetched files. Each file was either empty or contained only whitespace.";
 export const GITLAB_FRESH_IMPORT_EMPTY =

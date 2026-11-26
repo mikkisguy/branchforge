@@ -19,6 +19,7 @@ import {
 import { lockProject } from "../project-files-operations.service.js";
 import {
   GITLAB_EXPORT_ATTEMPT_CHANGED,
+  GitLabRepositoryChangedError,
   GITLAB_EXPORT_ATTEMPT_UNCERTAIN,
   GITLAB_EXPORT_HISTORY_IN_PROGRESS,
 } from "./gitlab-error.helpers.js";
@@ -98,7 +99,7 @@ async function checkRepository(
     .from(gitlabRepositories)
     .where(eq(gitlabRepositories.projectId, attempt.projectId))
     .for("update");
-  if (!link) throw new Error(GITLAB_EXPORT_ATTEMPT_CHANGED);
+  if (!link) throw new GitLabRepositoryChangedError();
   assertGitlabRepositoryIdentity(attempt, link);
 }
 
@@ -342,7 +343,11 @@ async function matchesRemote(
     [],
     expected.map(({ path }) => path)
   );
-  return expected.every(({ hash }, index) => paths[index].hash === hash);
+  return expected.every(
+    ({ hash, lastCommitId }, index) =>
+      paths[index].hash === hash &&
+      (!lastCommitId || paths[index].lastCommitId === lastCommitId)
+  );
 }
 
 export async function verifyExportAttempt(

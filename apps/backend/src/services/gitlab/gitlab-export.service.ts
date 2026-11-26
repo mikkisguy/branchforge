@@ -123,6 +123,7 @@ import {
   GITLAB_EXPORT_BRANCH_COMMIT_REJECTED,
   GITLAB_EXPORT_BRANCH_CREATE_REJECTED,
   GITLAB_EXPORT_ATTEMPT_CHANGED,
+  GitLabRepositoryChangedError,
   GITLAB_EXPORT_REVIEW_STALE,
   GITLAB_EXPORT_ATTEMPT_UNCERTAIN,
   GITLAB_EXPORT_HISTORY_IN_PROGRESS,
@@ -587,11 +588,7 @@ function localExportFingerprint(
   );
 }
 
-async function planGitlabExport(
-  projectId: string,
-  userId: string,
-  branch?: string
-) {
+async function readExportPlanSnapshot(projectId: string, branch?: string) {
   return getDb().transaction(
     async (db) => {
       await assertNoPendingExportAttempt(
@@ -731,215 +728,247 @@ async function planGitlabExport(
         ),
       };
 
-      // A missing target is created from the default branch at commit time.
-      // Read that base so updates are not treated as 404 conflicts.
-      const base = await resolveExportContentBranch(
-        projectId,
-        userId,
-        targetBranch,
-        defaultBranch,
-        repository
-      );
-
-      // Determine the directory prefix for generated files (e.g. "game/")
-      const fileDirPrefix = computeCommonDirectoryPrefix(
-        activeFiles.map((f) => f.filePath)
-      );
-
-      const generated = structuredClone(inputs.generatedInputs);
-      const generatedInputs = structuredClone(generated);
-      generated.projectVariables.sort((a, b) => a.key.localeCompare(b.key));
-      generated.projectStats.sort((a, b) => a.key.localeCompare(b.key));
-      generated.projectCharacters.sort((a, b) =>
-        a.renpyTag.localeCompare(b.renpyTag)
-      );
-      for (const [declarations, legacy] of [
-        [maintenance.currentDefaults, false],
-        [maintenance.legacyDefaults, true],
-      ] as const) {
-        for (const declaration of declarations) {
-          if (declaration.kind === "variable") {
-            const row = generated.projectVariables.find(
-              (row) => row.key === declaration.key
-            );
-            if (row && row.authoredDefault === null)
-              row.authoredDefault = declaration.value === "True";
-            else if (!row && !legacy)
-              generated.projectVariables.push({
-                ...managedVariableDefaultValues(declaration),
-                description: null,
-                category: null,
-              });
-          } else {
-            const row = generated.projectStats.find(
-              (row) => row.key === declaration.key
-            );
-            if (row && row.authoredDefault === null)
-              row.authoredDefault = declaration.value;
-            else if (!row && !legacy)
-              generated.projectStats.push({
-                ...managedStatDefaultValues(declaration),
-                description: null,
-              });
-          }
-        }
-      }
-      for (const update of maintenance.characterUpdates) {
-        const raw = rawCharacters.find((row) => row.id === update.id)!;
-        const row = generated.projectCharacters.find(
-          (row) => row.renpyTag === raw.renpyTag
-        )!;
-        Object.assign(row, update.values);
-      }
-      generated.projectVariables.sort((a, b) => a.key.localeCompare(b.key));
-      generated.projectStats.sort((a, b) => a.key.localeCompare(b.key));
-      const remoteDependencies: Array<{
-        path: string;
-        hash: string | null;
-        lastCommitId: string | null;
-      }> = [];
-
-      // Export consistency: an excluded DB character without any current
-      // active source-owned global declaration would silently disappear
-      // from the remote tree. Fail with an actionable conflict before any
-      // remote write.
-      assertExcludedCharactersHaveSourceOwnership(
-        generated.projectCharacters,
-        excludedTags,
-        activeFiles.map((file) => ({
-          filePath: file.filePath,
-          content: file.content,
-        }))
-      );
-
-      const occupiedPaths = new Set(
-        [
-          ...trackedFiles.flatMap((file) => [
-            file.filePath,
-            file.remoteFilePath,
-          ]),
-          ...ops.flatMap((op) => [op.localPath, op.remoteBasePath]),
-          ...plan.actions.flatMap((action) => [
-            action.filePath,
-            action.previousPath,
-          ]),
-        ].flatMap((path) => (path ? [path.toLowerCase()] : []))
-      );
-
-      // Generated files share the single atomic commit.
-      const generatedActions = await buildGeneratedActions(
-        projectId,
-        userId,
-        base.revision,
-        fileDirPrefix,
-        previousPrefix,
-        generated,
-        activeFiles,
-        occupiedPaths,
-        excludedTags,
-        repository,
-        db,
-        (path, remote) =>
-          remoteDependencies.push({
-            path,
-            hash:
-              remote.content === null
-                ? null
-                : calculateContentHash(remote.content),
-            lastCommitId: remote.lastCommitId,
-          })
-      );
-
-      // Preflight each affected source against the stored per-file remote
-      // content baseline. The preflight also returns the actual remote content
-      // for update paths so identical plain updates can be dropped after
-      // conflict checks succeed.
-      if (plan.actions.length > 0) {
-        const remoteContents = await preflightConflicts(
-          projectId,
-          userId,
-          base.revision,
-          files,
-          plan,
-          repository
-        );
-
-        // Keep contentUpdatedFiles so omitted updates still advance baselines.
-        // Structural actions always remain in the atomic commit.
-        plan.actions = plan.actions.filter(
-          (action) =>
-            action.action !== "update" ||
-            remoteContents.get(action.filePath) !== action.content
-        );
-      }
-
-      const allActions = [...plan.actions, ...generatedActions];
-
-      const updatedPaths = new Set(
-        plan.actions
-          .filter((action) => action.action === "update")
-          .map((action) => action.filePath)
-      );
-      const capturedFiles = [
-        ...plan.operations.map(({ file, content, op }) => {
-          if (!file) throw new Error(GITLAB_EXPORT_ATTEMPT_CHANGED);
-          return captureFile(file, content, true, op);
-        }),
-        ...plan.contentUpdatedFiles.map(({ file, content }) =>
-          captureFile(file, content, updatedPaths.has(file.filePath))
-        ),
-      ];
-      const before = await captureExportPreimages(
-        projectId,
-        userId,
-        repository,
-        base.revision,
-        allActions,
-        capturedFiles
-          .filter((file) => !file.changedRemote)
-          .map(({ path }) => path)
-      );
-      const actions = guardExportActions(allActions, before);
-      remoteDependencies.sort((a, b) => a.path.localeCompare(b.path));
-      const reviewToken = createHash("sha256")
-        .update(
-          JSON.stringify({
-            projectId,
-            repository,
-            targetBranch,
-            branchExisted: base.branchExisted,
-            newBranchBase: base.branchExisted ? null : base,
-            actions,
-            before: [...before].sort((a, b) => a.path.localeCompare(b.path)),
-            remoteDependencies,
-            generatedInputs,
-            localFingerprint,
-            maintenance,
-            files: capturedFiles,
-            labelBaselines,
-            excludedTags: [...excludedTags].sort(),
-          })
-        )
-        .digest("hex");
       return {
-        plan,
-        generatedActions,
-        allActions: actions,
-        capturedFiles,
-        before,
-        labelBaselines,
-        base,
+        inputs,
         repository,
         defaultBranch,
         targetBranch,
-        maintenance,
         localFingerprint,
-        remoteDependencies,
-        reviewToken,
+        maintenance,
+        trackedFiles,
+        excludedTags,
+        files,
+        previousPrefix,
+        activeFiles,
+        plan,
+        labelBaselines,
       };
     },
     { isolationLevel: "repeatable read", accessMode: "read only" }
   );
+}
+
+async function planGitlabExport(
+  projectId: string,
+  userId: string,
+  branch?: string
+) {
+  const {
+    inputs,
+    repository,
+    defaultBranch,
+    targetBranch,
+    localFingerprint,
+    maintenance,
+    trackedFiles,
+    excludedTags,
+    files,
+    previousPrefix,
+    activeFiles,
+    plan,
+    labelBaselines,
+  } = await readExportPlanSnapshot(projectId, branch);
+  const { ops, rawCharacters } = inputs;
+
+  // A missing target is created from the default branch at commit time.
+  // Read that base so updates are not treated as 404 conflicts.
+  const base = await resolveExportContentBranch(
+    projectId,
+    userId,
+    targetBranch,
+    defaultBranch,
+    repository
+  );
+
+  // Determine the directory prefix for generated files (e.g. "game/")
+  const fileDirPrefix = computeCommonDirectoryPrefix(
+    activeFiles.map((f) => f.filePath)
+  );
+
+  const generated = structuredClone(inputs.generatedInputs);
+  const generatedInputs = structuredClone(generated);
+  generated.projectVariables.sort((a, b) => a.key.localeCompare(b.key));
+  generated.projectStats.sort((a, b) => a.key.localeCompare(b.key));
+  generated.projectCharacters.sort((a, b) =>
+    a.renpyTag.localeCompare(b.renpyTag)
+  );
+  for (const [declarations, legacy] of [
+    [maintenance.currentDefaults, false],
+    [maintenance.legacyDefaults, true],
+  ] as const) {
+    for (const declaration of declarations) {
+      if (declaration.kind === "variable") {
+        const row = generated.projectVariables.find(
+          (row) => row.key === declaration.key
+        );
+        if (row && row.authoredDefault === null)
+          row.authoredDefault = declaration.value === "True";
+        else if (!row && !legacy)
+          generated.projectVariables.push({
+            ...managedVariableDefaultValues(declaration),
+            description: null,
+            category: null,
+          });
+      } else {
+        const row = generated.projectStats.find(
+          (row) => row.key === declaration.key
+        );
+        if (row && row.authoredDefault === null)
+          row.authoredDefault = declaration.value;
+        else if (!row && !legacy)
+          generated.projectStats.push({
+            ...managedStatDefaultValues(declaration),
+            description: null,
+          });
+      }
+    }
+  }
+  for (const update of maintenance.characterUpdates) {
+    const raw = rawCharacters.find((row) => row.id === update.id)!;
+    const row = generated.projectCharacters.find(
+      (row) => row.renpyTag === raw.renpyTag
+    )!;
+    Object.assign(row, update.values);
+  }
+  generated.projectVariables.sort((a, b) => a.key.localeCompare(b.key));
+  generated.projectStats.sort((a, b) => a.key.localeCompare(b.key));
+  const beforeByPath = new Map<
+    string,
+    GitlabExportAttemptSnapshot["before"][number]
+  >();
+
+  // Export consistency: an excluded DB character without any current
+  // active source-owned global declaration would silently disappear
+  // from the remote tree. Fail with an actionable conflict before any
+  // remote write.
+  assertExcludedCharactersHaveSourceOwnership(
+    generated.projectCharacters,
+    excludedTags,
+    activeFiles.map((file) => ({
+      filePath: file.filePath,
+      content: file.content,
+    }))
+  );
+
+  const occupiedPaths = new Set(
+    [
+      ...trackedFiles.flatMap((file) => [file.filePath, file.remoteFilePath]),
+      ...ops.flatMap((op) => [op.localPath, op.remoteBasePath]),
+      ...plan.actions.flatMap((action) => [
+        action.filePath,
+        action.previousPath,
+      ]),
+    ].flatMap((path) => (path ? [path.toLowerCase()] : []))
+  );
+
+  // Generated files share the single atomic commit.
+  const generatedActions = await buildGeneratedActions(
+    projectId,
+    userId,
+    base.revision,
+    fileDirPrefix,
+    previousPrefix,
+    generated,
+    activeFiles,
+    occupiedPaths,
+    excludedTags,
+    repository,
+    (path, remote) => {
+      beforeByPath.set(path, {
+        path,
+        hash:
+          remote.content === null ? null : calculateContentHash(remote.content),
+        ...(remote.lastCommitId ? { lastCommitId: remote.lastCommitId } : {}),
+      });
+    }
+  );
+
+  // Preflight each affected source against the stored per-file remote
+  // content baseline. The preflight also returns the actual remote content
+  // for update paths so identical plain updates can be dropped after
+  // conflict checks succeed.
+  if (plan.actions.length > 0) {
+    const remoteContents = await preflightConflicts(
+      projectId,
+      userId,
+      base.revision,
+      files,
+      plan,
+      repository
+    );
+
+    // Keep contentUpdatedFiles so omitted updates still advance baselines.
+    // Structural actions always remain in the atomic commit.
+    plan.actions = plan.actions.filter(
+      (action) =>
+        action.action !== "update" ||
+        remoteContents.get(action.filePath) !== action.content
+    );
+  }
+
+  const allActions = [...plan.actions, ...generatedActions];
+
+  const updatedPaths = new Set(
+    plan.actions
+      .filter((action) => action.action === "update")
+      .map((action) => action.filePath)
+  );
+  const capturedFiles = [
+    ...plan.operations.map(({ file, content, op }) => {
+      if (!file) throw new Error(GITLAB_EXPORT_ATTEMPT_CHANGED);
+      return captureFile(file, content, true, op);
+    }),
+    ...plan.contentUpdatedFiles.map(({ file, content }) =>
+      captureFile(file, content, updatedPaths.has(file.filePath))
+    ),
+  ];
+  const actionPreimages = await captureExportPreimages(
+    projectId,
+    userId,
+    repository,
+    base.revision,
+    allActions,
+    capturedFiles.filter((file) => !file.changedRemote).map(({ path }) => path)
+  );
+  for (const file of actionPreimages) beforeByPath.set(file.path, file);
+  const before = [...beforeByPath.values()].sort((a, b) =>
+    a.path.localeCompare(b.path)
+  );
+  const actions = guardExportActions(allActions, before);
+  const reviewToken = createHash("sha256")
+    .update(
+      JSON.stringify({
+        projectId,
+        repository,
+        targetBranch,
+        branchExisted: base.branchExisted,
+        newBranchBase: base.branchExisted ? null : base,
+        actions,
+        before,
+        generatedInputs,
+        localFingerprint,
+        maintenance,
+        files: capturedFiles,
+        labelBaselines,
+        excludedTags: [...excludedTags].sort(),
+      })
+    )
+    .digest("hex");
+  return {
+    plan,
+    generatedActions,
+    allActions: actions,
+    capturedFiles,
+    before,
+    labelBaselines,
+    base,
+    repository,
+    defaultBranch,
+    targetBranch,
+    maintenance,
+    localFingerprint,
+    reviewToken,
+  };
 }
 
 /** Recheck every consumed local dependency under the project lock before writes. */
@@ -1006,12 +1035,7 @@ async function validateNoopRemotePlan(
       currentBase.revision !== planned.base.revision)
   )
     throw staleReview();
-  const expected = new Map(
-    [...planned.remoteDependencies, ...planned.before].map((file) => [
-      file.path,
-      file,
-    ])
-  );
+  const expected = new Map(planned.before.map((file) => [file.path, file]));
   const current = await captureExportPreimages(
     projectId,
     userId,
@@ -1089,18 +1113,28 @@ export async function exportToGitlab(
       ? null
       : await planGitlabExport(projectId, userId, branch).catch(
           (error: unknown) => {
-            if (error instanceof GitLabExportConflictError) throw staleReview();
+            if (
+              error instanceof GitLabExportConflictError ||
+              error instanceof RepositoryNotLinkedError ||
+              error instanceof GitLabRepositoryChangedError
+            )
+              throw staleReview();
             throw error;
           }
         );
   if (validatedPlan && validatedPlan.reviewToken !== reviewToken)
     throw staleReview();
   if (validatedPlan) {
-    await getDb().transaction(async (tx) => {
-      await lockProject(tx, projectId);
-      await assertNoPendingExportAttempt(tx, projectId);
-      await validateLocalExportPlan(tx, projectId, validatedPlan);
-    });
+    await getDb()
+      .transaction(async (tx) => {
+        await lockProject(tx, projectId);
+        await assertNoPendingExportAttempt(tx, projectId);
+        await validateLocalExportPlan(tx, projectId, validatedPlan);
+      })
+      .catch((error: unknown) => {
+        if (error instanceof GitLabRepositoryChangedError) throw staleReview();
+        throw error;
+      });
   }
 
   const db = getDb();
@@ -1129,6 +1163,7 @@ export async function exportToGitlab(
     targetBranch
   );
 
+  let attemptRetained = false;
   try {
     const repoLink = await getRepositoryLink(projectId);
     if (!repoLink) throw new RepositoryNotLinkedError();
@@ -1215,6 +1250,7 @@ BranchForge-Export-Attempt: ${randomUUID()}`,
         },
         applyAdmittedMaintenance
       );
+      attemptRetained = true;
       await claimExportAttempt(attempt);
 
       let commitId: string | null;
@@ -1242,6 +1278,7 @@ BranchForge-Export-Attempt: ${randomUUID()}`,
       } catch (error) {
         if (error instanceof GitLabCommitNotSentError) {
           await discardExportAttempt(attempt, true);
+          attemptRetained = false;
           throw error;
         }
         if (error instanceof GitLabBranchCreationUncertainError) {
@@ -1249,6 +1286,7 @@ BranchForge-Export-Attempt: ${randomUUID()}`,
         }
         if (error instanceof GitLabCommitRejectedError) {
           await discardExportAttempt(attempt, true);
+          attemptRetained = false;
           if (error instanceof GitLabBranchCreationRejectedError)
             throw new Error(GITLAB_EXPORT_BRANCH_CREATE_REJECTED, {
               cause: error,
@@ -1298,11 +1336,12 @@ BranchForge-Export-Attempt: ${randomUUID()}`,
       return { ...operation, status: "COMPLETED", conflictCount: 0, commitId };
     }
 
-    // No-op admission still applies maintenance and advances captured baselines atomically.
+    // Release the remote reads before taking admission locks. Local inputs
+    // are checked again under the lock before saving the observed baselines.
+    await validateNoopRemotePlan(projectId, userId, planned);
     await db.transaction(async (tx) => {
       await lockProject(tx, projectId);
       await assertNoPendingExportAttempt(tx, projectId);
-      await validateNoopRemotePlan(projectId, userId, planned);
       await applyAdmittedMaintenance(tx);
       if (plan.contentUpdatedFiles.length > 0) {
         await validateNoopExportBaselines(
@@ -1334,7 +1373,16 @@ BranchForge-Export-Attempt: ${randomUUID()}`,
         ? { commitId: reconciledCommitId }
         : { noChanges: true }),
     };
-  } catch (error) {
+  } catch (cause) {
+    const repositoryError =
+      cause instanceof GitLabCommitNotSentError ? cause.cause : cause;
+    const error =
+      reviewToken &&
+      !attemptRetained &&
+      (repositoryError instanceof GitLabRepositoryChangedError ||
+        repositoryError instanceof RepositoryNotLinkedError)
+        ? staleReview()
+        : cause;
     const errorMessage = toUserFacingExportError(error);
     // Drizzle can embed raw bound parameters, including saved scripts, in
     // the message, stack and cause. Log only the sanitized classification.
