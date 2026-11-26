@@ -157,6 +157,12 @@ The script prints these instructions automatically if the CLI is absent.
 
 **Performance:** Use `Promise.all()` for parallel independent queries. Avoid N+1 patterns.
 
+**Export admission locks:** Managed character, variable, and stat mutations
+must take `lockProject()` inside their database transaction. GitLab export
+confirmation relies on that lock to validate generated-file inputs before
+persisting its immutable attempt. Recovery also locks source files in ID order
+before reading fingerprints, because label/line saves use file-row locks.
+
 **Ren'Py source ownership:** Standard UI/configuration files (`screens.rpy`,
 `screen.rpy`, `options.rpy`, and `gui.rpy`, matched by basename) remain
 source-owned. Preserve their content during import/export; do not promote

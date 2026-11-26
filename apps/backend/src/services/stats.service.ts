@@ -6,6 +6,7 @@
  * that change based on player choices across visual novel scenes.
  */
 
+import { lockProject } from "./project-files-operations.service.js";
 import { getDb } from "../db/index.js";
 import { stats, labels } from "../db/schema/index.js";
 import { eq, and, isNull } from "drizzle-orm";
@@ -139,19 +140,22 @@ export class StatsService {
     };
 
     try {
-      const [result] = await db
-        .insert(stats)
-        .values(newStat)
-        .onConflictDoNothing({
-          target: [stats.projectId, stats.key],
-        })
-        .returning();
+      return await db.transaction(async (tx) => {
+        await lockProject(tx, projectId);
+        const [result] = await tx
+          .insert(stats)
+          .values(newStat)
+          .onConflictDoNothing({
+            target: [stats.projectId, stats.key],
+          })
+          .returning();
 
-      if (!result) {
-        throw new ConflictError("Stat with this key already exists");
-      }
+        if (!result) {
+          throw new ConflictError("Stat with this key already exists");
+        }
 
-      return mapToPublicStat(result);
+        return mapToPublicStat(result);
+      });
     } catch (err) {
       if (err instanceof ConflictError) throw err;
       if (isUniqueConstraintViolation(err)) {
@@ -167,49 +171,57 @@ export class StatsService {
     userId: string,
     input: UpdateStatInput
   ): Promise<PublicStat> {
-    const currentStat = await this.requireStatAccess(statId, userId);
-
-    const effectiveMin = input.minValue ?? currentStat.minValue;
-    const effectiveMax = input.maxValue ?? currentStat.maxValue;
-
-    if (effectiveMin > effectiveMax) {
-      throw new ValidationError(
-        "Minimum value must be less than or equal to maximum value"
-      );
-    }
-
+    const target = await this.requireStatAccess(statId, userId);
     const db = getDb();
+    return db.transaction(async (tx) => {
+      await lockProject(tx, target.projectId);
+      const [currentStat] = await tx
+        .select()
+        .from(stats)
+        .where(eq(stats.id, statId));
+      if (!currentStat) throw new NotFoundError("Stat");
 
-    try {
-      const [updated] = await db
-        .update(stats)
-        .set({
-          ...input,
-          updatedAt: new Date(),
-        })
-        .where(eq(stats.id, statId))
-        .returning();
+      const effectiveMin = input.minValue ?? currentStat.minValue;
+      const effectiveMax = input.maxValue ?? currentStat.maxValue;
 
-      if (!updated) {
-        throw new NotFoundError("Stat");
+      if (effectiveMin > effectiveMax) {
+        throw new ValidationError(
+          "Minimum value must be less than or equal to maximum value"
+        );
       }
 
-      return mapToPublicStat(updated);
-    } catch (err) {
-      if (err instanceof NotFoundError) throw err;
-      if (isUniqueConstraintViolation(err)) {
-        throw new ConflictError("Stat with this key already exists");
+      try {
+        const [updated] = await tx
+          .update(stats)
+          .set({
+            ...input,
+            updatedAt: new Date(),
+          })
+          .where(eq(stats.id, statId))
+          .returning();
+
+        if (!updated) {
+          throw new NotFoundError("Stat");
+        }
+
+        return mapToPublicStat(updated);
+      } catch (err) {
+        if (err instanceof NotFoundError) throw err;
+        if (isUniqueConstraintViolation(err)) {
+          throw new ConflictError("Stat with this key already exists");
+        }
+        throw err;
       }
-      throw err;
-    }
+    });
   }
 
   /** Delete a stat. */
   async deleteStat(statId: string, userId: string): Promise<void> {
-    await this.requireStatAccess(statId, userId);
-
-    const db = getDb();
-    await db.delete(stats).where(eq(stats.id, statId));
+    const target = await this.requireStatAccess(statId, userId);
+    await getDb().transaction(async (tx) => {
+      await lockProject(tx, target.projectId);
+      await tx.delete(stats).where(eq(stats.id, statId));
+    });
   }
 
   // --------------------------------------------------------------------------

@@ -28,6 +28,7 @@ import cookie from "@fastify/cookie";
 import session from "@fastify/session";
 import { gitlabRoutes } from "../gitlab.routes.js";
 import * as gitlabService from "../../services/gitlab.service.js";
+import * as exportService from "../../services/gitlab/gitlab-export.service.js";
 import * as gitlabSyncService from "../../services/gitlab-sync.service.js";
 import * as rateLimiter from "../../services/rate-limiter.service.js";
 import * as db from "../../db/index.js";
@@ -87,6 +88,11 @@ vi.mock("../../services/gitlab-sync.service.js", () => ({
   getSyncOperation: vi.fn(),
   listSyncOperations: vi.fn(),
   detectConflicts: vi.fn(),
+}));
+
+vi.mock("../../services/gitlab/gitlab-export.service.js", () => ({
+  reviewGitlabExport: vi.fn(),
+  recoverGitlabExport: vi.fn(),
 }));
 
 // Mock the rate limiter service
@@ -519,6 +525,7 @@ describe("GitLab Routes (Integration)", () => {
             projectId: testProjectId,
             branch: testBranch,
             commitMessage: supplied,
+            reviewToken: "a".repeat(64),
           },
         });
 
@@ -527,7 +534,8 @@ describe("GitLab Routes (Integration)", () => {
           testProjectId,
           expect.any(String),
           testBranch,
-          expected
+          expected,
+          "a".repeat(64)
         );
         expect(response.json()).toMatchObject({
           id: testOperationId,
@@ -548,6 +556,89 @@ describe("GitLab Routes (Integration)", () => {
 
       expect(response.statusCode).toBe(400);
     });
+  });
+
+  it("rejects public export without a review token", async () => {
+    const response = await fastify.inject({
+      method: "POST",
+      url: "/api/gitlab/export",
+      payload: { projectId: testProjectId, branch: testBranch },
+    });
+    expect(response.statusCode).toBe(400);
+    expect(gitlabSyncService.exportToGitlab).not.toHaveBeenCalled();
+  });
+
+  it("validates and forwards an authenticated review request", async () => {
+    vi.mocked(exportService.reviewGitlabExport).mockResolvedValue({
+      projectId: testProjectId,
+      repository: {
+        repositoryLinkId: "link",
+        gitlabProjectId: 42,
+        gitlabOrigin: "https://gitlab.com",
+      },
+      targetBranch: testBranch,
+      branchExisted: true,
+      baseBranch: null,
+      actions: [],
+      reviewToken: "a".repeat(64),
+    });
+    const response = await fastify.inject({
+      method: "POST",
+      url: "/api/gitlab/export/review",
+      payload: { projectId: testProjectId, branch: testBranch },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(exportService.reviewGitlabExport).toHaveBeenCalledWith(
+      testProjectId,
+      expect.any(String),
+      testBranch
+    );
+    expect(response.json().actions).toEqual([]);
+  });
+
+  it("requires a new review after a stale confirmation", async () => {
+    const stale = new ConflictError("Refresh the review and confirm again.");
+    stale.userMessage = stale.message;
+    vi.mocked(gitlabSyncService.exportToGitlab).mockRejectedValue(stale);
+    const response = await fastify.inject({
+      method: "POST",
+      url: "/api/gitlab/export",
+      payload: {
+        projectId: testProjectId,
+        branch: testBranch,
+        reviewToken: "a".repeat(64),
+      },
+    });
+    expect(response.statusCode).toBe(409);
+    expect(response.json().message).toContain("Refresh the review");
+  });
+
+  it("exposes recovery separately from new export confirmation", async () => {
+    vi.mocked(exportService.recoverGitlabExport).mockResolvedValue(true);
+    const response = await fastify.inject({
+      method: "POST",
+      url: "/api/gitlab/export/recover",
+      payload: { projectId: testProjectId },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ recovered: true });
+    expect(exportService.recoverGitlabExport).toHaveBeenCalledWith(
+      testProjectId,
+      expect.any(String)
+    );
+    expect(gitlabSyncService.exportToGitlab).not.toHaveBeenCalled();
+  });
+
+  it("reports that no export was recovered when no attempt exists", async () => {
+    vi.mocked(exportService.recoverGitlabExport).mockResolvedValue(false);
+    const response = await fastify.inject({
+      method: "POST",
+      url: "/api/gitlab/export/recover",
+      payload: { projectId: testProjectId },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ recovered: false });
+    expect(gitlabSyncService.exportToGitlab).not.toHaveBeenCalled();
   });
 
   it("surfaces generated declaration conflicts from fresh imports", async () => {

@@ -117,6 +117,12 @@ pnpm db:studio
 
 **Performance:** Use `Promise.all()` for parallel independent queries. Avoid N+1 patterns.
 
+**Export admission locks:** Managed character, variable, and stat mutations
+must take `lockProject()` inside their database transaction. GitLab export
+confirmation relies on that lock to validate generated-file inputs before
+persisting its immutable attempt. Recovery also locks source files in ID order
+before reading fingerprints, because label/line saves use file-row locks.
+
 **Rate Limiting:** Required for auth endpoints, recommended for all public endpoints. Use `checkRateLimit()` from `src/services/rate-limiter.service.ts`.
 
 **Security:** Return generic error messages to clients. Log detailed errors server-side. Never expose internal implementation details.

@@ -1,4 +1,5 @@
 import { and, eq, inArray } from "drizzle-orm";
+import type { Transaction } from "../../db/types.js";
 import { getDb } from "../../db/index.js";
 import { gitlabSyncOperations } from "../../db/schema/index.js";
 import type { fetchSupportingFileSources } from "../export-sources.service.js";
@@ -37,7 +38,12 @@ export async function buildGeneratedActions(
   activeFiles: SourceFile[],
   occupiedPaths: ReadonlySet<string>,
   excludedTags: ReadonlySet<string>,
-  repository: GitlabRepositoryIdentity
+  repository: GitlabRepositoryIdentity,
+  db: Transaction | ReturnType<typeof getDb> = getDb(),
+  recordRemote?: (
+    path: string,
+    remote: Awaited<ReturnType<typeof getFileContentWithMetadata>>
+  ) => void
 ): Promise<BatchCommitAction[]> {
   const sourceOwnedKeys = collectSourceOwnedRpySymbolKeys(
     activeFiles,
@@ -111,6 +117,7 @@ export async function buildGeneratedActions(
         repository
       );
 
+      recordRemote?.(filePath, remote);
       if (remote.content === null && !hasRows) return null;
       if (remote.content === content) return null;
       if (
@@ -162,7 +169,7 @@ export async function buildGeneratedActions(
   if (updates.length > 0) {
     // A recorded commit ID is a confirmed GitLab write even if a later
     // local finalization step failed and the export status is FAILED.
-    const confirmed = await getDb()
+    const confirmed = await db
       .select({ commitId: gitlabSyncOperations.commitId })
       .from(gitlabSyncOperations)
       .where(

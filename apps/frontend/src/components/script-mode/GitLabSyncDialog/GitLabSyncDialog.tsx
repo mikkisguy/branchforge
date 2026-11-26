@@ -6,10 +6,12 @@
  */
 
 import { useReducer, useCallback, useRef, useEffect, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { GITLAB_EXPORT_RECOVERY_REQUIRED } from "@branchforge/shared";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Download, FilePenLine, RotateCcw, Trash2, Upload } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import { useGitLabExportReview } from "@/hooks/useGitLabExportReview";
 import { useGitLabSync } from "@/hooks/useGitLabSync";
 import { useToast } from "@/contexts/ToastContext";
 import { useLabels } from "@/hooks/useLabels";
@@ -116,6 +118,35 @@ export function GitLabSyncDialog({
     knownBranches: branchesReady ? branchesQuery.data : undefined,
   });
 
+  const review = useGitLabExportReview(
+    projectId,
+    branch.trim(),
+    exportDialogOpen &&
+      !exportBranchInvalid &&
+      !state.isProcessing &&
+      !state.operation
+  );
+  const [reviewNotice, setReviewNotice] = useState<string | null>(null);
+  const recovery = useMutation({
+    mutationFn: () => gitlabApi.recoverGitlabExport(projectId),
+    onSuccess: ({ recovered }) => {
+      setReviewNotice(
+        recovered
+          ? "Previous export recovered. Review the current changes before confirming."
+          : "No previous export needs recovery. Review the current changes before confirming."
+      );
+      void review.refetch();
+    },
+  });
+  const reviewReady =
+    exportDialogOpen &&
+    !exportBranchInvalid &&
+    review.isSuccess &&
+    !review.isFetching &&
+    review.data.targetBranch === branch.trim() &&
+    review.data.actions.length > 0 &&
+    !recovery.isPending;
+
   // Preselect the linked default branch in export existing-branch mode when
   // it is present in the freshly fetched list and the user has not made a
   // selection yet.
@@ -169,7 +200,7 @@ export function GitLabSyncDialog({
       (operationType === "import" && pendingChanges.isLoading)
     )
       return;
-    if (operationType === "export" && exportBranchInvalid) return;
+    if (operationType === "export" && (!reviewReady || !review.data)) return;
     if (!branch.trim()) {
       error("Branch name is required");
       return;
@@ -188,7 +219,8 @@ export function GitLabSyncDialog({
         ? await exportToGitlab(
             projectId,
             branch.trim(),
-            formState.commitMessage.trim() || undefined
+            formState.commitMessage.trim() || undefined,
+            review.data!.reviewToken
           )
         : await importFromGitlab(projectId, branch.trim(), resolution);
 
@@ -196,6 +228,16 @@ export function GitLabSyncDialog({
     // Refresh the list for a server-side conflict that raced our preflight.
     if (!result) {
       if (operationType === "import") void pendingChanges.refetch();
+      else {
+        reset();
+        setReviewNotice(
+          "The push was not confirmed. Refresh the review and confirm again."
+        );
+        await queryClient.resetQueries({
+          queryKey: gitlabKeys.exportReview(projectId, branch.trim()),
+          exact: true,
+        });
+      }
       return;
     }
 
@@ -272,7 +314,8 @@ export function GitLabSyncDialog({
   }, [
     importBlocked,
     branch,
-    exportBranchInvalid,
+    reviewReady,
+    review.data,
     formState.commitMessage,
     formState.conflictResolution,
     operationType,
@@ -288,6 +331,7 @@ export function GitLabSyncDialog({
     queryClient,
     clearAutoCloseTimeout,
     pendingChanges,
+    setReviewNotice,
   ]);
 
   /**
@@ -302,8 +346,9 @@ export function GitLabSyncDialog({
     });
     dispatch({ type: "RESET_BRANCH_MODE" });
     reset();
+    setReviewNotice(null);
     onOpenChange(false);
-  }, [clearAutoCloseTimeout, reset, onOpenChange]);
+  }, [clearAutoCloseTimeout, reset, onOpenChange, setReviewNotice]);
 
   const handleDialogOpenChange = useCallback(
     (nextOpen: boolean) => {
@@ -463,6 +508,97 @@ export function GitLabSyncDialog({
                 }
                 onBranchesRetry={() => void branchesQuery.refetch()}
               />
+              {operationType === "export" && !exportBranchInvalid && (
+                <section
+                  className="space-y-2 rounded-md border border-border/30 p-3"
+                  aria-label="Export review"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <h3 className="text-sm font-medium">Changes to push</h3>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={review.isFetching}
+                      onClick={() => {
+                        setReviewNotice(null);
+                        void review.refetch();
+                      }}
+                    >
+                      Refresh review
+                    </Button>
+                  </div>
+                  {reviewNotice && (
+                    <p role="alert" className="text-sm text-muted-foreground">
+                      {reviewNotice}
+                    </p>
+                  )}
+                  {review.isFetching || review.isPending ? (
+                    <p role="status" className="text-sm text-muted-foreground">
+                      Reviewing changes…
+                    </p>
+                  ) : review.isError ? (
+                    <div className="space-y-2">
+                      <p role="alert" className="text-sm text-destructive">
+                        {review.error.message}
+                      </p>
+                      {review.error.message ===
+                        GITLAB_EXPORT_RECOVERY_REQUIRED && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={recovery.isPending}
+                          onClick={() => recovery.mutate()}
+                        >
+                          {recovery.isPending
+                            ? "Recovering previous export…"
+                            : "Recover previous export"}
+                        </Button>
+                      )}
+                      {recovery.isError && (
+                        <p role="alert" className="text-sm text-destructive">
+                          {recovery.error.message}
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    review.data && (
+                      <>
+                        <p className="text-sm break-words">
+                          Target branch: {review.data.targetBranch}
+                          {!review.data.branchExisted &&
+                            ` (new, from ${review.data.baseBranch})`}
+                        </p>
+                        {review.data.actions.length === 0 ? (
+                          <p
+                            role="status"
+                            className="text-sm text-muted-foreground"
+                          >
+                            No changes to push.
+                          </p>
+                        ) : (
+                          <ul
+                            className="divide-y divide-border/30 text-sm"
+                            aria-label="Files in export"
+                          >
+                            {review.data.actions.map((action, index) => (
+                              <li
+                                key={`${index}:${action.filePath}`}
+                                className="break-words py-2"
+                              >
+                                {action.action === "move"
+                                  ? `Move: ${action.previousPath} → ${action.filePath}`
+                                  : `${action.action[0].toUpperCase()}${action.action.slice(1)}: ${action.filePath}`}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </>
+                    )
+                  )}
+                </section>
+              )}
             </>
           )}
         </div>
@@ -474,8 +610,9 @@ export function GitLabSyncDialog({
           branch={branch}
           branchInvalid={operationType === "export" && exportBranchInvalid}
           syncBlocked={
-            operationType === "import" &&
-            (importBlocked || pendingChanges.isLoading)
+            operationType === "export"
+              ? !reviewReady
+              : importBlocked || pendingChanges.isLoading
           }
           createNewBranch={formState.createNewBranch}
           operationType={operationType}

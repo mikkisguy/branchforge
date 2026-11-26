@@ -19,6 +19,7 @@ import {
   vi,
 } from "vitest";
 import nock from "nock";
+import { createHash } from "node:crypto";
 import * as gitlabService from "../gitlab.service.js";
 import * as gitlabRepoService from "../gitlab/gitlab-repository.service.js";
 import * as gitlabExportAttemptService from "../gitlab/gitlab-export-attempt.service.js";
@@ -82,6 +83,13 @@ import {
   getExportForDownload,
   getExportPreview,
 } from "../export.service.js";
+
+/** Keep readable fixture names while supplying real per-file commit guards. */
+function testCommitId(value: string): string {
+  return /^[a-f0-9]{40}$/i.test(value)
+    ? value
+    : createHash("sha1").update(value).digest("hex");
+}
 
 describe("GitLabSyncService (Integration)", () => {
   let db: ReturnType<typeof getDb>;
@@ -206,9 +214,9 @@ describe("GitLabSyncService (Integration)", () => {
   }
 
   beforeEach(async () => {
-    vi.clearAllMocks();
+    vi.restoreAllMocks();
     vi.spyOn(gitlabRepoService, "getBranchCommitSha").mockResolvedValue(
-      "existing-sha"
+      testCommitId("existing-sha")
     );
     nock.cleanAll();
     nock.disableNetConnect();
@@ -772,7 +780,7 @@ describe("GitLabSyncService (Integration)", () => {
 
   function mockRemoteFiles(
     read: (path: string) => string | null,
-    revision: (path: string) => string = () => "remote-rev-1"
+    revision: (path: string) => string = () => testCommitId("remote-rev-1")
   ) {
     return vi
       .spyOn(gitlabRepoService, "getFileContentWithMetadata")
@@ -780,7 +788,7 @@ describe("GitLabSyncService (Integration)", () => {
         const content = read(path);
         return {
           content,
-          lastCommitId: content === null ? null : revision(path),
+          lastCommitId: content === null ? null : testCommitId(revision(path)),
           contentSha256: null,
           blobId: null,
         };
@@ -882,19 +890,24 @@ describe("GitLabSyncService (Integration)", () => {
         "getFileContentWithMetadata"
       ).mockImplementation(async (_projectId, _userId, filePath) => ({
         content: filePath === sourcePath ? remoteSource : null,
-        lastCommitId: "remote-rev-1",
+        lastCommitId: testCommitId("remote-rev-1"),
         contentSha256: null,
         blobId: null,
       }));
       const commitSpy = vi
         .spyOn(gitlabFileService, "batchCommitFiles")
-        .mockResolvedValue("commit-managed");
+        .mockResolvedValue(testCommitId("commit-managed"));
 
       const first = await exportToGitlab(testProjectId, testUserId, testBranch);
       expect(first.status, first.errorMessage ?? undefined).toBe("COMPLETED");
       expect(commitSpy.mock.calls[0]?.[4]).toEqual(
         expect.arrayContaining([
-          { action: "update", filePath: sourcePath, content: cleaned },
+          {
+            action: "update",
+            lastCommitId: testCommitId("remote-rev-1"),
+            filePath: sourcePath,
+            content: cleaned,
+          },
           expect.objectContaining({
             action: "create",
             filePath: "game/branchforge_variables.rpy",
@@ -935,7 +948,12 @@ describe("GitLabSyncService (Integration)", () => {
       expect(third.status).toBe("COMPLETED");
       expect(commitSpy.mock.calls[2]?.[4]).toEqual(
         expect.arrayContaining([
-          { action: "update", filePath: sourcePath, content: edited },
+          {
+            action: "update",
+            lastCommitId: testCommitId("remote-rev-1"),
+            filePath: sourcePath,
+            content: edited,
+          },
         ])
       );
     });
@@ -959,7 +977,7 @@ describe("GitLabSyncService (Integration)", () => {
       mockRemoteContent(original);
       const commitSpy = vi
         .spyOn(gitlabFileService, "batchCommitFiles")
-        .mockResolvedValue("commit-legacy-edit");
+        .mockResolvedValue(testCommitId("commit-legacy-edit"));
 
       const result = await exportToGitlab(
         testProjectId,
@@ -971,6 +989,7 @@ describe("GitLabSyncService (Integration)", () => {
         expect.arrayContaining([
           {
             action: "update",
+            lastCommitId: testCommitId("remote-rev-1"),
             filePath: "variables.rpy",
             content: edited,
           },
@@ -1010,7 +1029,7 @@ describe("GitLabSyncService (Integration)", () => {
 
     it("should export files to GitLab when files exist", async () => {
       vi.spyOn(gitlabFileService, "batchCommitFiles").mockResolvedValue(
-        "commit123"
+        testCommitId("commit123")
       );
       await makeFileContentModified(testGitlabFileId);
       mockRemoteContent(await setOlderRemoteBaseline(testGitlabFileId));
@@ -1028,7 +1047,7 @@ describe("GitLabSyncService (Integration)", () => {
         status: "COMPLETED",
         branch: testBranch,
         conflictCount: 0,
-        commitId: "commit123",
+        commitId: testCommitId("commit123"),
       });
       expect(gitlabFileService.batchCommitFiles).toHaveBeenCalledWith(
         testProjectId,
@@ -1038,6 +1057,7 @@ describe("GitLabSyncService (Integration)", () => {
         [
           {
             action: "update",
+            lastCommitId: testCommitId("remote-rev-1"),
             filePath: testGitlabFile.filePath,
             content: testGitlabFile.content,
           },
@@ -1063,11 +1083,11 @@ describe("GitLabSyncService (Integration)", () => {
           if (branch === "feature/labels") {
             throw new NotFoundError("Branch 'feature/labels'");
           }
-          return "base-sha";
+          return testCommitId("base-sha");
         }
       );
       vi.spyOn(gitlabFileService, "batchCommitFiles").mockResolvedValue(
-        "commit-new-branch"
+        testCommitId("commit-new-branch")
       );
       await makeFileContentModified(testGitlabFileId);
       const contentSpy = mockRemoteContent(
@@ -1084,13 +1104,13 @@ describe("GitLabSyncService (Integration)", () => {
       expect(result).toMatchObject({
         status: "COMPLETED",
         branch: "feature/labels",
-        commitId: "commit-new-branch",
+        commitId: testCommitId("commit-new-branch"),
       });
       expect(contentSpy).toHaveBeenCalledWith(
         testProjectId,
         testUserId,
         testGitlabFile.filePath,
-        "base-sha",
+        testCommitId("base-sha"),
         undefined,
         expect.objectContaining({ repositoryLinkId })
       );
@@ -1102,6 +1122,7 @@ describe("GitLabSyncService (Integration)", () => {
         [
           {
             action: "update",
+            lastCommitId: testCommitId("remote-rev-1"),
             filePath: testGitlabFile.filePath,
             content: testGitlabFile.content,
           },
@@ -1141,7 +1162,7 @@ describe("GitLabSyncService (Integration)", () => {
       await db.insert(projectFiles).values(emptyFile);
 
       vi.spyOn(gitlabFileService, "batchCommitFiles").mockResolvedValue(
-        "commit124"
+        testCommitId("commit124")
       );
       await makeFileContentModified(testGitlabFileId);
       await db.insert(projectFilePendingOperations).values({
@@ -1156,7 +1177,7 @@ describe("GitLabSyncService (Integration)", () => {
         "getFileContentWithMetadata"
       ).mockImplementation(async (_projectId, _userId, filePath) => ({
         content: filePath === emptyFile.filePath ? null : "",
-        lastCommitId: "remote-rev-1",
+        lastCommitId: testCommitId("remote-rev-1"),
         contentSha256: null,
         blobId: null,
       }));
@@ -1183,6 +1204,7 @@ describe("GitLabSyncService (Integration)", () => {
         expect.arrayContaining([
           {
             action: "update",
+            lastCommitId: testCommitId("remote-rev-1"),
             filePath: testGitlabFile.filePath,
             content: testGitlabFile.content,
           },
@@ -1198,6 +1220,7 @@ describe("GitLabSyncService (Integration)", () => {
     });
 
     it("should handle export when no files exist", async () => {
+      mockRemoteFiles(() => null);
       // Delete the gitlab file first
       await db
         .delete(projectFiles)
@@ -1268,14 +1291,14 @@ describe("GitLabSyncService (Integration)", () => {
       await makeFileContentModified(testGitlabFileId);
       await db
         .update(projectFiles)
-        .set({ remoteRevision: "script-revision" })
+        .set({ remoteRevision: testCommitId("script-revision") })
         .where(eq(projectFiles.id, testGitlabFileId));
       const remoteFiles = new Map<string, string>([
         [testGitlabFile.filePath, testGitlabFile.content],
       ]);
       mockRemoteFiles(
         (path) => remoteFiles.get(path) ?? null,
-        () => "generated-commit"
+        () => testCommitId("generated-commit")
       );
       const commitSpy = vi
         .spyOn(gitlabFileService, "batchCommitFiles")
@@ -1285,7 +1308,7 @@ describe("GitLabSyncService (Integration)", () => {
               if (action.content !== undefined)
                 remoteFiles.set(action.filePath, action.content);
             }
-            return "generated-commit";
+            return testCommitId("generated-commit");
           }
         );
       const first = await exportToGitlab(testProjectId, testUserId, testBranch);
@@ -1301,7 +1324,7 @@ describe("GitLabSyncService (Integration)", () => {
         .from(projectFiles)
         .where(eq(projectFiles.id, testGitlabFileId));
       expect(scriptFile.lastPushedContentHash).toBe(testGitlabFile.contentHash);
-      expect(scriptFile.remoteRevision).toBe("script-revision");
+      expect(scriptFile.remoteRevision).toBe(testCommitId("script-revision"));
 
       const second = await exportToGitlab(
         testProjectId,
@@ -1346,7 +1369,9 @@ describe("GitLabSyncService (Integration)", () => {
 
       const sourcePath = testGitlabFile.filePath;
       const remote = new Map([[sourcePath, testGitlabFile.content]]);
-      const revisions = new Map([[sourcePath, "source-revision"]]);
+      const revisions = new Map([
+        [sourcePath, testCommitId("source-revision")],
+      ]);
       mockRemoteFiles(
         (path) => remote.get(path) ?? null,
         (path) => revisions.get(path)!
@@ -1356,7 +1381,7 @@ describe("GitLabSyncService (Integration)", () => {
         .spyOn(gitlabFileService, "batchCommitFiles")
         .mockImplementation(
           async (_projectId, _userId, _branch, _message, actions) => {
-            const revision = `generated-${++commits}`;
+            const revision = testCommitId(`generated-${++commits}`);
             for (const action of actions) {
               remote.set(action.filePath, action.content!);
               revisions.set(action.filePath, revision);
@@ -1368,7 +1393,7 @@ describe("GitLabSyncService (Integration)", () => {
       const push = () => exportToGitlab(testProjectId, testUserId, testBranch);
       expect(await push()).toMatchObject({
         status: "COMPLETED",
-        commitId: "generated-1",
+        commitId: testCommitId("generated-1"),
       });
       const categories = [
         [
@@ -1407,15 +1432,20 @@ describe("GitLabSyncService (Integration)", () => {
 
       expect(await push()).toMatchObject({
         status: "COMPLETED",
-        commitId: "generated-2",
+        commitId: testCommitId("generated-2"),
       });
       expect(commitSpy.mock.calls[1][4]).toEqual([
-        { action: "update", filePath: sourcePath, content: updatedScript },
+        {
+          action: "update",
+          filePath: sourcePath,
+          content: updatedScript,
+          lastCommitId: testCommitId("source-revision"),
+        },
         ...categories.map(([filePath, , content]) => ({
           action: "update",
           filePath,
           content,
-          lastCommitId: "generated-1",
+          lastCommitId: testCommitId("generated-1"),
         })),
       ]);
       for (const [path, , empty] of categories) {
@@ -1461,7 +1491,7 @@ describe("GitLabSyncService (Integration)", () => {
         .spyOn(gitlabFileService, "batchCommitFiles")
         .mockImplementation(
           async (_projectId, _userId, _branch, _message, actions) => {
-            const revision = `layout-${++commits}`;
+            const revision = testCommitId(`layout-${++commits}`);
             for (const action of actions) {
               if (action.previousPath) remote.delete(action.previousPath);
               remote.set(action.filePath, {
@@ -1476,7 +1506,7 @@ describe("GitLabSyncService (Integration)", () => {
       const push = () => exportToGitlab(testProjectId, testUserId, testBranch);
       expect(await push()).toMatchObject({
         status: "COMPLETED",
-        commitId: "layout-1",
+        commitId: testCommitId("layout-1"),
       });
       expect(remote.get(originalGenerated)?.content).toContain(
         "default unused_flag = False"
@@ -1496,7 +1526,7 @@ describe("GitLabSyncService (Integration)", () => {
       remote.set(originalGenerated, originalExport);
       expect(await push()).toMatchObject({
         status: "COMPLETED",
-        commitId: "layout-2",
+        commitId: testCommitId("layout-2"),
       });
       expect(commitSpy.mock.calls[1][4]).toEqual([
         expect.objectContaining({
@@ -1509,7 +1539,7 @@ describe("GitLabSyncService (Integration)", () => {
           action: "update",
           filePath: originalGenerated,
           content: empty,
-          lastCommitId: "layout-1",
+          lastCommitId: testCommitId("layout-1"),
         },
       ]);
       expect(remote.get(originalGenerated)?.content).toBe(empty);
@@ -1517,7 +1547,7 @@ describe("GitLabSyncService (Integration)", () => {
       await deleteVariable(variable.id, testUserId);
       expect(await push()).toMatchObject({
         status: "COMPLETED",
-        commitId: "layout-3",
+        commitId: testCommitId("layout-3"),
       });
       expect(remote.get(newGenerated)?.content).toBe(empty);
       expect(remote.get(originalGenerated)?.content).toBe(empty);
@@ -1551,7 +1581,7 @@ describe("GitLabSyncService (Integration)", () => {
           lastPushedContentHash: "stale-baseline",
           remoteContent: exportedContent,
           remoteContentHash: calculateContentHash(exportedContent),
-          remoteRevision: "existing-revision",
+          remoteRevision: testCommitId("existing-revision"),
         })
         .where(eq(projectFiles.id, testGitlabFileId));
       vi.spyOn(
@@ -1564,7 +1594,7 @@ describe("GitLabSyncService (Integration)", () => {
             : filePath === testGitlabFile.filePath
               ? exportedContent
               : null,
-        lastCommitId: "remote-rev-1",
+        lastCommitId: testCommitId("remote-rev-1"),
         contentSha256: null,
         blobId: null,
       }));
@@ -1583,7 +1613,7 @@ describe("GitLabSyncService (Integration)", () => {
       expect(file.lastPushedContentHash).toBe(
         calculateContentHash(localContent)
       );
-      expect(file.remoteRevision).toBe("existing-revision");
+      expect(file.remoteRevision).toBe(testCommitId("existing-revision"));
       expect(file.remoteContent).toBe(exportedContent);
     });
 
@@ -1599,7 +1629,7 @@ describe("GitLabSyncService (Integration)", () => {
           await db
             .update(projectFiles)
             .set({
-              remoteRevision: "concurrent-commit",
+              remoteRevision: testCommitId("concurrent-commit"),
               remoteContent: newerContent,
               remoteContentHash: calculateContentHash(newerContent),
             })
@@ -1607,7 +1637,7 @@ describe("GitLabSyncService (Integration)", () => {
         }
         return {
           content: path === sourcePath ? testGitlabFile.content : null,
-          lastCommitId: "older-revision",
+          lastCommitId: testCommitId("older-revision"),
           contentSha256: null,
           blobId: null,
         };
@@ -1620,7 +1650,7 @@ describe("GitLabSyncService (Integration)", () => {
         .from(projectFiles)
         .where(eq(projectFiles.id, testGitlabFileId));
       expect(file).toMatchObject({
-        remoteRevision: "concurrent-commit",
+        remoteRevision: testCommitId("concurrent-commit"),
         remoteContent: newerContent,
       });
     });
@@ -1657,7 +1687,7 @@ describe("GitLabSyncService (Integration)", () => {
         return {
           content:
             path === testGitlabFile.filePath ? testGitlabFile.content : null,
-          lastCommitId: "existing-sha",
+          lastCommitId: testCommitId("existing-sha"),
           contentSha256: null,
           blobId: null,
         };
@@ -1719,7 +1749,7 @@ describe("GitLabSyncService (Integration)", () => {
         async (_projectId, _userId, branch) => {
           if (branch === "feature/no-changes")
             throw new NotFoundError("Branch");
-          return "base-sha";
+          return testCommitId("base-sha");
         }
       );
       await makeFileContentModified(testGitlabFileId);
@@ -1789,13 +1819,13 @@ describe("GitLabSyncService (Integration)", () => {
             filePath === testGitlabFile.filePath
               ? testGitlabFile.content
               : null,
-          lastCommitId: "remote-rev-1",
+          lastCommitId: testCommitId("remote-rev-1"),
           contentSha256: null,
           blobId: null,
         }));
         const commit = vi
           .spyOn(gitlabFileService, "batchCommitFiles")
-          .mockResolvedValue("commit-defaults");
+          .mockResolvedValue(testCommitId("commit-defaults"));
         const result = await exportToGitlab(
           testProjectId,
           testUserId,
@@ -1842,11 +1872,11 @@ describe("GitLabSyncService (Integration)", () => {
             ? testGitlabFile.content
             : null;
         },
-        () => "commit-generated"
+        () => testCommitId("commit-generated")
       );
       const batchCommitFilesSpy = vi
         .spyOn(gitlabFileService, "batchCommitFiles")
-        .mockResolvedValue("commit-generated");
+        .mockResolvedValue(testCommitId("commit-generated"));
 
       await exportToGitlab(
         testProjectId,
@@ -1887,7 +1917,7 @@ describe("GitLabSyncService (Integration)", () => {
 
     it("should generate default commit message when not provided", async () => {
       vi.spyOn(gitlabFileService, "batchCommitFiles").mockResolvedValue(
-        "commit125"
+        testCommitId("commit125")
       );
       await makeFileContentModified(testGitlabFileId);
       mockRemoteContent(await setOlderRemoteBaseline(testGitlabFileId));
@@ -1913,7 +1943,7 @@ describe("GitLabSyncService (Integration)", () => {
 
       const batchCommitFilesSpy = vi
         .spyOn(gitlabFileService, "batchCommitFiles")
-        .mockResolvedValue("commit126");
+        .mockResolvedValue(testCommitId("commit126"));
       await makeFileContentModified(testGitlabFileId);
       await makeFileContentModified(testGitlabFile2.id);
       mockRemoteContent(await setOlderRemoteBaseline(testGitlabFileId));
@@ -1966,7 +1996,7 @@ describe("GitLabSyncService (Integration)", () => {
 
       // Mock the GitLab service
       vi.spyOn(gitlabFileService, "batchCommitFiles").mockResolvedValue(
-        "commit127"
+        testCommitId("commit127")
       );
       await makeFileContentModified(testGitlabFileId);
       mockRemoteContent(testGitlabFile.content);
@@ -2049,7 +2079,7 @@ describe("GitLabSyncService (Integration)", () => {
 
       // Mock the GitLab service
       vi.spyOn(gitlabFileService, "batchCommitFiles").mockResolvedValue(
-        "commit128"
+        testCommitId("commit128")
       );
       await makeFileContentModified(testGitlabFileId);
       mockRemoteContent(testGitlabFile.content);
@@ -2129,7 +2159,7 @@ describe("GitLabSyncService (Integration)", () => {
           key: "quick_menu",
         });
 
-        await recordCompletedExport("remote-rev-stale");
+        await recordCompletedExport(testCommitId("remote-rev-stale"));
         vi.spyOn(
           gitlabRepoService,
           "getFileContentWithMetadata"
@@ -2142,13 +2172,13 @@ describe("GitLabSyncService (Integration)", () => {
               : filePath === "game/gui.rpy"
                 ? raw
                 : null,
-          lastCommitId: "remote-rev-stale",
+          lastCommitId: testCommitId("remote-rev-stale"),
           contentSha256: null,
           blobId: null,
         }));
         const commitSpy = vi
           .spyOn(gitlabFileService, "batchCommitFiles")
-          .mockResolvedValue("commit-stale-generated");
+          .mockResolvedValue(testCommitId("commit-stale-generated"));
 
         const result = await exportToGitlab(
           testProjectId,
@@ -2221,7 +2251,7 @@ describe("GitLabSyncService (Integration)", () => {
       });
       const commitSpy = vi
         .spyOn(gitlabFileService, "batchCommitFiles")
-        .mockResolvedValue("commit-u");
+        .mockResolvedValue(testCommitId("commit-u"));
       mockRemoteContent(null);
 
       const result = await exportToGitlab(
@@ -2282,7 +2312,7 @@ describe("GitLabSyncService (Integration)", () => {
       });
       const commitSpy = vi
         .spyOn(gitlabFileService, "batchCommitFiles")
-        .mockResolvedValue("commit-conflict");
+        .mockResolvedValue(testCommitId("commit-conflict"));
       mockRemoteContent(null);
 
       const result = await exportToGitlab(
@@ -2323,7 +2353,7 @@ describe("GitLabSyncService (Integration)", () => {
       });
       const commitSpy = vi
         .spyOn(gitlabFileService, "batchCommitFiles")
-        .mockResolvedValue("commit-preserved");
+        .mockResolvedValue(testCommitId("commit-preserved"));
       mockRemoteContent(sourceWithU);
 
       const result = await exportToGitlab(
@@ -2442,7 +2472,7 @@ describe("GitLabSyncService (Integration)", () => {
 
       const batchSpy = vi
         .spyOn(gitlabFileService, "batchCommitFiles")
-        .mockResolvedValue("commit-xyz");
+        .mockResolvedValue(testCommitId("commit-xyz"));
 
       // Preflight: existing sources exist remotely with no stored baseline
       // (legacy rows), create destination does not exist yet.
@@ -2465,7 +2495,7 @@ describe("GitLabSyncService (Integration)", () => {
         ) {
           return {
             content: "remote-content",
-            lastCommitId: "remote-rev",
+            lastCommitId: testCommitId("remote-rev"),
             contentSha256: null,
             blobId: null,
           };
@@ -2486,7 +2516,7 @@ describe("GitLabSyncService (Integration)", () => {
       );
 
       expect(result.status).toBe("COMPLETED");
-      expect(result.commitId).toBe("commit-xyz");
+      expect(result.commitId).toBe(testCommitId("commit-xyz"));
 
       expect(batchSpy).toHaveBeenCalledTimes(1);
       const actions = batchSpy.mock.calls[0]![4]!;
@@ -2650,12 +2680,12 @@ describe("GitLabSyncService (Integration)", () => {
       {
         reason: "missing generator header",
         content: "default obsolete = False\n",
-        revision: "previous-export",
+        revision: testCommitId("previous-export"),
       },
       {
         reason: "tracked remote path",
         content: generateVariablesFile([{ key: "obsolete" }]),
-        revision: "previous-export",
+        revision: testCommitId("previous-export"),
       },
     ])(
       "preserves pending source changes and reports a generated path conflict for $reason",
@@ -2675,7 +2705,7 @@ describe("GitLabSyncService (Integration)", () => {
             remoteFilePath: generatedPath,
           });
         }
-        await recordCompletedExport("previous-export");
+        await recordCompletedExport(testCommitId("previous-export"));
         mockRemoteFiles(
           (path) => (path === generatedPath ? content : null),
           () => revision
@@ -2707,7 +2737,7 @@ describe("GitLabSyncService (Integration)", () => {
       const generatedPath = "game/branchforge_variables.rpy";
       const staleContent = generateVariablesFile([{ key: "obsolete" }]);
       const sourcePath = testGitlabFile.filePath;
-      await recordCompletedExport("previous-export");
+      await recordCompletedExport(testCommitId("previous-export"));
       await db
         .update(projectFiles)
         .set({ deletedAt: new Date() })
@@ -2720,7 +2750,7 @@ describe("GitLabSyncService (Integration)", () => {
         remoteBasePath: sourcePath,
       });
 
-      let generatedRevision = "previous-export";
+      let generatedRevision = testCommitId("previous-export");
       mockRemoteFiles(
         (path) => {
           if (path === generatedPath) return staleContent;
@@ -2760,7 +2790,7 @@ describe("GitLabSyncService (Integration)", () => {
             action: "update",
             file_path: generatedPath,
             content: generateVariablesFile([]),
-            last_commit_id: "previous-export",
+            last_commit_id: testCommitId("previous-export"),
           },
         ],
       });
@@ -2782,13 +2812,16 @@ describe("GitLabSyncService (Integration)", () => {
         .where(eq(projectFiles.id, testGitlabFileId));
       expect(tombstone.deletedAt).not.toBeNull();
 
-      generatedRevision = "previous-export";
+      generatedRevision = testCommitId("previous-export");
       request.mockResolvedValueOnce(
-        Response.json({ id: "cleanup-commit", parent_ids: ["existing-sha"] })
+        Response.json({
+          id: testCommitId("cleanup-commit"),
+          parent_ids: [testCommitId("existing-sha")],
+        })
       );
       expect(await push()).toMatchObject({
         status: "COMPLETED",
-        commitId: "cleanup-commit",
+        commitId: testCommitId("cleanup-commit"),
       });
       expect(
         await db
@@ -2868,7 +2901,7 @@ describe("GitLabSyncService (Integration)", () => {
         [removedFile.filePath, removedFile.content],
       ]);
       const committed = new Map<string, string>();
-      let head = "base-revision";
+      let head = testCommitId("base-revision");
       let dispatchedMessage = "";
       vi.spyOn(gitlabRepoService, "getBranchCommitSha").mockImplementation(
         async () => head
@@ -2877,26 +2910,33 @@ describe("GitLabSyncService (Integration)", () => {
         gitlabRepoService,
         "getFileContentWithMetadata"
       ).mockImplementation(async (_p, _u, path, ref) => ({
-        content: (ref === "base-revision" ? base : committed).get(path) ?? null,
+        content:
+          (ref === testCommitId("base-revision") ? base : committed).get(
+            path
+          ) ?? null,
         lastCommitId:
-          ref === "base-revision" && path === oldPath ? "a".repeat(40) : ref,
+          ref === testCommitId("base-revision")
+            ? path === oldPath
+              ? "a".repeat(40)
+              : ref
+            : testCommitId("applied-revision"),
         contentSha256: null,
         blobId: null,
       }));
       vi.spyOn(gitlabRepoService, "getExportCommit").mockImplementation(
         async (_p, _u, _repo, revision) => {
-          if (revision === "later-revision") {
+          if (revision === testCommitId("later-revision")) {
             return {
               id: revision,
               message: "Unrelated change",
-              parent_ids: ["applied-revision"],
+              parent_ids: [testCommitId("applied-revision")],
             };
           }
-          expect(revision).toBe("applied-revision");
+          expect(revision).toBe(testCommitId("applied-revision"));
           return {
             id: revision,
             message: dispatchedMessage,
-            parent_ids: ["base-revision"],
+            parent_ids: [testCommitId("base-revision")],
           };
         }
       );
@@ -2908,7 +2948,7 @@ describe("GitLabSyncService (Integration)", () => {
           expect(attempt).toMatchObject({
             branch,
             repositoryLinkId,
-            baseRevision: "base-revision",
+            baseRevision: testCommitId("base-revision"),
             message,
             snapshot: {
               version: 1,
@@ -2950,10 +2990,10 @@ describe("GitLabSyncService (Integration)", () => {
             if (action.action === "delete") committed.delete(action.filePath);
             else committed.set(action.filePath, action.content!);
           }
-          head = "later-revision";
+          head = testCommitId("later-revision");
           throw new Error("Connection lost after GitLab accepted commit");
         })
-        .mockResolvedValueOnce("next-revision");
+        .mockResolvedValueOnce(testCommitId("next-revision"));
 
       const push = () => exportToGitlab(testProjectId, testUserId, testBranch);
       const interrupted = await push();
@@ -2969,14 +3009,19 @@ describe("GitLabSyncService (Integration)", () => {
 
       expect(await push()).toMatchObject({
         status: "COMPLETED",
-        commitId: "next-revision",
+        commitId: testCommitId("next-revision"),
       });
       expect(commit.mock.calls[1][4]).toEqual([
-        { action: "update", filePath: renamedPath, content: expectedEdited },
+        {
+          action: "update",
+          filePath: renamedPath,
+          content: expectedEdited,
+          lastCommitId: testCommitId("applied-revision"),
+        },
       ]);
       expect(await getSyncOperation(interrupted.id, testUserId)).toMatchObject({
         status: "COMPLETED",
-        commitId: "applied-revision",
+        commitId: testCommitId("applied-revision"),
       });
       expect(await db.select().from(gitlabExportAttempts)).toHaveLength(0);
       expect(await db.select().from(projectFilePendingOperations)).toHaveLength(
@@ -2993,7 +3038,7 @@ describe("GitLabSyncService (Integration)", () => {
         .from(projectFiles)
         .where(eq(projectFiles.id, plainFile.id));
       expect(savedPlain).toMatchObject({
-        remoteRevision: "applied-revision",
+        remoteRevision: testCommitId("applied-revision"),
         remoteContent: plainUpdate,
         lastPushedContentHash: calculateContentHash(plainUpdate),
       });
@@ -3005,7 +3050,7 @@ describe("GitLabSyncService (Integration)", () => {
         .insert(variables)
         .values({ projectId: testProjectId, key: "flag" })
         .returning();
-      let head = "base-revision";
+      let head = testCommitId("base-revision");
       let message = "";
       let contents: string | null = null;
       const push = () => exportToGitlab(testProjectId, testUserId, testBranch);
@@ -3017,8 +3062,12 @@ describe("GitLabSyncService (Integration)", () => {
         "getFileContentWithMetadata"
       ).mockImplementation(async (_p, _u, path, ref) => ({
         content:
-          ref !== "base-revision" && path === generatedPath ? contents : null,
-        lastCommitId: ref.startsWith("tail-") ? "generated-commit" : ref,
+          ref !== testCommitId("base-revision") && path === generatedPath
+            ? contents
+            : null,
+        lastCommitId: testCommitId(
+          ref.startsWith("tail-") ? testCommitId("generated-commit") : ref
+        ),
         contentSha256: null,
         blobId: null,
       }));
@@ -3031,11 +3080,11 @@ describe("GitLabSyncService (Integration)", () => {
             expect(concurrent).toMatchObject({ status: "FAILED" });
             message = dispatchedMessage;
             contents = actions[0].content!;
-            head = "generated-commit";
+            head = testCommitId("generated-commit");
             return null;
           }
         )
-        .mockResolvedValueOnce("cleanup-commit");
+        .mockResolvedValueOnce(testCommitId("cleanup-commit"));
 
       const interrupted = await push();
       expect(interrupted.status).toBe("FAILED");
@@ -3047,7 +3096,7 @@ describe("GitLabSyncService (Integration)", () => {
       readCommit.mockResolvedValueOnce({
         id: head,
         message: "Manually copied file",
-        parent_ids: ["base-revision"],
+        parent_ids: [testCommitId("base-revision")],
       });
       expect(await push()).toMatchObject({ status: "FAILED" });
       expect(commit).toHaveBeenCalledOnce();
@@ -3055,15 +3104,21 @@ describe("GitLabSyncService (Integration)", () => {
 
       head = "tail-45";
       readCommit.mockImplementation(async (_p, _u, _repo, revision) => {
-        if (revision === "generated-commit") {
-          return { id: revision, message, parent_ids: ["base-revision"] };
+        if (revision === testCommitId("generated-commit")) {
+          return {
+            id: revision,
+            message,
+            parent_ids: [testCommitId("base-revision")],
+          };
         }
         const ordinal = Number(revision.slice("tail-".length));
         return {
           id: revision,
           message: "Another commit",
           parent_ids: [
-            ordinal > 1 ? `tail-${ordinal - 1}` : "generated-commit",
+            ordinal > 1
+              ? `tail-${ordinal - 1}`
+              : testCommitId("generated-commit"),
           ],
         };
       });
@@ -3080,19 +3135,19 @@ describe("GitLabSyncService (Integration)", () => {
       });
       expect(await push()).toMatchObject({
         status: "COMPLETED",
-        commitId: "cleanup-commit",
+        commitId: testCommitId("cleanup-commit"),
       });
       expect(commit.mock.calls[1][4]).toEqual([
         {
           action: "update",
           filePath: generatedPath,
           content: generateVariablesFile([]),
-          lastCommitId: "generated-commit",
+          lastCommitId: testCommitId("generated-commit"),
         },
       ]);
       expect(await getSyncOperation(interrupted.id, testUserId)).toMatchObject({
         status: "COMPLETED",
-        commitId: "generated-commit",
+        commitId: testCommitId("generated-commit"),
       });
     });
 
@@ -3101,7 +3156,7 @@ describe("GitLabSyncService (Integration)", () => {
       await db
         .insert(variables)
         .values({ projectId: testProjectId, key: "overlap" });
-      let head = "base-revision";
+      let head = testCommitId("base-revision");
       let message = "";
       let contents: string | null = null;
       const push = () => exportToGitlab(testProjectId, testUserId, testBranch);
@@ -3113,10 +3168,10 @@ describe("GitLabSyncService (Integration)", () => {
         "getFileContentWithMetadata"
       ).mockImplementation(async (_p, _u, path, ref) => ({
         content:
-          ref === "applied-revision" && path === generatedPath
+          ref === testCommitId("applied-revision") && path === generatedPath
             ? contents
             : null,
-        lastCommitId: ref,
+        lastCommitId: testCommitId(ref),
         contentSha256: null,
         blobId: null,
       }));
@@ -3126,7 +3181,7 @@ describe("GitLabSyncService (Integration)", () => {
           async (_p, _u, _branch, dispatchedMessage, actions) => {
             message = dispatchedMessage;
             contents = actions[0].content!;
-            head = "applied-revision";
+            head = testCommitId("applied-revision");
             return null;
           }
         );
@@ -3139,17 +3194,21 @@ describe("GitLabSyncService (Integration)", () => {
             startConcurrent = false;
             expect(await push()).toMatchObject({
               status: "COMPLETED",
-              commitId: "applied-revision",
+              commitId: testCommitId("applied-revision"),
             });
           }
-          return { id, message, parent_ids: ["base-revision"] };
+          return {
+            id,
+            message,
+            parent_ids: [testCommitId("base-revision")],
+          };
         }
       );
 
       expect(await push()).toMatchObject({
         id: original.id,
         status: "COMPLETED",
-        commitId: "applied-revision",
+        commitId: testCommitId("applied-revision"),
       });
       expect(commit).toHaveBeenCalledOnce();
       const operations = await db
@@ -3258,6 +3317,7 @@ describe("GitLabSyncService (Integration)", () => {
           action: "move",
           filePath: newerDestination,
           previousPath: destination,
+          lastCommitId: testCommitId("remote-rev-1"),
           content: testGitlabFile.content,
         },
       ]);
@@ -3290,7 +3350,7 @@ describe("GitLabSyncService (Integration)", () => {
             lastPushedContentHash: calculateContentHash(original),
           })
           .where(eq(projectFiles.id, testGitlabFileId));
-        let head = "existing-sha";
+        let head = testCommitId("existing-sha");
         vi.spyOn(gitlabRepoService, "getBranchCommitSha").mockImplementation(
           async () => head
         );
@@ -3303,10 +3363,10 @@ describe("GitLabSyncService (Integration)", () => {
               ? null
               : ref === "changed-parent"
                 ? "# Changed upstream"
-                : ref === "new-commit"
+                : ref === testCommitId("new-commit")
                   ? desired
                   : original,
-          lastCommitId: ref,
+          lastCommitId: testCommitId(ref),
           contentSha256: null,
           blobId: null,
         }));
@@ -3314,9 +3374,9 @@ describe("GitLabSyncService (Integration)", () => {
           async (_p, _u, _repo, id) => {
             const parent = id.startsWith("tail-")
               ? `tail-${Number(id.slice(5)) - 1}`
-              : id === "new-commit"
+              : id === testCommitId("new-commit")
                 ? "changed-parent"
-                : "existing-sha";
+                : testCommitId("existing-sha");
             return { id, message: "", parent_ids: [parent] };
           }
         );
@@ -3328,9 +3388,12 @@ describe("GitLabSyncService (Integration)", () => {
         const request = vi
           .spyOn(gitlabApiClient, "fetchWithTimeout")
           .mockImplementationOnce(async () => {
-            head = longHistory ? "tail-45" : "new-commit";
+            head = longHistory ? "tail-45" : testCommitId("new-commit");
             return Response.json(
-              { id: "new-commit", parent_ids: ["changed-parent"] },
+              {
+                id: testCommitId("new-commit"),
+                parent_ids: ["changed-parent"],
+              },
               { status: 201 }
             );
           });
@@ -3346,12 +3409,12 @@ describe("GitLabSyncService (Integration)", () => {
         });
         expect(request).toHaveBeenCalledOnce();
         const [attempt] = await db.select().from(gitlabExportAttempts);
-        expect(attempt.commitId).toBe("new-commit");
+        expect(attempt.commitId).toBe(testCommitId("new-commit"));
         if (longHistory) {
           expect(attempt.verification).toMatchObject({
             head: "tail-45",
             next: "tail-5",
-            receipt: "new-commit",
+            receipt: testCommitId("new-commit"),
           });
         }
         const [file] = await db
@@ -3426,7 +3489,7 @@ describe("GitLabSyncService (Integration)", () => {
             localPath: "game/concurrent_create.rpy",
           });
           concurrentOpId = concurrentOp.id;
-          return "commit-h2-scoped";
+          return testCommitId("commit-h2-scoped");
         }
       );
 
@@ -3517,7 +3580,7 @@ describe("GitLabSyncService (Integration)", () => {
           ).toEqual([plannedOp.id]);
           expect(plannedRow?.attemptStartedAt).toBeNull();
           expect(skippedRow?.attemptStartedAt).toBeNull();
-          return "commit-h2-mark";
+          return testCommitId("commit-h2-mark");
         }
       );
       vi.spyOn(
@@ -3550,7 +3613,7 @@ describe("GitLabSyncService (Integration)", () => {
 
   describe("fresh GitLab project import", () => {
     const branch = "chapter-two";
-    const snapshot = "existing-sha";
+    const snapshot = testCommitId("existing-sha");
     const variablePath = "game/branchforge_variables.rpy";
     const statPath = "game/branchforge_stats.rpy";
     const characterPath = "game/branchforge_definitions.rpy";
@@ -3581,7 +3644,7 @@ describe("GitLabSyncService (Integration)", () => {
         expect(ref).toBe(snapshot);
         return {
           content: remote.get(path) ?? null,
-          lastCommitId: "fresh-remote",
+          lastCommitId: testCommitId("fresh-remote"),
           contentSha256: null,
           blobId: null,
         };
@@ -3649,7 +3712,7 @@ describe("GitLabSyncService (Integration)", () => {
         async (_projectId, _userId, _branch, _message, actions) => {
           for (const action of actions)
             remote.set(action.filePath, action.content!);
-          return "fresh-export";
+          return testCommitId("fresh-export");
         }
       );
       expect(
@@ -3988,7 +4051,7 @@ describe("GitLabSyncService (Integration)", () => {
           "getFileContentWithMetadata"
         ).mockResolvedValue({
           content: remote,
-          lastCommitId: "unchanged",
+          lastCommitId: testCommitId("unchanged"),
           contentSha256: null,
           blobId: null,
         });
@@ -4053,7 +4116,7 @@ describe("GitLabSyncService (Integration)", () => {
       const revisions = new Map<string, string>();
       mockRemoteFiles(
         (path) => remote.get(path) ?? null,
-        (path) => revisions.get(path) ?? "defaults-remote-rev"
+        (path) => revisions.get(path) ?? testCommitId("defaults-remote-rev")
       );
       vi.spyOn(rpyParserService, "parseRPYFileWithLabels").mockImplementation(
         parseRealRPY
@@ -4063,10 +4126,10 @@ describe("GitLabSyncService (Integration)", () => {
           for (const action of actions) {
             if (action.content !== undefined) {
               remote.set(action.filePath, action.content);
-              revisions.set(action.filePath, "defaults-push");
+              revisions.set(action.filePath, testCommitId("defaults-push"));
             }
           }
-          return "defaults-push";
+          return testCommitId("defaults-push");
         }
       );
       await db.insert(stats).values({
@@ -4199,7 +4262,7 @@ describe("GitLabSyncService (Integration)", () => {
             "getFileContentWithMetadata"
           ).mockResolvedValue({
             content,
-            lastCommitId: "remote-rev",
+            lastCommitId: testCommitId("remote-rev"),
             contentSha256: null,
             blobId: null,
           });
@@ -4267,7 +4330,7 @@ describe("GitLabSyncService (Integration)", () => {
           "getFileContentWithMetadata"
         ).mockResolvedValue({
           content: 'label start:\n    "Exact identity"\n    return',
-          lastCommitId: "remote-rev",
+          lastCommitId: testCommitId("remote-rev"),
           contentSha256: null,
           blobId: null,
         });
@@ -4319,7 +4382,7 @@ describe("GitLabSyncService (Integration)", () => {
           ).mockResolvedValue({
             content:
               'label start:\n    "Lower"\n    return\nlabel START:\n    "Upper"\n    return',
-            lastCommitId: "remote-rev",
+            lastCommitId: testCommitId("remote-rev"),
             contentSha256: null,
             blobId: null,
           });
@@ -4374,7 +4437,7 @@ describe("GitLabSyncService (Integration)", () => {
           "getFileContentWithMetadata"
         ).mockResolvedValue({
           content: 'label start:\n    "Restored dialogue"\n    return',
-          lastCommitId: "remote-rev",
+          lastCommitId: testCommitId("remote-rev"),
           contentSha256: null,
           blobId: null,
         });
@@ -4444,7 +4507,7 @@ describe("GitLabSyncService (Integration)", () => {
         .from(projectFiles)
         .where(eq(projectFiles.id, testGitlabFileId));
       vi.spyOn(gitlabRepoService, "getBranchCommitSha").mockResolvedValue(
-        "remote-rev"
+        testCommitId("remote-rev")
       );
       vi.spyOn(gitlabRepoService, "listRpyFiles").mockResolvedValue([
         { name: "script.rpy", path: "game/script.rpy" },
@@ -4462,7 +4525,7 @@ describe("GitLabSyncService (Integration)", () => {
         });
         return {
           content: 'label start:\n    "Remote content"\n    return',
-          lastCommitId: "remote-rev",
+          lastCommitId: testCommitId("remote-rev"),
           contentSha256: null,
           blobId: null,
         };
@@ -4503,7 +4566,7 @@ describe("GitLabSyncService (Integration)", () => {
         "getFileContentWithMetadata"
       ).mockResolvedValue({
         content,
-        lastCommitId: "character-review-rev",
+        lastCommitId: testCommitId("character-review-rev"),
         contentSha256: null,
         blobId: null,
       });
@@ -4784,7 +4847,7 @@ describe("GitLabSyncService (Integration)", () => {
         "getFileContentWithMetadata"
       ).mockResolvedValue({
         content: 'label start:\n    "Imported content"\n    return',
-        lastCommitId: "remote-rev-import-1",
+        lastCommitId: testCommitId("remote-rev-import-1"),
         contentSha256: null,
         blobId: null,
       });
@@ -4871,7 +4934,7 @@ describe("GitLabSyncService (Integration)", () => {
     it("rejects pull results fetched while a push completes", async () => {
       vi.spyOn(gitlabRepoService, "listRpyFiles").mockImplementationOnce(
         async () => {
-          await recordCompletedExport("concurrent-export");
+          await recordCompletedExport(testCommitId("concurrent-export"));
           return [];
         }
       );
@@ -4920,7 +4983,7 @@ describe("GitLabSyncService (Integration)", () => {
         "getFileContentWithMetadata"
       ).mockResolvedValue({
         content: remoteContent,
-        lastCommitId: "remote-rev-import-2",
+        lastCommitId: testCommitId("remote-rev-import-2"),
         contentSha256: null,
         blobId: null,
       });
@@ -4989,7 +5052,7 @@ describe("GitLabSyncService (Integration)", () => {
         "getFileContentWithMetadata"
       ).mockResolvedValue({
         content: remoteContent,
-        lastCommitId: "remote-rev-import-3",
+        lastCommitId: testCommitId("remote-rev-import-3"),
         contentSha256: null,
         blobId: null,
       });
@@ -5057,7 +5120,7 @@ describe("GitLabSyncService (Integration)", () => {
         "getFileContentWithMetadata"
       ).mockResolvedValue({
         content: remoteContent,
-        lastCommitId: "remote-rev-h1",
+        lastCommitId: testCommitId("remote-rev-h1"),
         contentSha256: null,
         blobId: null,
       });
@@ -5125,7 +5188,7 @@ describe("GitLabSyncService (Integration)", () => {
         "getFileContentWithMetadata"
       ).mockResolvedValue({
         content: remoteContent,
-        lastCommitId: "remote-rev-settings",
+        lastCommitId: testCommitId("remote-rev-settings"),
         contentSha256: null,
         blobId: null,
       });
@@ -5180,7 +5243,7 @@ describe("GitLabSyncService (Integration)", () => {
         "getFileContentWithMetadata"
       ).mockResolvedValue({
         content: remoteContent,
-        lastCommitId: "remote-rev-clean",
+        lastCommitId: testCommitId("remote-rev-clean"),
         contentSha256: null,
         blobId: null,
       });
@@ -5245,7 +5308,7 @@ describe("GitLabSyncService (Integration)", () => {
         }
         return {
           content: 'label start:\n    "Remote"\n    return',
-          lastCommitId: "remote-rev-partial-fetch",
+          lastCommitId: testCommitId("remote-rev-partial-fetch"),
           contentSha256: null,
           blobId: null,
         };
@@ -5302,7 +5365,7 @@ describe("GitLabSyncService (Integration)", () => {
         "getFileContentWithMetadata"
       ).mockResolvedValue({
         content: remoteContent,
-        lastCommitId: "remote-rev-rollback",
+        lastCommitId: testCommitId("remote-rev-rollback"),
         contentSha256: null,
         blobId: null,
       });
@@ -5390,7 +5453,7 @@ describe("GitLabSyncService (Integration)", () => {
         "getFileContentWithMetadata"
       ).mockResolvedValue({
         content: "invalid rpy content",
-        lastCommitId: "remote-rev-import-4",
+        lastCommitId: testCommitId("remote-rev-import-4"),
         contentSha256: null,
         blobId: null,
       });
@@ -5430,7 +5493,7 @@ describe("GitLabSyncService (Integration)", () => {
         "getFileContentWithMetadata"
       ).mockResolvedValue({
         content: remote,
-        lastCommitId: "remote-rev-protected",
+        lastCommitId: testCommitId("remote-rev-protected"),
         contentSha256: null,
         blobId: null,
       });

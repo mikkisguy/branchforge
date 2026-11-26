@@ -162,7 +162,10 @@ export async function createVariable(
   };
 
   try {
-    const result = await db.insert(variables).values(newVariable).returning();
+    const result = await db.transaction(async (tx) => {
+      await lockProject(tx, projectId);
+      return tx.insert(variables).values(newVariable).returning();
+    });
 
     if (!result || result.length === 0 || !result[0]) {
       throw new Error(
@@ -225,11 +228,14 @@ export async function updateVariable(
     }
 
     // Update the variable
-    const result = await db
-      .update(variables)
-      .set(updateData)
-      .where(eq(variables.id, variableId))
-      .returning();
+    const result = await db.transaction(async (tx) => {
+      await lockProject(tx, accessCheck[0].variable.projectId);
+      return tx
+        .update(variables)
+        .set(updateData)
+        .where(eq(variables.id, variableId))
+        .returning();
+    });
 
     if (!result || result.length === 0 || !result[0]) {
       throw new Error(

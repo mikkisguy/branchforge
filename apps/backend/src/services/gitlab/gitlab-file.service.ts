@@ -171,7 +171,11 @@ export interface BatchCommitAction {
 }
 
 export class GitLabCommitRejectedError extends Error {
-  constructor(status: number, detail: string) {
+  constructor(
+    status: number,
+    detail: string,
+    public readonly branchCreated = false
+  ) {
     super(`GitLab API error: ${status} - ${detail}`);
     this.name = "GitLabCommitRejectedError";
   }
@@ -179,6 +183,10 @@ export class GitLabCommitRejectedError extends Error {
 
 /** Preparation failed before making the remote commit request. */
 export class GitLabCommitNotSentError extends Error {}
+
+/** Branch creation may have reached GitLab; keep the persisted attempt. */
+export class GitLabBranchCreationUncertainError extends Error {}
+export class GitLabBranchCreationRejectedError extends GitLabCommitRejectedError {}
 
 function toGitlabCommitAction(
   action: BatchCommitAction
@@ -238,6 +246,7 @@ export async function batchCommitFiles(
     verifyMovedReceipt: (commitId: string) => Promise<void>;
   }
 ): Promise<string | null> {
+  let branchCreated = false;
   const request = await (async () => {
     await requireProjectOwnership(projectId, userId);
 
@@ -257,18 +266,15 @@ export async function batchCommitFiles(
 
     let branchExists = false;
     try {
-      const head = await getBranchCommitSha(
+      await getBranchCommitSha(
         projectId,
         userId,
         branch,
         gitlabUrl,
         prepared?.repository
       );
-      if (
-        prepared &&
-        (!prepared.branchExisted || head !== prepared.baseRevision)
-      ) {
-        throw new GitLabCommitRejectedError(
+      if (prepared && !prepared.branchExisted) {
+        throw new GitLabBranchCreationRejectedError(
           409,
           "Target branch changed before submission"
         );
@@ -282,6 +288,64 @@ export async function batchCommitFiles(
           "Target branch disappeared before submission"
         );
       }
+    }
+
+    if (prepared && !prepared.branchExisted) {
+      // POST /repository/branches atomically rejects an already existing ref.
+      // start_sha on the commits endpoint does not provide that guarantee.
+      const branchUrl = new URL(
+        `/api/v4/projects/${repoLink.gitlabProjectId}/repository/branches`,
+        url
+      );
+      let created: Response;
+      try {
+        created = await fetchWithTimeout(branchUrl.toString(), {
+          method: "POST",
+          headers: {
+            "PRIVATE-TOKEN": token,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ branch, ref: prepared.baseRevision }),
+        });
+      } catch (cause) {
+        throw new GitLabBranchCreationUncertainError(
+          "Branch creation is uncertain. Recover the export before retrying; the branch may remain at its base.",
+          { cause }
+        );
+      }
+      if (!created.ok) {
+        if (
+          created.status >= 400 &&
+          created.status < 500 &&
+          created.status !== 408
+        ) {
+          throw new GitLabBranchCreationRejectedError(
+            created.status,
+            "Branch could not be created. Refresh the export review; the target may already exist."
+          );
+        }
+        throw new GitLabBranchCreationUncertainError(
+          "Branch creation is uncertain. Recover the export before retrying; the branch may remain at its base."
+        );
+      }
+      try {
+        const receipt = (await created.json()) as {
+          name?: string;
+          commit?: { id?: string };
+        };
+        if (
+          receipt.name !== branch ||
+          receipt.commit?.id !== prepared.baseRevision
+        )
+          throw new Error("Unexpected branch receipt");
+      } catch (cause) {
+        throw new GitLabBranchCreationUncertainError(
+          "Branch creation is uncertain. Recover the export before retrying; the branch may remain at its base.",
+          { cause }
+        );
+      }
+      branchExists = true;
+      branchCreated = true;
     }
 
     // Build the request body
@@ -299,7 +363,11 @@ export async function batchCommitFiles(
 
     return { apiUrl, token, body };
   })().catch((error: unknown) => {
-    if (prepared && !(error instanceof GitLabCommitRejectedError)) {
+    if (
+      prepared &&
+      !(error instanceof GitLabCommitRejectedError) &&
+      !(error instanceof GitLabBranchCreationUncertainError)
+    ) {
       throw new GitLabCommitNotSentError("GitLab commit preparation failed", {
         cause: error,
       });
@@ -324,7 +392,11 @@ export async function batchCommitFiles(
       response.status < 500 &&
       response.status !== 408
     ) {
-      throw new GitLabCommitRejectedError(response.status, errorText);
+      throw new GitLabCommitRejectedError(
+        response.status,
+        errorText,
+        branchCreated
+      );
     }
     throw new Error(`GitLab API error: ${response.status} - ${errorText}`);
   }

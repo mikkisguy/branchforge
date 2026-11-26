@@ -1,3 +1,4 @@
+import type { GitlabExportReview } from "@branchforge/shared";
 /**
  * GitLab API Client
  *
@@ -490,6 +491,27 @@ export const gitlabApi = {
     >(`/gitlab/files/stored/${projectId}`);
   },
 
+  async recoverGitlabExport(
+    projectId: string
+  ): Promise<{ recovered: boolean }> {
+    return request("/gitlab/export/recover", {
+      method: "POST",
+      body: JSON.stringify({ projectId }),
+    });
+  },
+
+  async reviewGitlabExport(
+    projectId: string,
+    branch: string,
+    signal?: AbortSignal
+  ): Promise<GitlabExportReview> {
+    return request<GitlabExportReview>("/gitlab/export/review", {
+      method: "POST",
+      signal,
+      body: JSON.stringify({ projectId, branch }),
+    });
+  },
+
   /**
    * Export scenes to GitLab
    */
@@ -497,6 +519,7 @@ export const gitlabApi = {
     projectId: string,
     branch?: string,
     commitMessage?: string,
+    reviewToken?: string,
     signal?: AbortSignal
   ): Promise<SyncOperation> {
     return request<SyncOperation>("/gitlab/export", {
@@ -506,6 +529,7 @@ export const gitlabApi = {
         projectId,
         branch,
         commitMessage,
+        reviewToken,
       }),
     });
   },

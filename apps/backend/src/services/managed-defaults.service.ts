@@ -29,6 +29,21 @@ export function collectManagedDefaults(
   return [...defaults.values()];
 }
 
+/** Pure row defaults used by both export projection and persistence. */
+export function managedVariableDefaultValues(item: DetectedDefaultStatement) {
+  return { key: item.key, authoredDefault: item.value === "True" };
+}
+
+export function managedStatDefaultValues(item: DetectedDefaultStatement) {
+  return {
+    key: item.key,
+    name: item.key,
+    minValue: Math.max(0, Math.min(Math.round(Number(item.value)), 100)),
+    maxValue: 100,
+    authoredDefault: item.value,
+  };
+}
+
 export async function promoteManagedDefaults(
   tx: Transaction,
   projectId: string,
@@ -78,8 +93,7 @@ export async function promoteManagedDefaults(
       .values(
         booleanDefaults.map((item) => ({
           projectId,
-          key: item.key,
-          authoredDefault: item.value === "True",
+          ...managedVariableDefaultValues(item),
         }))
       )
       .onConflictDoUpdate({
@@ -100,12 +114,7 @@ export async function promoteManagedDefaults(
       .values(
         numericDefaults.map((item) => ({
           projectId,
-          key: item.key,
-          name: item.key,
-          // Bounds remain integer metadata. Only the literal drives export.
-          minValue: Math.max(0, Math.min(Math.round(Number(item.value)), 100)),
-          maxValue: 100,
-          authoredDefault: item.value,
+          ...managedStatDefaultValues(item),
         }))
       )
       .onConflictDoUpdate({

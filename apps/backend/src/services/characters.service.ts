@@ -665,29 +665,32 @@ export class CharactersService {
 
     const db = getDb();
 
-    const [newCharacter] = await db
-      .insert(characters)
-      .values({
-        projectId,
-        name: input.name,
-        displayName: input.displayName,
-        nameType: input.nameType ?? inferNameTypeFromStoredName(input.name),
-        renpyTag: input.renpyTag,
-        color: input.color,
-        isLoveInterest: input.isLoveInterest,
-        isNarrator: input.isNarrator,
-        notes: input.notes,
-      })
-      .onConflictDoNothing({
-        target: [characters.projectId, characters.renpyTag],
-      })
-      .returning();
+    return db.transaction(async (tx) => {
+      await lockProject(tx, projectId);
+      const [newCharacter] = await tx
+        .insert(characters)
+        .values({
+          projectId,
+          name: input.name,
+          displayName: input.displayName,
+          nameType: input.nameType ?? inferNameTypeFromStoredName(input.name),
+          renpyTag: input.renpyTag,
+          color: input.color,
+          isLoveInterest: input.isLoveInterest,
+          isNarrator: input.isNarrator,
+          notes: input.notes,
+        })
+        .onConflictDoNothing({
+          target: [characters.projectId, characters.renpyTag],
+        })
+        .returning();
 
-    if (!newCharacter) {
-      throw new ConflictError("Character with this tag already exists");
-    }
+      if (!newCharacter) {
+        throw new ConflictError("Character with this tag already exists");
+      }
 
-    return toCharacterDetail(newCharacter);
+      return toCharacterDetail(newCharacter);
+    });
   }
 
   /** Update a character. */
@@ -696,47 +699,54 @@ export class CharactersService {
     userId: string,
     input: UpdateCharacterInput
   ): Promise<CharacterDetail> {
-    const current = await this.requireCharacterAccess(characterId, userId);
-
+    const target = await this.requireCharacterAccess(characterId, userId);
     const db = getDb();
+    return db.transaction(async (tx) => {
+      await lockProject(tx, target.projectId);
+      const [current] = await tx
+        .select()
+        .from(characters)
+        .where(eq(characters.id, characterId));
+      if (!current) throw new NotFoundError("Character");
 
-    const updateValues: Record<string, unknown> = {
-      ...input,
-      updatedAt: new Date(),
-    };
+      const updateValues: Record<string, unknown> = {
+        ...input,
+        updatedAt: new Date(),
+      };
 
-    if (input.nameType !== undefined) {
-      // Explicit nameType from input — already in updateValues via spread
-    } else if (input.name !== undefined) {
-      const inferred = inferNameTypeFromStoredName(input.name);
-      if (inferred !== "literal") {
-        updateValues.nameType = inferred;
-      } else if (
-        current.nameType === "interpolated" ||
-        current.nameType === "tagged" ||
-        current.nameType === "empty" ||
-        current.nameType === "none" ||
-        current.nameType === "unknown"
-      ) {
-        updateValues.nameType = "literal";
-      } else if (
-        current.nameType === "variable" &&
-        !isVariableSafeIdentifier(input.name)
-      ) {
-        // Bare identifiers stay variable; unsafe names must become literal.
-        updateValues.nameType = "literal";
-      } else {
-        delete updateValues.nameType;
+      if (input.nameType !== undefined) {
+        // Explicit nameType from input — already in updateValues via spread
+      } else if (input.name !== undefined) {
+        const inferred = inferNameTypeFromStoredName(input.name);
+        if (inferred !== "literal") {
+          updateValues.nameType = inferred;
+        } else if (
+          current.nameType === "interpolated" ||
+          current.nameType === "tagged" ||
+          current.nameType === "empty" ||
+          current.nameType === "none" ||
+          current.nameType === "unknown"
+        ) {
+          updateValues.nameType = "literal";
+        } else if (
+          current.nameType === "variable" &&
+          !isVariableSafeIdentifier(input.name)
+        ) {
+          // Bare identifiers stay variable; unsafe names must become literal.
+          updateValues.nameType = "literal";
+        } else {
+          delete updateValues.nameType;
+        }
       }
-    }
 
-    const [updated] = await db
-      .update(characters)
-      .set(updateValues)
-      .where(eq(characters.id, characterId))
-      .returning();
+      const [updated] = await tx
+        .update(characters)
+        .set(updateValues)
+        .where(eq(characters.id, characterId))
+        .returning();
 
-    return toCharacterDetail(updated);
+      return toCharacterDetail(updated);
+    });
   }
 
   /** Delete a character and its avatar file. */
@@ -745,7 +755,10 @@ export class CharactersService {
 
     const db = getDb();
 
-    await db.delete(characters).where(eq(characters.id, characterId));
+    await db.transaction(async (tx) => {
+      await lockProject(tx, character.projectId);
+      await tx.delete(characters).where(eq(characters.id, characterId));
+    });
 
     if (character.avatarUrl) {
       // Invalid/legacy stored values resolve to null: skip file deletion so

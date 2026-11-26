@@ -169,12 +169,15 @@ async function lockLocalBaselines(
   });
 }
 
+/** Admission effects share this transaction and roll back with failed guards. */
 export async function prepareExportAttempt(
-  attempt: NewAttempt
+  attempt: NewAttempt,
+  beforePrepare?: (tx: Transaction) => Promise<void>
 ): Promise<Attempt> {
   return getDb().transaction(async (tx) => {
     await lockProject(tx, attempt.projectId);
     await checkRepository(tx, attempt);
+    await beforePrepare?.(tx);
     await lockLocalBaselines(
       tx,
       attempt.projectId,
@@ -303,13 +306,22 @@ export function guardExportActions(
   const revisions = new Map(
     preimages.map(({ path, lastCommitId }) => [path, lastCommitId])
   );
+  const produced = new Set<string>();
   return actions.map((action) => {
     const source = action.previousPath ?? action.filePath;
-    const lastCommitId = action.lastCommitId ?? revisions.get(source);
+    const intermediate = produced.has(source);
+    const lastCommitId = intermediate
+      ? undefined
+      : (action.lastCommitId ?? revisions.get(source));
+    if (action.action !== "create" && !intermediate && !lastCommitId) {
+      throw new Error(
+        "GitLab did not provide the file revision required to protect this export. Refresh or recover before retrying."
+      );
+    }
     revisions.delete(source);
     revisions.delete(action.filePath);
-    // Later actions referring to a path created earlier in this batch have no
-    // independent preflight revision, including the second step of a case move.
+    produced.delete(source);
+    if (action.action !== "delete") produced.add(action.filePath);
     return action.action !== "create" && lastCommitId
       ? { ...action, lastCommitId }
       : action;
