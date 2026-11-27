@@ -1,7 +1,7 @@
 /** Known safe public messages that may be rendered verbatim. */
 const SAFE_EXPORT_MESSAGES: readonly string[] = [
   "An operator confirmed the GitLab push did not apply. Retry the export.",
-  "GitLab push verification is still in progress. Retry the same branch to continue the search.",
+  "GitLab push verification is still in progress. Select Recover previous export again to continue.",
   "BranchForge could not verify the previous GitLab push. Check the target branch and retry the same push, or contact your administrator.",
   "The previous GitLab push no longer matches this repository, branch, or pending file operations. Review the pending changes before retrying.",
   "Conflict: verify ownership of the generated file paths in GitLab and BranchForge before retrying.",

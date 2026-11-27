@@ -57,6 +57,12 @@ describe("formatGitLabSyncError", () => {
     expect(formatGitLabSyncError(message, "export")).toBe(message);
   });
 
+  it("preserves instructions for continuing export recovery", () => {
+    const message =
+      "GitLab push verification is still in progress. Select Recover previous export again to continue.";
+    expect(formatGitLabSyncError(message, "export")).toBe(message);
+  });
+
   it("explains when a pending export prevents import", () => {
     const message =
       "Retry the previous GitLab push before pulling changes into this project.";

@@ -255,6 +255,24 @@ function reduceExpectedPaths(snapshot: Snapshot): Snapshot["before"] {
   return [...hashes].map(([path, hash]) => ({ path, hash }));
 }
 
+function fullCommitId(commitId: string | null | undefined): string | undefined {
+  return commitId && /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/i.test(commitId)
+    ? commitId
+    : undefined;
+}
+
+export function exportFilePreimage(
+  path: string,
+  remote: { content: string | null; lastCommitId: string | null }
+): Snapshot["before"][number] {
+  const lastCommitId = fullCommitId(remote.lastCommitId);
+  return {
+    path,
+    hash: remote.content === null ? null : calculateContentHash(remote.content),
+    ...(lastCommitId ? { lastCommitId } : {}),
+  };
+}
+
 export async function captureExportPreimages(
   projectId: string,
   userId: string,
@@ -274,7 +292,7 @@ export async function captureExportPreimages(
   for (let index = 0; index < ordered.length; index += 5) {
     const batch = await Promise.allSettled(
       ordered.slice(index, index + 5).map(async (path) => {
-        const { content, lastCommitId } = await getFileContentWithMetadata(
+        const remote = await getFileContentWithMetadata(
           projectId,
           userId,
           path,
@@ -282,14 +300,7 @@ export async function captureExportPreimages(
           undefined,
           repository
         );
-        return {
-          path,
-          hash: content === null ? null : calculateContentHash(content),
-          // GitLab's per-file guard accepts a real Git commit revision.
-          ...(lastCommitId && /^[a-f0-9]{40}$/i.test(lastCommitId)
-            ? { lastCommitId }
-            : {}),
-        };
+        return exportFilePreimage(path, remote);
       })
     );
     for (const result of batch) {
@@ -313,7 +324,7 @@ export function guardExportActions(
     const intermediate = produced.has(source);
     const lastCommitId = intermediate
       ? undefined
-      : (action.lastCommitId ?? revisions.get(source));
+      : (fullCommitId(action.lastCommitId) ?? revisions.get(source));
     if (action.action !== "create" && !intermediate && !lastCommitId) {
       throw new Error(
         "GitLab did not provide the file revision required to protect this export. Refresh or recover before retrying."

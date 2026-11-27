@@ -29,7 +29,7 @@ export const GITLAB_EXPORT_BRANCH_CREATE_REJECTED =
 export const GITLAB_EXPORT_ATTEMPT_UNCERTAIN =
   "BranchForge could not verify the previous GitLab push. Check the target branch and retry the same push, or contact your administrator.";
 export const GITLAB_EXPORT_HISTORY_IN_PROGRESS =
-  "GitLab push verification is still in progress. Retry the same branch to continue the search.";
+  "GitLab push verification is still in progress. Select Recover previous export again to continue.";
 export const GITLAB_IMPORT_STALE_AFTER_EXPORT =
   "A GitLab push completed while pull data was loading. Retry the pull to fetch the latest files.";
 export const GITLAB_IMPORT_PENDING_EXPORT =

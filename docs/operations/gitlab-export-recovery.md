@@ -1,6 +1,6 @@
 # Recover an unresolved GitLab export
 
-Retry the push on its original repository and branch first. BranchForge verifies the saved batch using a commit receipt or a unique commit marker. On a long, stable branch history, a retry continues the search from the last verified point. A change to the branch head or receipt restarts the search.
+Open the GitLab export dialog and select **Recover previous export**. BranchForge verifies the saved batch using a commit receipt or a unique commit marker. If verification is still in progress, select **Recover previous export** again to continue from the last verified point. A change to the branch head or receipt restarts the search. If the attempt remains unresolved, inspect it using the steps below.
 
 ## Inspect the attempt
 

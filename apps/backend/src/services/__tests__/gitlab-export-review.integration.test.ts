@@ -1,6 +1,8 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { eq, sql } from "drizzle-orm";
 import { getDb } from "../../db/index.js";
+import type { Transaction } from "../../db/types.js";
 import {
   users,
   projects,
@@ -630,6 +632,40 @@ describe("exact GitLab export review", () => {
     ]);
   });
 
+  it("keeps the moved receipt and reports a relink during verification", async () => {
+    const review = await reviewGitlabExport(projectId, userId, "main");
+    vi.spyOn(integration, "getDecryptedToken").mockResolvedValue("test-token");
+    vi.spyOn(apiClient, "fetchWithTimeout").mockImplementationOnce(async () => {
+      await db
+        .update(gitlabRepositories)
+        .set({ gitlabProjectId: 43 })
+        .where(eq(gitlabRepositories.projectId, projectId));
+      vi.mocked(repository.getBranchCommitSha).mockRestore();
+      return Response.json(
+        { id: commit, parent_ids: ["d".repeat(40)] },
+        { status: 201 }
+      );
+    });
+
+    const result = await exportToGitlab(
+      projectId,
+      userId,
+      "main",
+      undefined,
+      review.reviewToken
+    );
+
+    expect(result).toMatchObject({
+      status: "FAILED",
+      errorMessage: expect.stringContaining(
+        "The previous GitLab push no longer matches this repository"
+      ),
+    });
+    expect((await snapshot()).attempts).toMatchObject([
+      { commitId: commit, gitlabProjectId: 42 },
+    ]);
+  });
+
   it("leaves maintenance, content, pending operations and history unchanged, then dispatches exactly the reviewed batch", async () => {
     const commitSpy = mockCommit();
     const before = await snapshot();
@@ -695,16 +731,25 @@ describe("exact GitLab export review", () => {
         lastPushedContentHash: "stale",
       })
       .where(eq(projectFiles.id, fileId));
+    const insideTransaction = new AsyncLocalStorage<boolean>();
+    const transaction = db.transaction.bind(db);
+    vi.spyOn(db, "transaction").mockImplementation(
+      <T>(
+        run: (tx: Transaction) => Promise<T>,
+        config?: Parameters<typeof db.transaction>[1]
+      ) =>
+        transaction((tx) => insideTransaction.run(true, () => run(tx)), config)
+    );
     const lookup = vi.mocked(repository.getBranchCommitSha);
     lookup.mockImplementation(async () => {
-      const result = await db.execute<{ held: boolean }>(sql`
-        select exists (
-          select 1 from pg_stat_activity
-          where datname = current_database() and state = 'idle in transaction'
-        ) as held
-      `);
-      expect(result.rows[0]?.held).toBe(false);
+      expect(insideTransaction.getStore()).toBeUndefined();
       return head;
+    });
+    const read = vi.mocked(repository.getFileContentWithMetadata);
+    const readRemote = read.getMockImplementation()!;
+    read.mockImplementation(async (...args) => {
+      expect(insideTransaction.getStore()).toBeUndefined();
+      return readRemote(...args);
     });
 
     const review = await reviewGitlabExport(projectId, userId, "main");
@@ -719,6 +764,7 @@ describe("exact GitLab export review", () => {
 
     expect(result).toMatchObject({ status: "COMPLETED", noChanges: true });
     expect(lookup).toHaveBeenCalledTimes(3);
+    expect(read).toHaveBeenCalled();
   });
 
   it("reviews and dispatches only the generated file for a variable-only change", async () => {
@@ -748,6 +794,25 @@ describe("exact GitLab export review", () => {
 
     expect(result.status).toBe("COMPLETED");
     expect(summaries(commitSpy.mock.calls[0][4])).toEqual(review.actions);
+  });
+
+  it("confirms a no-op with an unchanged SHA-256 generated file revision", async () => {
+    await db
+      .update(projectFiles)
+      .set({ content: original, contentHash: calculateContentHash(original) })
+      .where(eq(projectFiles.id, fileId));
+    const variable = { key: "has_key", authoredDefault: true };
+    await db.insert(variables).values({ projectId, ...variable });
+    remote.set("game/branchforge_variables.rpy", {
+      content: generateVariablesFile([variable]),
+      revision: "e".repeat(64),
+    });
+    const review = await reviewGitlabExport(projectId, userId, "main");
+    expect(review.actions).toEqual([]);
+
+    await expect(
+      exportToGitlab(projectId, userId, "main", undefined, review.reviewToken)
+    ).resolves.toMatchObject({ status: "COMPLETED", noChanges: true });
   });
 
   it.each(["generated content", "generated revision", "unrelated file"])(

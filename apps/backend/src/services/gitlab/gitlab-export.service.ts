@@ -90,6 +90,7 @@ import {
   captureExportPreimages,
   claimExportAttempt,
   discardExportAttempt,
+  exportFilePreimage,
   finalizeExportAttempt,
   getPendingExportAttempt,
   guardExportActions,
@@ -874,12 +875,7 @@ async function planGitlabExport(
     excludedTags,
     repository,
     (path, remote) => {
-      beforeByPath.set(path, {
-        path,
-        hash:
-          remote.content === null ? null : calculateContentHash(remote.content),
-        ...(remote.lastCommitId ? { lastCommitId: remote.lastCommitId } : {}),
-      });
+      beforeByPath.set(path, exportFilePreimage(path, remote));
     }
   );
 
@@ -1322,8 +1318,9 @@ BranchForge-Export-Attempt: ${randomUUID()}`,
           throw error;
         }
         if (
-          error instanceof Error &&
-          error.message === GITLAB_EXPORT_HISTORY_IN_PROGRESS
+          error instanceof GitLabRepositoryChangedError ||
+          (error instanceof Error &&
+            error.message === GITLAB_EXPORT_HISTORY_IN_PROGRESS)
         ) {
           throw error;
         }
