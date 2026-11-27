@@ -293,21 +293,16 @@ describe("GitLabSyncSyncForm", () => {
       </>
     );
 
-    await user.click(screen.getByRole("button", { name: "Export to main" }));
+    await user.click(screen.getByRole("button", { name: "Push changes" }));
     expect(onSync).toHaveBeenCalled();
   });
 
-  it("explains that a new branch is created from the default branch", () => {
+  it("shows the new branch input", () => {
     renderExportForm({
       createNewBranch: true,
       branch: "feature/labels",
       defaultBranch: "main",
     });
-    expect(
-      screen.getByText(
-        "Creates a branch from main and commits your changes to it."
-      )
-    ).toBeInTheDocument();
     expect(
       screen.getByPlaceholderText("feature/my-changes")
     ).toBeInTheDocument();
@@ -373,7 +368,7 @@ describe("GitLabSyncSyncForm", () => {
       screen.getByText("Branch name contains invalid characters")
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Create branch and export" })
+      screen.getByRole("button", { name: "Create branch and push" })
     ).toBeDisabled();
   });
 
@@ -392,9 +387,7 @@ describe("GitLabSyncSyncForm", () => {
       />
     );
 
-    expect(
-      screen.getByRole("button", { name: "Export to branch" })
-    ).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Push changes" })).toBeDisabled();
   });
 });
 

@@ -5,6 +5,10 @@
  * get/list operations, and conflict detection.
  */
 
+import {
+  recoverGitlabExport,
+  reviewGitlabExport,
+} from "../services/gitlab/gitlab-export.service.js";
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { authenticate } from "../middleware/auth.middleware.js";
 import {
@@ -31,6 +35,8 @@ import {
 } from "../services/gitlab/gitlab-error.helpers.js";
 import {
   exportToGitlabSchema,
+  reviewGitlabExportSchema,
+  type ReviewGitlabExportInput,
   importFromGitlabSchema,
   importProjectSchema,
   detectConflictsSchema,
@@ -61,14 +67,15 @@ async function exportHandler(
   reply: FastifyReply
 ): Promise<void> {
   const userId = getAuthenticatedUserId(request);
-  const { projectId, branch, commitMessage } = request.body;
+  const { projectId, branch, commitMessage, reviewToken } = request.body;
 
   try {
     const operation = await exportToGitlab(
       projectId,
       userId,
       branch,
-      commitMessage
+      commitMessage,
+      reviewToken
     );
     await reply.status(202).send(operation);
   } catch (err) {
@@ -83,6 +90,33 @@ async function exportHandler(
     await reply.status(500).send({
       error: "Failed to export to GitLab",
       message: "An internal error occurred",
+    });
+  }
+}
+
+async function reviewExportHandler(
+  request: FastifyRequest<{ Body: ReviewGitlabExportInput }>,
+  reply: FastifyReply
+): Promise<void> {
+  try {
+    await reply.send(
+      await reviewGitlabExport(
+        request.body.projectId,
+        getAuthenticatedUserId(request),
+        request.body.branch
+      )
+    );
+  } catch (err) {
+    if (handleKnownRouteErrors(err, reply)) {
+      await reply;
+      return;
+    }
+    // Review conflicts are safe to expose only through their sanitized user message.
+    const { toUserFacingExportError } =
+      await import("../services/gitlab/gitlab-error.helpers.js");
+    await reply.status(409).send({
+      error: "Export review unavailable",
+      message: toUserFacingExportError(err),
     });
   }
 }
@@ -316,6 +350,37 @@ export async function gitlabSyncRoutes(
   fastify: FastifyInstance
 ): Promise<void> {
   // Sync operations (require auth)
+  fastify.post<{ Body: ReviewGitlabExportInput }>("/gitlab/export/recover", {
+    onRequest: [authenticate],
+    preValidation: validateBody(reviewGitlabExportSchema),
+    handler: async (request, reply) => {
+      try {
+        const recovered = await recoverGitlabExport(
+          request.body.projectId,
+          getAuthenticatedUserId(request)
+        );
+        await reply.send({ recovered });
+      } catch (err) {
+        if (handleKnownRouteErrors(err, reply)) {
+          await reply;
+          return;
+        }
+        const { toUserFacingExportError } =
+          await import("../services/gitlab/gitlab-error.helpers.js");
+        await reply.status(409).send({
+          error: "Export recovery incomplete",
+          message: toUserFacingExportError(err),
+        });
+      }
+    },
+  });
+
+  fastify.post("/gitlab/export/review", {
+    onRequest: [authenticate],
+    preValidation: validateBody(reviewGitlabExportSchema),
+    handler: reviewExportHandler,
+  });
+
   fastify.post<{ Body: ExportToGitlabInput }>(
     "/gitlab/export",
     {

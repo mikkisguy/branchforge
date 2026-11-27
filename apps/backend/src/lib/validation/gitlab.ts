@@ -133,6 +133,7 @@ export type ImportProjectInput = z.infer<typeof importProjectSchema>;
 export const exportToGitlabSchema = z
   .object({
     projectId: uuidSchema,
+    reviewToken: z.string().regex(/^[a-f0-9]{64}$/),
     branch: gitBranchNameSchema.optional(),
     commitMessage: optionalString(
       GITLAB_COMMIT_MESSAGE_MAX_LENGTH,
@@ -211,3 +212,9 @@ export const operationIdParamsSchema = z
   .strict();
 
 export type OperationIdParams = z.infer<typeof operationIdParamsSchema>;
+
+export const reviewGitlabExportSchema = exportToGitlabSchema.omit({
+  reviewToken: true,
+  commitMessage: true,
+});
+export type ReviewGitlabExportInput = z.infer<typeof reviewGitlabExportSchema>;

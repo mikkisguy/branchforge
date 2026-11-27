@@ -6,10 +6,11 @@
  */
 
 import { useReducer, useCallback, useRef, useEffect, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Download, FilePenLine, RotateCcw, Trash2, Upload } from "lucide-react";
+import { GITLAB_EXPORT_RECOVERY_REQUIRED } from "@branchforge/shared";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Download, RotateCcw, Upload } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { Badge } from "@/components/ui/badge";
+import { useGitLabExportReview } from "@/hooks/useGitLabExportReview";
 import { useGitLabSync } from "@/hooks/useGitLabSync";
 import { useToast } from "@/contexts/ToastContext";
 import { useLabels } from "@/hooks/useLabels";
@@ -96,25 +97,65 @@ export function GitLabSyncDialog({
       dispatch({ type: "RESET_BRANCH_SELECTION" });
     }
   }, [projectId, defaultBranch]);
-  const branchesReady =
-    branchesQuery.isSuccess &&
-    !branchesQuery.isFetching &&
-    branchesQuery.data.length > 0;
+  const knownBranches = branchesQuery.isSuccess
+    ? branchesQuery.data
+    : undefined;
   const { branch, branchNameError, branchAlreadyExists } =
     resolveSyncBranchFields({
       operationType,
       createNewBranch: formState.createNewBranch,
       userBranch: formState.userBranch,
       defaultBranch,
-      knownBranches: branchesReady ? branchesQuery.data : undefined,
+      knownBranches,
     });
   const exportBranchInvalid = !canExportToBranch({
     branch,
     createNewBranch: formState.createNewBranch,
     branchNameError,
     branchAlreadyExists,
-    knownBranches: branchesReady ? branchesQuery.data : undefined,
+    knownBranches,
   });
+
+  const review = useGitLabExportReview(
+    projectId,
+    branch.trim(),
+    exportDialogOpen &&
+      !exportBranchInvalid &&
+      !state.isProcessing &&
+      !state.operation
+  );
+  const [reviewNotice, setReviewNotice] = useState<string | null>(null);
+  const recovery = useMutation({
+    mutationFn: () => gitlabApi.recoverGitlabExport(projectId),
+    onSuccess: ({ recovered }) => {
+      setReviewNotice(
+        recovered
+          ? "Previous export recovered. Review the current changes before confirming."
+          : "No previous export needs recovery. Review the current changes before confirming."
+      );
+      void review.refetch();
+    },
+  });
+  const branchModeMismatch =
+    review.isSuccess && review.data.branchExisted === formState.createNewBranch;
+  const selectedBranchMissing =
+    !formState.createNewBranch &&
+    !!branch &&
+    knownBranches !== undefined &&
+    !knownBranches.includes(branch);
+  const branchProblem = branchModeMismatch || selectedBranchMissing;
+  const reviewBusy = review.isFetching || branchesQuery.isFetching;
+  const reviewReady =
+    exportDialogOpen &&
+    !exportBranchInvalid &&
+    !branchProblem &&
+    !reviewBusy &&
+    review.isSuccess &&
+    review.data.targetBranch === branch.trim() &&
+    review.data.actions.length > 0 &&
+    !recovery.isPending &&
+    !pendingChanges.isReversing &&
+    !pendingChanges.isDiscarding;
 
   // Preselect the linked default branch in export existing-branch mode when
   // it is present in the freshly fetched list and the user has not made a
@@ -123,23 +164,22 @@ export function GitLabSyncDialog({
     if (
       operationType !== "export" ||
       !exportDialogOpen ||
-      !branchesReady ||
+      branchesQuery.isFetching ||
       formState.createNewBranch ||
       formState.userBranch !== null
     ) {
       return;
     }
-    const list = branchesQuery.data;
-    if (list && list.includes(defaultBranch)) {
+    if (knownBranches?.includes(defaultBranch)) {
       dispatch({ type: "SET_USER_BRANCH", value: defaultBranch });
     }
   }, [
     operationType,
     exportDialogOpen,
-    branchesReady,
+    branchesQuery.isFetching,
     formState.createNewBranch,
     formState.userBranch,
-    branchesQuery.data,
+    knownBranches,
     defaultBranch,
   ]);
 
@@ -169,7 +209,7 @@ export function GitLabSyncDialog({
       (operationType === "import" && pendingChanges.isLoading)
     )
       return;
-    if (operationType === "export" && exportBranchInvalid) return;
+    if (operationType === "export" && (!reviewReady || !review.data)) return;
     if (!branch.trim()) {
       error("Branch name is required");
       return;
@@ -188,7 +228,8 @@ export function GitLabSyncDialog({
         ? await exportToGitlab(
             projectId,
             branch.trim(),
-            formState.commitMessage.trim() || undefined
+            formState.commitMessage.trim() || undefined,
+            review.data!.reviewToken
           )
         : await importFromGitlab(projectId, branch.trim(), resolution);
 
@@ -196,6 +237,15 @@ export function GitLabSyncDialog({
     // Refresh the list for a server-side conflict that raced our preflight.
     if (!result) {
       if (operationType === "import") void pendingChanges.refetch();
+      else {
+        setReviewNotice(
+          "The push was not confirmed. Refresh the review and confirm again."
+        );
+        await queryClient.resetQueries({
+          queryKey: gitlabKeys.exportReview(projectId, branch.trim()),
+          exact: true,
+        });
+      }
       return;
     }
 
@@ -272,7 +322,8 @@ export function GitLabSyncDialog({
   }, [
     importBlocked,
     branch,
-    exportBranchInvalid,
+    reviewReady,
+    review.data,
     formState.commitMessage,
     formState.conflictResolution,
     operationType,
@@ -288,6 +339,7 @@ export function GitLabSyncDialog({
     queryClient,
     clearAutoCloseTimeout,
     pendingChanges,
+    setReviewNotice,
   ]);
 
   /**
@@ -302,8 +354,9 @@ export function GitLabSyncDialog({
     });
     dispatch({ type: "RESET_BRANCH_MODE" });
     reset();
+    setReviewNotice(null);
     onOpenChange(false);
-  }, [clearAutoCloseTimeout, reset, onOpenChange]);
+  }, [clearAutoCloseTimeout, reset, onOpenChange, setReviewNotice]);
 
   const handleDialogOpenChange = useCallback(
     (nextOpen: boolean) => {
@@ -403,33 +456,6 @@ export function GitLabSyncDialog({
                   )}
                 </>
               )}
-              {operationType === "export" && (
-                <PendingFileChangesSection
-                  changes={pendingChanges.changes}
-                  contentChanges={pendingChanges.contentChanges}
-                  contentChangedCount={pendingChanges.contentChangedCount}
-                  isLoading={pendingChanges.isLoading}
-                  error={pendingChanges.error}
-                  isReversing={pendingChanges.isReversing}
-                  onRetry={() => void pendingChanges.refetch()}
-                  onReverse={(change) => {
-                    const action =
-                      change.kind === "CREATED"
-                        ? pendingChanges.cancelCreation
-                        : change.kind === "RENAMED"
-                          ? pendingChanges.undoRename
-                          : pendingChanges.restoreFile;
-                    void action(change.fileId).catch((reason: unknown) => {
-                      error(
-                        reason instanceof Error
-                          ? reason.message
-                          : "Could not reverse the file change"
-                      );
-                    });
-                  }}
-                  onDiscardAll={() => setDiscardConfirmationOpen(true)}
-                />
-              )}
               <GitLabSyncSyncForm
                 branch={branch}
                 commitMessage={formState.commitMessage}
@@ -453,16 +479,151 @@ export function GitLabSyncDialog({
                   dispatch({ type: "SET_CREATE_NEW_BRANCH", value });
                 }}
                 branchNameError={branchNameError}
-                branchAlreadyExists={branchAlreadyExists}
+                branchAlreadyExists={branchAlreadyExists && !branchModeMismatch}
                 branches={branchesQuery.data}
-                branchesLoading={
-                  branchesQuery.isPending || branchesQuery.isFetching
-                }
+                branchesLoading={branchesQuery.isPending}
                 branchesError={
                   branchesQuery.isError ? branchesQuery.error : null
                 }
                 onBranchesRetry={() => void branchesQuery.refetch()}
               />
+              {operationType === "export" &&
+                (!exportBranchInvalid || branchProblem) && (
+                  <section
+                    className="space-y-2 border-t border-border/30 pt-4"
+                    aria-labelledby="gitlab-export-review-title"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <h3
+                        id="gitlab-export-review-title"
+                        className="text-sm font-medium"
+                      >
+                        Changes to push
+                      </h3>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        aria-disabled={reviewBusy}
+                        className="aria-disabled:opacity-50"
+                        onClick={() => {
+                          if (reviewBusy) return;
+                          setReviewNotice(null);
+                          if (branchProblem) void branchesQuery.refetch();
+                          if (!exportBranchInvalid) void review.refetch();
+                        }}
+                      >
+                        Refresh review
+                      </Button>
+                    </div>
+                    {reviewNotice && (
+                      <p role="alert" className="text-sm text-muted-foreground">
+                        {reviewNotice}
+                      </p>
+                    )}
+                    {branchProblem ? (
+                      <p role="alert" className="text-sm text-destructive">
+                        {formState.createNewBranch
+                          ? "This branch already exists. Choose it from the branch list or enter a different name."
+                          : "This branch no longer exists. Choose another branch or create a new one."}
+                      </p>
+                    ) : review.isFetching || review.isPending ? (
+                      <p
+                        role="status"
+                        className="text-sm text-muted-foreground"
+                      >
+                        Reviewing changes…
+                      </p>
+                    ) : review.isError ? (
+                      <div className="space-y-2">
+                        <p role="alert" className="text-sm text-destructive">
+                          {review.error.message}
+                        </p>
+                        {review.error.message ===
+                          GITLAB_EXPORT_RECOVERY_REQUIRED && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            disabled={recovery.isPending}
+                            onClick={() => recovery.mutate()}
+                          >
+                            {recovery.isPending
+                              ? "Recovering previous export…"
+                              : "Recover previous export"}
+                          </Button>
+                        )}
+                        {recovery.isError && (
+                          <p role="alert" className="text-sm text-destructive">
+                            {recovery.error.message}
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      review.data && (
+                        <>
+                          {!review.data.branchExisted &&
+                            review.data.baseBranch &&
+                            review.data.actions.length > 0 && (
+                              <p className="text-sm text-muted-foreground break-words">
+                                New branch starts from {review.data.baseBranch}.
+                              </p>
+                            )}
+                          {review.data.actions.length === 0 ? (
+                            <p
+                              role="status"
+                              className="text-sm text-muted-foreground"
+                            >
+                              No changes to push.
+                            </p>
+                          ) : (
+                            <ul
+                              className="divide-y divide-border/30 text-sm"
+                              aria-label="Files in export"
+                            >
+                              {review.data.actions.map((action, index) => (
+                                <li
+                                  key={`${index}:${action.filePath}`}
+                                  className="break-words py-2"
+                                >
+                                  {action.action === "move"
+                                    ? `Move: ${action.previousPath} → ${action.filePath}`
+                                    : `${action.action[0].toUpperCase()}${action.action.slice(1)}: ${action.filePath}`}
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </>
+                      )
+                    )}
+                  </section>
+                )}
+              {operationType === "export" && (
+                <UndoFileChanges
+                  changes={structuralChanges}
+                  error={pendingChanges.error}
+                  isPending={
+                    pendingChanges.isReversing || pendingChanges.isDiscarding
+                  }
+                  onRetry={() => void pendingChanges.refetch()}
+                  onReverse={(change) => {
+                    const action =
+                      change.kind === "CREATED"
+                        ? pendingChanges.cancelCreation
+                        : change.kind === "RENAMED"
+                          ? pendingChanges.undoRename
+                          : pendingChanges.restoreFile;
+                    void action(change.fileId).catch((reason: unknown) => {
+                      error(
+                        reason instanceof Error
+                          ? reason.message
+                          : "Could not reverse the file change"
+                      );
+                    });
+                  }}
+                  onDiscardAll={() => setDiscardConfirmationOpen(true)}
+                />
+              )}
             </>
           )}
         </div>
@@ -474,8 +635,9 @@ export function GitLabSyncDialog({
           branch={branch}
           branchInvalid={operationType === "export" && exportBranchInvalid}
           syncBlocked={
-            operationType === "import" &&
-            (importBlocked || pendingChanges.isLoading)
+            operationType === "export"
+              ? !reviewReady
+              : importBlocked || pendingChanges.isLoading
           }
           createNewBranch={formState.createNewBranch}
           operationType={operationType}
@@ -556,135 +718,83 @@ function syncOperationPresentation(operationType: SyncOperationType): {
   return { label: "Import from GitLab", Icon: Download };
 }
 
-function PendingFileChangesSection({
+function UndoFileChanges({
   changes,
-  contentChanges,
-  contentChangedCount,
-  isLoading,
   error,
-  isReversing,
+  isPending,
   onRetry,
   onReverse,
   onDiscardAll,
 }: {
   changes: import("@/lib/api/gitlab").PendingFileChange[];
-  contentChanges: Array<{ fileId: string; filePath: string }>;
-  contentChangedCount: number;
-  isLoading: boolean;
   error: Error | null;
-  isReversing: boolean;
+  isPending: boolean;
   onRetry: () => void;
   onReverse: (change: import("@/lib/api/gitlab").PendingFileChange) => void;
   onDiscardAll: () => void;
 }) {
-  if (isLoading)
+  if (error) {
     return (
-      <p className="text-sm text-muted-foreground">
-        Loading pending file changes…
-      </p>
-    );
-  if (error)
-    return (
-      <div className="rounded-md border border-destructive/40 p-3 text-sm text-destructive">
-        Could not load pending file changes.{" "}
-        <Button variant="link" className="h-auto p-0" onClick={onRetry}>
+      <p role="alert" className="text-sm text-destructive">
+        Could not load changes available for undo.{" "}
+        <Button
+          type="button"
+          variant="link"
+          className="h-auto p-0"
+          onClick={onRetry}
+        >
           Retry
         </Button>
-      </div>
+      </p>
     );
-  if (changes.length === 0 && contentChanges.length === 0) return null;
+  }
+  if (!changes.length) return null;
 
   return (
-    <section
-      className="space-y-2.5 rounded-md border border-border/30 p-3"
-      aria-label="Pending file changes"
-    >
-      <div className="flex items-center justify-between gap-3 border-b border-border/40 pb-2.5">
-        <h3 className="text-sm font-medium">Pending file changes</h3>
-        {changes.length > 0 && (
-          <Button
-            type="button"
-            variant="destructive-ghost"
-            size="sm"
-            onClick={onDiscardAll}
-          >
-            <Trash2 aria-hidden="true" />
-            Discard all
-          </Button>
-        )}
-      </div>
-      {changes.length > 0 && (
-        <div className="space-y-1.5">
-          <p className="text-xs font-medium text-muted-foreground">
-            File structure
-          </p>
-          <ul className="divide-y divide-border/30 text-sm">
-            {changes.map((change) => {
-              const actionLabel =
-                change.kind === "CREATED"
-                  ? "Cancel creation"
-                  : change.kind === "RENAMED"
-                    ? "Undo rename"
-                    : "Restore file";
-              const description =
-                change.kind === "CREATED"
-                  ? `Created: ${change.filePath}`
-                  : change.kind === "RENAMED"
-                    ? `${change.previousFilePath} → ${change.filePath}`
-                    : `Deleted: ${change.filePath}`;
-              return (
-                <li
-                  key={change.fileId}
-                  className="flex items-start justify-between gap-3 py-2"
-                >
-                  <span className="min-w-0 flex-1 break-words leading-5">
-                    {description}
-                  </span>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="shrink-0 border-border/70 bg-muted/50 hover:bg-muted"
-                    disabled={isReversing}
-                    onClick={() => onReverse(change)}
-                  >
-                    <RotateCcw aria-hidden="true" />
-                    {actionLabel}
-                  </Button>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      )}
-      {contentChangedCount > 0 && (
-        <div className="space-y-1.5">
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-xs font-medium text-muted-foreground">
-              Content updates
-            </p>
-            <Badge variant="secondary" className="shrink-0 text-[11px]">
-              {contentChangedCount}
-            </Badge>
-          </div>
-          <ul
-            className="space-y-1.5 text-sm"
-            aria-label="Files with content changes"
-          >
-            {contentChanges.map((change) => (
-              <li
-                key={change.fileId}
-                className="flex items-center gap-2 text-muted-foreground"
+    <details className="border-t border-border/30 pt-3 text-sm">
+      <summary className="cursor-pointer rounded-sm py-1 text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring">
+        Undo file changes
+      </summary>
+      <ul className="mt-1 divide-y divide-border/30">
+        {changes.map((change) => {
+          const actionLabel =
+            change.kind === "CREATED"
+              ? "Cancel creation"
+              : change.kind === "RENAMED"
+                ? "Undo rename"
+                : "Restore file";
+          return (
+            <li
+              key={change.fileId}
+              className="flex flex-wrap items-start justify-between gap-2 py-2"
+            >
+              <span className="min-w-0 flex-1 break-words leading-5">
+                {change.kind === "RENAMED" && `${change.previousFilePath} → `}
+                {change.filePath}
+              </span>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={isPending}
+                onClick={() => onReverse(change)}
               >
-                <FilePenLine className="size-3.5 shrink-0" aria-hidden="true" />
-                <span className="min-w-0 break-words leading-5">
-                  {change.filePath}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-    </section>
+                <RotateCcw aria-hidden="true" />
+                {actionLabel}
+              </Button>
+            </li>
+          );
+        })}
+      </ul>
+      <Button
+        type="button"
+        variant="destructive-ghost"
+        size="sm"
+        disabled={isPending}
+        onClick={onDiscardAll}
+      >
+        Discard all
+      </Button>
+    </details>
   );
 }

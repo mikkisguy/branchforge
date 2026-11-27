@@ -37,7 +37,11 @@ export async function buildGeneratedActions(
   activeFiles: SourceFile[],
   occupiedPaths: ReadonlySet<string>,
   excludedTags: ReadonlySet<string>,
-  repository: GitlabRepositoryIdentity
+  repository: GitlabRepositoryIdentity,
+  recordRemote?: (
+    path: string,
+    remote: Awaited<ReturnType<typeof getFileContentWithMetadata>>
+  ) => void
 ): Promise<BatchCommitAction[]> {
   const sourceOwnedKeys = collectSourceOwnedRpySymbolKeys(
     activeFiles,
@@ -111,6 +115,7 @@ export async function buildGeneratedActions(
         repository
       );
 
+      recordRemote?.(filePath, remote);
       if (remote.content === null && !hasRows) return null;
       if (remote.content === content) return null;
       if (

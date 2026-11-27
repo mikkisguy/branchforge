@@ -58,7 +58,7 @@ export function GitLabSyncDialogFooter({
             disabled={!branch.trim() || branchInvalid || syncBlocked}
             className="max-[380px]:w-full"
           >
-            {submitLabel({ operationType, createNewBranch, branch })}
+            {submitLabel({ operationType, createNewBranch })}
           </Button>
         </>
       )}
@@ -85,17 +85,15 @@ export function GitLabSyncDialogFooter({
 function submitLabel({
   operationType,
   createNewBranch,
-  branch,
 }: {
   operationType: "export" | "import";
   createNewBranch: boolean;
-  branch: string;
 }): string {
   if (operationType === "import") {
     return "Import";
   }
   if (createNewBranch) {
-    return "Create branch and export";
+    return "Create branch and push";
   }
-  return `Export to ${branch || "branch"}`;
+  return "Push changes";
 }

@@ -98,7 +98,6 @@ export function GitLabSyncSyncForm({
   const branchHelp = branchHelpText({
     operationType,
     createNewBranch,
-    defaultBranch,
     branchNameError,
     branchAlreadyExists,
   });
@@ -162,7 +161,7 @@ export function GitLabSyncSyncForm({
               aria-invalid={
                 branchNameError || branchAlreadyExists ? true : undefined
               }
-              aria-describedby="sync-branch-help"
+              aria-describedby={branchHelp ? "sync-branch-help" : undefined}
             />
           ) : (
             <BranchSelect
@@ -349,13 +348,11 @@ function BranchSelect({
 function branchHelpText({
   operationType,
   createNewBranch,
-  defaultBranch,
   branchNameError,
   branchAlreadyExists,
 }: {
   operationType: "export" | "import";
   createNewBranch: boolean;
-  defaultBranch: string;
   branchNameError: string | null;
   branchAlreadyExists: boolean;
 }): string | null {
@@ -367,7 +364,6 @@ function branchHelpText({
     if (branchAlreadyExists) {
       return "A branch with this name already exists. Choose an existing branch to export to it.";
     }
-    return `Creates a branch from ${defaultBranch} and commits your changes to it.`;
   }
   return null;
 }

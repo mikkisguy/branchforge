@@ -40,10 +40,13 @@ export interface UseGitLabPendingChangesReturn {
  * Refetches every cache affected by a pending-change reversal or push.
  * Exported so the sync dialog can refresh after a push as well.
  */
-export function refetchAfterPendingChangeSync(
+export async function refetchAfterPendingChangeSync(
   queryClient: ReturnType<typeof useQueryClient>,
   projectId: string
-): void {
+): Promise<void> {
+  const exportReviews = { queryKey: gitlabKeys.exportReviews(projectId) };
+  await queryClient.cancelQueries(exportReviews);
+  void queryClient.invalidateQueries(exportReviews);
   void queryClient.invalidateQueries({
     queryKey: gitlabKeys.pendingChanges(projectId),
   });
@@ -76,9 +79,8 @@ export function useGitLabPendingChanges(
   });
 
   const refreshCaches = useCallback(
-    (operationProjectId: string) => {
-      refetchAfterPendingChangeSync(queryClient, operationProjectId);
-    },
+    (operationProjectId: string) =>
+      refetchAfterPendingChangeSync(queryClient, operationProjectId),
     [queryClient]
   );
 
@@ -93,9 +95,8 @@ export function useGitLabPendingChanges(
     }) => {
       await gitlabApi.reversePendingOperation(operationProjectId, fileId);
     },
-    onSuccess: (_result, variables) => {
-      refreshCaches(variables.operationProjectId);
-    },
+    onSuccess: (_result, variables) =>
+      refreshCaches(variables.operationProjectId),
   });
 
   // react-doctor-disable-next-line react-doctor/query-mutation-missing-invalidation -- onSuccess calls refreshCaches for every affected query family
@@ -103,9 +104,8 @@ export function useGitLabPendingChanges(
     mutationFn: async (operationProjectId: string) => {
       await gitlabApi.discardAllPendingChanges(operationProjectId);
     },
-    onSuccess: (_result, operationProjectId) => {
-      refreshCaches(operationProjectId);
-    },
+    onSuccess: (_result, operationProjectId) =>
+      refreshCaches(operationProjectId),
   });
 
   const changes = query.data?.changes ?? [];

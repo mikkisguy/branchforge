@@ -7,7 +7,10 @@ import {
   waitFor,
 } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { DetectCharactersResponse } from "@branchforge/shared";
+import type {
+  GitlabExportReview,
+  DetectCharactersResponse,
+} from "@branchforge/shared";
 import { charactersApi } from "@/lib/api/characters";
 import type { SyncOperation } from "@/lib/api/gitlab";
 import { gitlabApi } from "@/lib/api/gitlab";
@@ -18,10 +21,14 @@ const {
   mockImport,
   mockExport,
   mockPending,
+  useRealPending,
   mockSyncState,
+  useRealSync,
   errorToast,
   successToast,
 } = vi.hoisted(() => ({
+  useRealSync: { current: false },
+  useRealPending: { current: false },
   mockImport: vi.fn(),
   mockExport: vi.fn(),
   successToast: vi.fn(),
@@ -39,18 +46,36 @@ vi.mock("@/lib/api/characters", () => ({
   charactersApi: { detectCharacters: vi.fn(), importCharacters: vi.fn() },
 }));
 
-vi.mock("@/hooks/useGitLabSync", () => ({
-  useGitLabSync: () => ({
+vi.mock("@/hooks/useGitLabSync", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/hooks/useGitLabSync")>();
+  const useMockSync = () => ({
     state: mockSyncState,
     exportToGitlab: mockExport,
     importFromGitlab: mockImport,
     reset: vi.fn(),
-  }),
-}));
+  });
+  return {
+    useGitLabSync: () => {
+      const useSync = useRealSync.current ? actual.useGitLabSync : useMockSync;
+      return useSync();
+    },
+  };
+});
 
-vi.mock("@/hooks/useGitLabPendingChanges", () => ({
-  useGitLabPendingChanges: mockPending,
-}));
+vi.mock("@/hooks/useGitLabPendingChanges", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("@/hooks/useGitLabPendingChanges")>();
+  return {
+    useGitLabPendingChanges: (
+      ...args: Parameters<typeof actual.useGitLabPendingChanges>
+    ) => {
+      const usePending = useRealPending.current
+        ? actual.useGitLabPendingChanges
+        : mockPending;
+      return usePending(...args);
+    },
+  };
+});
 
 function pendingState() {
   return {
@@ -65,7 +90,33 @@ function pendingState() {
   };
 }
 
+function reviewFor(
+  branch = "main",
+  actions: GitlabExportReview["actions"] = [
+    { action: "update", filePath: "game/script.rpy" },
+  ]
+): GitlabExportReview {
+  return {
+    projectId: "project-1",
+    repository: {
+      repositoryLinkId: "link",
+      gitlabProjectId: 42,
+      gitlabOrigin: "https://gitlab.com",
+    },
+    targetBranch: branch,
+    branchExisted: true,
+    baseBranch: null,
+    actions,
+    reviewToken: "a".repeat(64),
+  };
+}
+
 beforeEach(() => {
+  useRealSync.current = false;
+  useRealPending.current = false;
+  vi.spyOn(gitlabApi, "reviewGitlabExport")
+    .mockReset()
+    .mockImplementation(async (_projectId, branch) => reviewFor(branch));
   mockPending.mockReturnValue(pendingState());
   mockSyncState.operation = null;
   mockSyncState.error = null;
@@ -121,7 +172,7 @@ describe("GitLabSyncDialog", () => {
       try {
         const view = render(dialog);
         const button = await screen.findByRole("button", {
-          name: "Export to main",
+          name: "Push changes",
         });
         await waitFor(() => expect(button).toBeEnabled());
         vi.useFakeTimers();
@@ -200,7 +251,7 @@ describe("GitLabSyncDialog", () => {
       );
 
       expect(
-        screen.getByRole("button", { name: "Export to branch" })
+        screen.getByRole("button", { name: "Push changes" })
       ).toBeDisabled();
 
       resolveBranches(["main", "develop"]);
@@ -210,7 +261,7 @@ describe("GitLabSyncDialog", () => {
           screen.getByRole("combobox", { name: "Branch" })
         ).toHaveTextContent("develop");
         expect(
-          screen.getByRole("button", { name: "Export to develop" })
+          screen.getByRole("button", { name: "Push changes" })
         ).toBeEnabled();
       });
       expect(getBranches).toHaveBeenCalledWith("project-1");
@@ -269,7 +320,7 @@ describe("GitLabSyncDialog", () => {
           screen.getByRole("combobox", { name: "Branch" })
         ).toHaveTextContent("feature");
         expect(
-          screen.getByRole("button", { name: "Export to feature" })
+          screen.getByRole("button", { name: "Push changes" })
         ).toBeEnabled();
       });
       expect(getBranches).toHaveBeenCalledWith("project-2");
@@ -459,5 +510,340 @@ describe("GitLab pull structural-change preflight", () => {
     await waitFor(() => expect(pending.refetch).toHaveBeenCalled());
     expect(screen.getByText(message)).toBeInTheDocument();
     expect(errorToast).not.toHaveBeenCalled();
+  });
+});
+
+describe("exact export review", () => {
+  function renderReview() {
+    vi.spyOn(gitlabApi, "getBranches").mockResolvedValue(["main", "other"]);
+    const queryClient = createTestQueryClient();
+    const element = (open = true) => (
+      <QueryClientProvider client={queryClient}>
+        <GitLabSyncDialog
+          open={open}
+          onOpenChange={vi.fn()}
+          operationType="export"
+          projectId="project-1"
+        />
+      </QueryClientProvider>
+    );
+    return { ...render(element()), element };
+  }
+
+  it("shows content updates once and keeps the destination in the branch selector", async () => {
+    mockPending.mockReturnValue({
+      ...pendingState(),
+      contentChanges: [{ fileId: "file-1", filePath: "game/script.rpy" }],
+      contentChangedCount: 1,
+    });
+    renderReview();
+
+    expect(await screen.findAllByText(/game\/script\.rpy/)).toHaveLength(1);
+    expect(screen.getAllByText(/\bmain\b/)).toHaveLength(1);
+    expect(screen.getByRole("combobox", { name: "Branch" })).toHaveTextContent(
+      "main"
+    );
+    expect(screen.queryByText("Undo file changes")).not.toBeInTheDocument();
+  });
+
+  it("shows the reviewed base for a new branch", async () => {
+    vi.mocked(gitlabApi.reviewGitlabExport).mockImplementation(
+      async (_projectId, branch) =>
+        branch === "feature/export"
+          ? {
+              ...reviewFor(branch),
+              branchExisted: false,
+              baseBranch: "release",
+            }
+          : reviewFor(branch)
+    );
+    renderReview();
+
+    await screen.findByRole("combobox", { name: "Branch" });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Create a new branch" })
+    );
+    fireEvent.change(screen.getByRole("textbox", { name: "New branch name" }), {
+      target: { value: "feature/export" },
+    });
+
+    expect(
+      await screen.findByText("New branch starts from release.")
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Create branch and push" })
+    ).toBeEnabled();
+  });
+
+  it("keeps the missing branch warning visible through a branch refresh", async () => {
+    vi.mocked(gitlabApi.reviewGitlabExport).mockResolvedValue({
+      ...reviewFor(),
+      branchExisted: false,
+      baseBranch: "release",
+    });
+    renderReview();
+    const warning = await screen.findByRole("alert");
+    expect(warning).toHaveTextContent("This branch no longer exists.");
+    expect(screen.getByRole("button", { name: "Push changes" })).toBeDisabled();
+
+    let resolveBranches!: (branches: string[]) => void;
+    vi.mocked(gitlabApi.getBranches).mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveBranches = resolve;
+      })
+    );
+    const refresh = screen.getByRole("button", { name: "Refresh review" });
+    refresh.focus();
+    fireEvent.click(refresh);
+    await waitFor(() =>
+      expect(refresh).toHaveAttribute("aria-disabled", "true")
+    );
+    expect(refresh).toHaveFocus();
+    expect(warning).toBeVisible();
+    expect(screen.getByRole("combobox", { name: "Branch" })).toHaveTextContent(
+      "main"
+    );
+
+    await act(async () => resolveBranches(["other"]));
+    expect(warning).toBeVisible();
+    expect(refresh).toHaveFocus();
+    expect(screen.getByRole("button", { name: "Push changes" })).toBeDisabled();
+  });
+
+  it("announces undo load failures and offers a retry", async () => {
+    const pending = pendingState();
+    mockPending.mockReturnValue({
+      ...pending,
+      error: new Error("Request failed"),
+    });
+    renderReview();
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Could not load changes available for undo."
+    );
+    expect(screen.queryByText("Undo file changes")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(pending.refetch).toHaveBeenCalledOnce();
+  });
+
+  it("keeps undo collapsed and requires an updated review after undo", async () => {
+    useRealPending.current = true;
+    vi.spyOn(gitlabApi, "getPendingChanges").mockResolvedValue({
+      changes: [
+        {
+          fileId: "file-1",
+          filePath: "game/script.rpy",
+          previousFilePath: null,
+          kind: "CREATED",
+          contentChanged: false,
+        },
+      ],
+      contentChanges: [],
+      contentChangedCount: 0,
+    });
+    const reverse = vi
+      .spyOn(gitlabApi, "reversePendingOperation")
+      .mockResolvedValue({
+        success: true,
+        reversed: true,
+        operation: null,
+      });
+    vi.mocked(gitlabApi.reviewGitlabExport)
+      .mockResolvedValueOnce(
+        reviewFor("main", [{ action: "create", filePath: "game/script.rpy" }])
+      )
+      .mockResolvedValueOnce(reviewFor("main", []));
+    renderReview();
+
+    expect(
+      await screen.findByText("Create: game/script.rpy")
+    ).toBeInTheDocument();
+    const undo = await screen.findByText("Undo file changes");
+    const disclosure = undo.closest("details");
+    expect(disclosure).not.toHaveAttribute("open");
+    fireEvent.click(undo);
+    expect(disclosure).toHaveAttribute("open");
+    fireEvent.click(screen.getByRole("button", { name: "Cancel creation" }));
+
+    expect(await screen.findByText("No changes to push.")).toBeInTheDocument();
+    expect(reverse).toHaveBeenCalledWith("project-1", "file-1");
+    expect(screen.getByRole("button", { name: "Push changes" })).toBeDisabled();
+  });
+
+  it("shows generated and moved paths and sends the reviewed token on explicit confirmation", async () => {
+    vi.mocked(gitlabApi.reviewGitlabExport).mockResolvedValue(
+      reviewFor("main", [
+        { action: "create", filePath: "game/branchforge_variables.rpy" },
+        {
+          action: "move",
+          previousPath: "game/old.rpy",
+          filePath: "game/new.rpy",
+        },
+      ])
+    );
+    renderReview();
+    expect(
+      await screen.findByText("Create: game/branchforge_variables.rpy")
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Move: game/old.rpy → game/new.rpy")
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Push changes" }));
+    await waitFor(() =>
+      expect(mockExport).toHaveBeenCalledWith(
+        "project-1",
+        "main",
+        "Sync export from BranchForge",
+        "a".repeat(64)
+      )
+    );
+  });
+
+  it("disables confirmation for an empty review", async () => {
+    vi.mocked(gitlabApi.reviewGitlabExport).mockResolvedValue(
+      reviewFor("main", [])
+    );
+    renderReview();
+    expect(await screen.findByText("No changes to push.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Push changes" })).toBeDisabled();
+  });
+
+  it("refreshes after a stale response and waits for a new explicit confirmation", async () => {
+    mockExport.mockResolvedValue(null);
+    renderReview();
+    const button = await screen.findByRole("button", {
+      name: "Push changes",
+    });
+    await waitFor(() => expect(button).toBeEnabled());
+    fireEvent.click(button);
+    expect(
+      await screen.findByText(
+        "The push was not confirmed. Refresh the review and confirm again."
+      )
+    ).toBeInTheDocument();
+    await waitFor(() =>
+      expect(gitlabApi.reviewGitlabExport).toHaveBeenCalledTimes(2)
+    );
+    expect(mockExport).toHaveBeenCalledOnce();
+    await waitFor(() => expect(button).toBeEnabled());
+    fireEvent.click(button);
+    await waitFor(() => expect(mockExport).toHaveBeenCalledTimes(2));
+  });
+
+  it("keeps the real sync hook's confirmation error visible after refreshing", async () => {
+    useRealSync.current = true;
+    const failure = "The GitLab token no longer has push permission.";
+    const submit = vi
+      .spyOn(gitlabApi, "exportToGitlab")
+      .mockRejectedValueOnce(new Error(failure));
+    renderReview();
+
+    const button = await screen.findByRole("button", {
+      name: "Push changes",
+    });
+    await waitFor(() => expect(button).toBeEnabled());
+    fireEvent.click(button);
+
+    expect(await screen.findByText(failure)).toBeInTheDocument();
+    await waitFor(() =>
+      expect(gitlabApi.reviewGitlabExport).toHaveBeenCalledTimes(2)
+    );
+    expect(screen.getByText(failure)).toBeInTheDocument();
+    expect(submit).toHaveBeenCalledOnce();
+  });
+
+  it("exposes explicit recovery after a reopened dialog cannot review a pending export", async () => {
+    vi.mocked(gitlabApi.reviewGitlabExport).mockRejectedValueOnce(
+      new Error(
+        "Recover the previous GitLab export before reviewing another push."
+      )
+    );
+    const recover = vi
+      .spyOn(gitlabApi, "recoverGitlabExport")
+      .mockResolvedValue({ recovered: true });
+    renderReview();
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Recover previous export" })
+    );
+    await waitFor(() => expect(recover).toHaveBeenCalledWith("project-1"));
+    expect(
+      await screen.findByText("Update: game/script.rpy")
+    ).toBeInTheDocument();
+    expect(mockExport).not.toHaveBeenCalled();
+  });
+
+  it("offers refresh without recovery for an unrelated review error", async () => {
+    vi.mocked(gitlabApi.reviewGitlabExport).mockRejectedValueOnce(
+      new Error("GitLab is unreachable")
+    );
+    renderReview();
+    expect(
+      await screen.findByText("GitLab is unreachable")
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Recover previous export" })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Refresh review" })
+    ).toBeEnabled();
+  });
+
+  it("does not announce a recovered export when another request already recovered it", async () => {
+    vi.mocked(gitlabApi.reviewGitlabExport).mockRejectedValueOnce(
+      new Error(
+        "Recover the previous GitLab export before reviewing another push."
+      )
+    );
+    vi.spyOn(gitlabApi, "recoverGitlabExport").mockResolvedValue({
+      recovered: false,
+    });
+    renderReview();
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Recover previous export" })
+    );
+    expect(
+      await screen.findByText(
+        "No previous export needs recovery. Review the current changes before confirming."
+      )
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(
+        "Previous export recovered. Review the current changes before confirming."
+      )
+    ).not.toBeInTheDocument();
+  });
+
+  it("ignores an old response when the branch changes", async () => {
+    let resolveOld!: (review: GitlabExportReview) => void;
+    vi.mocked(gitlabApi.reviewGitlabExport).mockImplementation(
+      (_project, branch) =>
+        branch === "main"
+          ? new Promise((resolve) => {
+              resolveOld = resolve;
+            })
+          : Promise.resolve(
+              reviewFor(branch, [
+                { action: "delete", filePath: "game/other.rpy" },
+              ])
+            )
+    );
+    renderReview();
+    await waitFor(() =>
+      expect(gitlabApi.reviewGitlabExport).toHaveBeenCalled()
+    );
+    fireEvent.click(await screen.findByLabelText("Branch"));
+    fireEvent.click(await screen.findByRole("option", { name: "other" }));
+    expect(
+      await screen.findByText("Delete: game/other.rpy")
+    ).toBeInTheDocument();
+    await act(async () =>
+      resolveOld(
+        reviewFor("main", [{ action: "create", filePath: "game/stale.rpy" }])
+      )
+    );
+    expect(
+      screen.queryByText("Create: game/stale.rpy")
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Push changes" })).toBeEnabled();
   });
 });

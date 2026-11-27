@@ -21,7 +21,7 @@ import {
   getGitlabIntegration,
 } from "./gitlab-integration.service.js";
 import { fetchWithTimeout } from "./gitlab-api.client.js";
-import { GITLAB_EXPORT_ATTEMPT_CHANGED } from "./gitlab-error.helpers.js";
+import { GitLabRepositoryChangedError } from "./gitlab-error.helpers.js";
 import type {
   GitlabBranch,
   GitlabFile,
@@ -298,7 +298,7 @@ export function assertGitlabRepositoryIdentity(
     expected.gitlabProjectId !== actual.gitlabProjectId ||
     expected.gitlabOrigin !== actual.gitlabOrigin
   ) {
-    throw new Error(GITLAB_EXPORT_ATTEMPT_CHANGED);
+    throw new GitLabRepositoryChangedError();
   }
 }
 

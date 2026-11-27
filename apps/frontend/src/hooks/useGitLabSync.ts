@@ -114,7 +114,8 @@ interface UseGitLabSyncReturn {
   exportToGitlab: (
     projectId: string,
     branch?: string,
-    commitMessage?: string
+    commitMessage?: string,
+    reviewToken?: string
   ) => Promise<SyncOperation | null>;
 
   // Import
@@ -350,13 +351,20 @@ export function useGitLabSync(): UseGitLabSyncReturn {
       projectId,
       branch,
       commitMessage,
+      reviewToken,
     }: {
       projectId: string;
       branch?: string;
       commitMessage?: string;
+      reviewToken?: string;
     }) => {
       activeProjectIdRef.current = projectId;
-      return gitlabApi.exportToGitlab(projectId, branch, commitMessage);
+      return gitlabApi.exportToGitlab(
+        projectId,
+        branch,
+        commitMessage,
+        reviewToken
+      );
     },
     onMutate: () => {
       reset();
@@ -474,13 +482,15 @@ export function useGitLabSync(): UseGitLabSyncReturn {
   const exportToGitlab = async (
     projectId: string,
     branch?: string,
-    commitMessage?: string
+    commitMessage?: string,
+    reviewToken?: string
   ): Promise<SyncOperation | null> => {
     try {
       const result = await exportMutation.mutateAsync({
         projectId,
         branch,
         commitMessage,
+        reviewToken,
       });
 
       if (isTerminalStatus(result.status)) {

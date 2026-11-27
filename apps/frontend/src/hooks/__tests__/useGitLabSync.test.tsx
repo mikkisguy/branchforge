@@ -143,7 +143,8 @@ describe("useGitLabSync", () => {
       const exportPromise = result.current.exportToGitlab(
         "project-1",
         "main",
-        "Test commit"
+        "Test commit",
+        undefined
       );
 
       // Should set processing state immediately
@@ -159,7 +160,8 @@ describe("useGitLabSync", () => {
       expect(gitlabApi.exportToGitlab).toHaveBeenCalledWith(
         "project-1",
         "main",
-        "Test commit"
+        "Test commit",
+        undefined
       );
     });
 
@@ -225,13 +227,15 @@ describe("useGitLabSync", () => {
       await result.current.exportToGitlab(
         "project-1",
         "custom-branch",
-        "Custom commit"
+        "Custom commit",
+        "review-token"
       );
 
       expect(gitlabApi.exportToGitlab).toHaveBeenCalledWith(
         "project-1",
         "custom-branch",
-        "Custom commit"
+        "Custom commit",
+        "review-token"
       );
     });
 
@@ -249,6 +253,7 @@ describe("useGitLabSync", () => {
 
       expect(gitlabApi.exportToGitlab).toHaveBeenCalledWith(
         "project-1",
+        undefined,
         undefined,
         undefined
       );

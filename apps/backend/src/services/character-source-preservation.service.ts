@@ -201,165 +201,184 @@ export function recoverLegacyCharacterSource(
   return null;
 }
 
-/** One-time server maintenance, serialized with source writes by the project lock. */
-export async function ensureCharacterSourcePreservation(
-  projectId: string
-): Promise<void> {
-  const db = getDb();
-  const [state] = await db
-    .select({
-      version: projectSettings.characterSourcePreservationVersion,
-      defaultsRecovered: projectSettings.managedDefaultsRecovered,
-    })
-    .from(projectSettings)
-    .where(eq(projectSettings.projectId, projectId))
-    .limit(1);
-  if (state?.version === 1 && state.defaultsRecovered) return;
-  await db.transaction(async (tx) => {
-    await lockProject(tx, projectId);
-    const [settings] = await tx
-      .select()
-      .from(projectSettings)
-      .where(eq(projectSettings.projectId, projectId))
-      .limit(1);
-    if (
-      settings?.characterSourcePreservationVersion === 1 &&
-      settings.managedDefaultsRecovered
-    )
-      return;
-    const excludedTags = new Set(
-      settings?.excludedCharacterTags ?? DEFAULT_EXCLUDED_RENPY_TAGS
-    );
-    const files = await tx
-      .select()
-      .from(projectFiles)
-      .where(
-        and(
-          eq(projectFiles.projectId, projectId),
-          isNull(projectFiles.deletedAt)
-        )
-      );
-    // Any entry point can trigger recovery. Preserve current defaults in
-    // this transaction before recovery removes declarations from content.
-    await promoteManagedDefaults(
-      tx,
-      projectId,
-      collectManagedDefaults(files),
-      "current"
-    );
-    if (!settings?.managedDefaultsRecovered) {
-      const candidates = files.flatMap((file) => {
-        // ZIP's original is immutable, so a later accepted file revision
-        // makes its stripped values ambiguous. For GitLab, require the
-        // explicit local baseline in addition to the recovery match.
-        const raw =
-          file.source === "GITLAB"
-            ? file.lastPushedContentHash && file.remoteContent
-            : file.createdAt.getTime() === file.updatedAt.getTime() &&
-              file.originalContent;
-        if (!raw || !recoverLegacyCharacterSource(file, excludedTags))
-          return [];
-        return collectManagedDefaults([
-          { filePath: file.filePath, content: raw },
-        ]);
+/** Pure maintenance projection shared by reads and the maintenance writer. */
+export function projectCharacterSourcePreservation(
+  files: Array<typeof projectFiles.$inferSelect>,
+  rows: Array<typeof characters.$inferSelect>,
+  settings: typeof projectSettings.$inferSelect | undefined
+) {
+  const excludedTags = new Set(
+    settings?.excludedCharacterTags ?? DEFAULT_EXCLUDED_RENPY_TAGS
+  );
+  // Any entry point can trigger recovery. Preserve current defaults in
+  // this transaction before recovery removes declarations from content.
+  const currentDefaults = collectManagedDefaults(files);
+  let legacyDefaults: ReturnType<typeof collectManagedDefaults> = [];
+  if (!settings?.managedDefaultsRecovered) {
+    const candidates = files.flatMap((file) => {
+      // ZIP's original is immutable, so a later accepted file revision
+      // makes its stripped values ambiguous. For GitLab, require the
+      // explicit local baseline in addition to the recovery match.
+      const raw =
+        file.source === "GITLAB"
+          ? file.lastPushedContentHash && file.remoteContent
+          : file.createdAt.getTime() === file.updatedAt.getTime() &&
+            file.originalContent;
+      if (!raw || !recoverLegacyCharacterSource(file, excludedTags)) return [];
+      return collectManagedDefaults([
+        { filePath: file.filePath, content: raw },
+      ]);
+    });
+    const counts = new Map<string, number>();
+    for (const candidate of candidates) {
+      counts.set(candidate.key, (counts.get(candidate.key) ?? 0) + 1);
+    }
+    legacyDefaults = candidates.filter((item) => counts.get(item.key) === 1);
+  }
+  const fileUpdates: Array<{
+    id: string;
+    values: Pick<
+      typeof projectFiles.$inferSelect,
+      | "content"
+      | "contentHash"
+      | "characterDefinitions"
+      | "lastPushedContentHash"
+    >;
+  }> = [];
+  const characterUpdates: Array<{
+    id: string;
+    values: Partial<
+      Pick<
+        typeof characters.$inferSelect,
+        "sourceDefinition" | "name" | "nameType" | "color"
+      >
+    >;
+  }> = [];
+  if (settings?.characterSourcePreservationVersion === 1) {
+    return {
+      excludedCharacterTags: [...excludedTags],
+      currentDefaults,
+      legacyDefaults,
+      fileUpdates,
+      characterUpdates,
+      settingsNeeded: !settings.managedDefaultsRecovered,
+    };
+  }
+  const templates = new Map<string, CharacterSourceDefinition[]>();
+  const legacyBaselines = new Map<
+    string,
+    { name: string | null; color: string }
+  >();
+  for (const file of files) {
+    const recovery =
+      file.characterDefinitions === null
+        ? recoverLegacyCharacterSource(file, excludedTags)
+        : null;
+    const definitions = file.characterDefinitions ?? recovery?.definitions;
+    if (recovery) {
+      const contentHash = calculateContentHash(recovery.content);
+      fileUpdates.push({
+        id: file.id,
+        values: {
+          content: recovery.content,
+          contentHash,
+          characterDefinitions: recovery.definitions,
+          lastPushedContentHash:
+            file.lastPushedContentHash === file.contentHash
+              ? contentHash
+              : file.lastPushedContentHash,
+        },
       });
-      const counts = new Map<string, number>();
-      for (const candidate of candidates) {
-        counts.set(candidate.key, (counts.get(candidate.key) ?? 0) + 1);
-      }
-      await promoteManagedDefaults(
-        tx,
-        projectId,
-        candidates.filter((item) => counts.get(item.key) === 1),
-        "legacy"
-      );
     }
-    if (settings?.characterSourcePreservationVersion === 1) {
-      await tx
-        .update(projectSettings)
-        .set({ managedDefaultsRecovered: true })
-        .where(eq(projectSettings.projectId, projectId));
-      return;
-    }
-    const templates = new Map<string, CharacterSourceDefinition[]>();
-    const legacyBaselines = new Map<
-      string,
-      { name: string | null; color: string }
-    >();
-    for (const file of files) {
-      const recovery =
-        file.characterDefinitions === null
-          ? recoverLegacyCharacterSource(file, excludedTags)
-          : null;
-      const definitions = file.characterDefinitions ?? recovery?.definitions;
-      if (recovery) {
-        const contentHash = calculateContentHash(recovery.content);
-        await tx
-          .update(projectFiles)
-          .set({
-            content: recovery.content,
-            contentHash,
-            characterDefinitions: recovery.definitions,
-            lastPushedContentHash:
-              file.lastPushedContentHash === file.contentHash
-                ? contentHash
-                : file.lastPushedContentHash,
-          })
-          .where(eq(projectFiles.id, file.id));
-      }
-      if (isSourceOwnedRpyFile(file.filePath)) continue;
-      if (recovery) {
-        const raw = file.remoteContent ?? file.originalContent;
-        if (raw) {
-          for (const baseline of extractLegacyRpySymbols(raw).characters) {
-            legacyBaselines.set(baseline.tag, baseline);
-          }
+    if (isSourceOwnedRpyFile(file.filePath)) continue;
+    if (recovery) {
+      const raw = file.remoteContent ?? file.originalContent;
+      if (raw) {
+        for (const baseline of extractLegacyRpySymbols(raw).characters) {
+          legacyBaselines.set(baseline.tag, baseline);
         }
       }
-      for (const [tag, template] of Object.entries(definitions ?? {})) {
-        const entries = templates.get(tag) ?? [];
-        entries.push(template);
-        templates.set(tag, entries);
-      }
     }
-    // Duplicate source tags make historical attribution ambiguous; do not guess.
-    const rows = await tx
-      .select()
-      .from(characters)
-      .where(eq(characters.projectId, projectId));
-    for (const row of rows) {
-      const entries = templates.get(row.renpyTag);
-      if (row.sourceDefinition === null && entries?.length === 1) {
-        const baseline = legacyBaselines.get(row.renpyTag);
-        const template = entries[0];
-        await tx
-          .update(characters)
-          .set({
-            sourceDefinition: template,
-            // Legacy ZIP parsing confused what_color with speaker color and
-            // retained escaped name syntax. Normalize only unchanged values;
-            // explicitly edited names/colors remain authoritative.
-            ...(baseline && row.name === (baseline.name ?? row.renpyTag)
-              ? {
-                  name: template.name ?? row.renpyTag,
-                  ...(row.nameType === "literal"
-                    ? { nameType: template.nameType }
-                    : {}),
-                }
-              : {}),
-            ...(baseline &&
-            canonicalizeColor(row.color) === canonicalizeColor(baseline.color)
-              ? { color: template.color }
-              : {}),
-          })
-          .where(eq(characters.id, row.id));
-      }
+    for (const [tag, template] of Object.entries(definitions ?? {})) {
+      const entries = templates.get(tag) ?? [];
+      entries.push(template);
+      templates.set(tag, entries);
     }
+  }
+  // Duplicate source tags make historical attribution ambiguous; do not guess.
+  for (const row of rows) {
+    const entries = templates.get(row.renpyTag);
+    if (row.sourceDefinition === null && entries?.length === 1) {
+      const baseline = legacyBaselines.get(row.renpyTag);
+      const template = entries[0];
+      characterUpdates.push({
+        id: row.id,
+        values: {
+          sourceDefinition: template,
+          // Legacy ZIP parsing confused what_color with speaker color and
+          // retained escaped name syntax. Normalize only unchanged values;
+          // explicitly edited names/colors remain authoritative.
+          ...(baseline && row.name === (baseline.name ?? row.renpyTag)
+            ? {
+                name: template.name ?? row.renpyTag,
+                ...(row.nameType === "literal"
+                  ? { nameType: template.nameType }
+                  : {}),
+              }
+            : {}),
+          ...(baseline &&
+          canonicalizeColor(row.color) === canonicalizeColor(baseline.color)
+            ? { color: template.color }
+            : {}),
+        },
+      });
+    }
+  }
+  return {
+    excludedCharacterTags: [...excludedTags],
+    currentDefaults,
+    legacyDefaults,
+    fileUpdates,
+    characterUpdates,
+    settingsNeeded: true,
+  };
+}
+
+export async function applyCharacterSourceProjection(
+  tx: Transaction,
+  projectId: string,
+  projection: ReturnType<typeof projectCharacterSourcePreservation>
+): Promise<void> {
+  await promoteManagedDefaults(
+    tx,
+    projectId,
+    projection.currentDefaults,
+    "current"
+  );
+  await promoteManagedDefaults(
+    tx,
+    projectId,
+    projection.legacyDefaults,
+    "legacy"
+  );
+  for (const update of projection.fileUpdates) {
+    await tx
+      .update(projectFiles)
+      .set(update.values)
+      .where(eq(projectFiles.id, update.id));
+  }
+  for (const update of projection.characterUpdates) {
+    await tx
+      .update(characters)
+      .set(update.values)
+      .where(eq(characters.id, update.id));
+  }
+  if (projection.settingsNeeded) {
     await tx
       .insert(projectSettings)
       .values({
         projectId,
-        excludedCharacterTags: [...excludedTags],
+        excludedCharacterTags: projection.excludedCharacterTags,
         characterSourcePreservationVersion: 1,
         managedDefaultsRecovered: true,
       })
@@ -370,6 +389,49 @@ export async function ensureCharacterSourcePreservation(
           managedDefaultsRecovered: true,
         },
       });
+  }
+}
+
+/** One-time server maintenance, serialized with source writes by the project lock. */
+export async function ensureCharacterSourcePreservation(
+  projectId: string
+): Promise<void> {
+  const db = getDb();
+  const [state] = await db
+    .select()
+    .from(projectSettings)
+    .where(eq(projectSettings.projectId, projectId))
+    .limit(1);
+  if (
+    state?.characterSourcePreservationVersion === 1 &&
+    state.managedDefaultsRecovered
+  )
+    return;
+  await db.transaction(async (tx) => {
+    await lockProject(tx, projectId);
+    const [settings] = await tx
+      .select()
+      .from(projectSettings)
+      .where(eq(projectSettings.projectId, projectId))
+      .limit(1);
+    const files = await tx
+      .select()
+      .from(projectFiles)
+      .where(
+        and(
+          eq(projectFiles.projectId, projectId),
+          isNull(projectFiles.deletedAt)
+        )
+      );
+    const rows = await tx
+      .select()
+      .from(characters)
+      .where(eq(characters.projectId, projectId));
+    await applyCharacterSourceProjection(
+      tx,
+      projectId,
+      projectCharacterSourcePreservation(files, rows, settings)
+    );
   });
 }
 

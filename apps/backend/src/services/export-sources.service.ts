@@ -41,7 +41,10 @@ export function fetchExportPreviewSources(projectId: string) {
   }, snapshot);
 }
 
-async function readSupportingFileSources(tx: Transaction, projectId: string) {
+export async function readSupportingFileSources(
+  tx: Transaction,
+  projectId: string
+) {
   const projectVariables = await tx
     .select({
       key: variables.key,
@@ -50,7 +53,8 @@ async function readSupportingFileSources(tx: Transaction, projectId: string) {
       category: variables.category,
     })
     .from(variables)
-    .where(eq(variables.projectId, projectId));
+    .where(eq(variables.projectId, projectId))
+    .orderBy(variables.key);
   const projectStats = await tx
     .select({
       key: stats.key,
@@ -61,7 +65,8 @@ async function readSupportingFileSources(tx: Transaction, projectId: string) {
       description: stats.description,
     })
     .from(stats)
-    .where(eq(stats.projectId, projectId));
+    .where(eq(stats.projectId, projectId))
+    .orderBy(stats.key);
   const projectCharacters = await tx
     .select({
       renpyTag: characters.renpyTag,
@@ -73,7 +78,8 @@ async function readSupportingFileSources(tx: Transaction, projectId: string) {
       sourceDefinition: characters.sourceDefinition,
     })
     .from(characters)
-    .where(eq(characters.projectId, projectId));
+    .where(eq(characters.projectId, projectId))
+    .orderBy(characters.renpyTag);
 
   return { projectVariables, projectStats, projectCharacters };
 }

@@ -17,16 +17,30 @@ const GENERATED_PATH_CONFLICT_PREFIX =
 const GENERATED_PATH_CONFLICT_MESSAGE =
   "Conflict: verify ownership of the generated file paths in GitLab and BranchForge before retrying.";
 
+export const GITLAB_EXPORT_BRANCH_UNCERTAIN =
+  "Branch creation could not be verified. The branch may remain at its base. Recover the previous export before retrying.";
+export const GITLAB_EXPORT_REVIEW_STALE =
+  "The export review has changed. Refresh the review and confirm again.";
+export const GITLAB_EXPORT_BRANCH_COMMIT_REJECTED =
+  "The branch was created, but the file commit was rejected. The branch may remain at its base. Refresh the review before retrying.";
+export const GITLAB_EXPORT_BRANCH_CREATE_REJECTED =
+  "The target branch could not be created. Refresh the review before confirming again.";
+
 export const GITLAB_EXPORT_ATTEMPT_UNCERTAIN =
   "BranchForge could not verify the previous GitLab push. Check the target branch and retry the same push, or contact your administrator.";
 export const GITLAB_EXPORT_HISTORY_IN_PROGRESS =
-  "GitLab push verification is still in progress. Retry the same branch to continue the search.";
+  "GitLab push verification is still in progress. Select Recover previous export again to continue.";
 export const GITLAB_IMPORT_STALE_AFTER_EXPORT =
   "A GitLab push completed while pull data was loading. Retry the pull to fetch the latest files.";
 export const GITLAB_IMPORT_PENDING_EXPORT =
   "Retry the previous GitLab push before pulling changes into this project.";
 export const GITLAB_EXPORT_ATTEMPT_CHANGED =
   "The previous GitLab push no longer matches this repository, branch, or pending file operations. Review the pending changes before retrying.";
+export class GitLabRepositoryChangedError extends Error {
+  constructor() {
+    super(GITLAB_EXPORT_ATTEMPT_CHANGED);
+  }
+}
 export const GITLAB_IMPORT_EMPTY =
   "No importable content found in the fetched files. Each file was either empty or contained only whitespace.";
 export const GITLAB_FRESH_IMPORT_EMPTY =
@@ -43,6 +57,10 @@ export class GitLabEmptyImportError extends Error {
 
 // Safe exact messages that may be persisted or returned to clients.
 const SAFE_EXPORT_MESSAGES: readonly string[] = [
+  GITLAB_EXPORT_REVIEW_STALE,
+  GITLAB_EXPORT_BRANCH_UNCERTAIN,
+  GITLAB_EXPORT_BRANCH_COMMIT_REJECTED,
+  GITLAB_EXPORT_BRANCH_CREATE_REJECTED,
   "An operator confirmed the GitLab push did not apply. Retry the export.",
   GENERATED_PATH_CONFLICT_MESSAGE,
   GITLAB_EXPORT_ATTEMPT_UNCERTAIN,

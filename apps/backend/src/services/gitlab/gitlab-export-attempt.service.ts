@@ -19,6 +19,7 @@ import {
 import { lockProject } from "../project-files-operations.service.js";
 import {
   GITLAB_EXPORT_ATTEMPT_CHANGED,
+  GitLabRepositoryChangedError,
   GITLAB_EXPORT_ATTEMPT_UNCERTAIN,
   GITLAB_EXPORT_HISTORY_IN_PROGRESS,
 } from "./gitlab-error.helpers.js";
@@ -98,7 +99,7 @@ async function checkRepository(
     .from(gitlabRepositories)
     .where(eq(gitlabRepositories.projectId, attempt.projectId))
     .for("update");
-  if (!link) throw new Error(GITLAB_EXPORT_ATTEMPT_CHANGED);
+  if (!link) throw new GitLabRepositoryChangedError();
   assertGitlabRepositoryIdentity(attempt, link);
 }
 
@@ -169,12 +170,15 @@ async function lockLocalBaselines(
   });
 }
 
+/** Admission effects share this transaction and roll back with failed guards. */
 export async function prepareExportAttempt(
-  attempt: NewAttempt
+  attempt: NewAttempt,
+  beforePrepare?: (tx: Transaction) => Promise<void>
 ): Promise<Attempt> {
   return getDb().transaction(async (tx) => {
     await lockProject(tx, attempt.projectId);
     await checkRepository(tx, attempt);
+    await beforePrepare?.(tx);
     await lockLocalBaselines(
       tx,
       attempt.projectId,
@@ -251,6 +255,24 @@ function reduceExpectedPaths(snapshot: Snapshot): Snapshot["before"] {
   return [...hashes].map(([path, hash]) => ({ path, hash }));
 }
 
+function fullCommitId(commitId: string | null | undefined): string | undefined {
+  return commitId && /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/i.test(commitId)
+    ? commitId
+    : undefined;
+}
+
+export function exportFilePreimage(
+  path: string,
+  remote: { content: string | null; lastCommitId: string | null }
+): Snapshot["before"][number] {
+  const lastCommitId = fullCommitId(remote.lastCommitId);
+  return {
+    path,
+    hash: remote.content === null ? null : calculateContentHash(remote.content),
+    ...(lastCommitId ? { lastCommitId } : {}),
+  };
+}
+
 export async function captureExportPreimages(
   projectId: string,
   userId: string,
@@ -270,7 +292,7 @@ export async function captureExportPreimages(
   for (let index = 0; index < ordered.length; index += 5) {
     const batch = await Promise.allSettled(
       ordered.slice(index, index + 5).map(async (path) => {
-        const { content, lastCommitId } = await getFileContentWithMetadata(
+        const remote = await getFileContentWithMetadata(
           projectId,
           userId,
           path,
@@ -278,14 +300,7 @@ export async function captureExportPreimages(
           undefined,
           repository
         );
-        return {
-          path,
-          hash: content === null ? null : calculateContentHash(content),
-          // GitLab's per-file guard accepts a real Git commit revision.
-          ...(lastCommitId && /^[a-f0-9]{40}$/i.test(lastCommitId)
-            ? { lastCommitId }
-            : {}),
-        };
+        return exportFilePreimage(path, remote);
       })
     );
     for (const result of batch) {
@@ -303,13 +318,22 @@ export function guardExportActions(
   const revisions = new Map(
     preimages.map(({ path, lastCommitId }) => [path, lastCommitId])
   );
+  const produced = new Set<string>();
   return actions.map((action) => {
     const source = action.previousPath ?? action.filePath;
-    const lastCommitId = action.lastCommitId ?? revisions.get(source);
+    const intermediate = produced.has(source);
+    const lastCommitId = intermediate
+      ? undefined
+      : (fullCommitId(action.lastCommitId) ?? revisions.get(source));
+    if (action.action !== "create" && !intermediate && !lastCommitId) {
+      throw new Error(
+        "GitLab did not provide the file revision required to protect this export. Refresh or recover before retrying."
+      );
+    }
     revisions.delete(source);
     revisions.delete(action.filePath);
-    // Later actions referring to a path created earlier in this batch have no
-    // independent preflight revision, including the second step of a case move.
+    produced.delete(source);
+    if (action.action !== "delete") produced.add(action.filePath);
     return action.action !== "create" && lastCommitId
       ? { ...action, lastCommitId }
       : action;
@@ -330,7 +354,11 @@ async function matchesRemote(
     [],
     expected.map(({ path }) => path)
   );
-  return expected.every(({ hash }, index) => paths[index].hash === hash);
+  return expected.every(
+    ({ hash, lastCommitId }, index) =>
+      paths[index].hash === hash &&
+      (!lastCommitId || paths[index].lastCommitId === lastCommitId)
+  );
 }
 
 export async function verifyExportAttempt(

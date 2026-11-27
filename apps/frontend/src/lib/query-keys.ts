@@ -62,6 +62,10 @@ export const gitlabKeys = {
     ["gitlab", "operations", projectId] as const,
   operation: (operationId: string) =>
     ["gitlab", "operations", operationId] as const,
+  exportReviews: (projectId: string) =>
+    ["gitlab", "export-review", projectId] as const,
+  exportReview: (projectId: string, branch: string) =>
+    ["gitlab", "export-review", projectId, branch] as const,
   pendingChanges: (projectId: string) =>
     ["gitlab", "pending-changes", projectId] as const,
 } as const;

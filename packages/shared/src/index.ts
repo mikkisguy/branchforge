@@ -1518,3 +1518,26 @@ export {
   findProjectImageForTarget,
   type ProjectImage,
 } from "./project-images.js";
+
+/** Stable recovery guidance shared by the API and dialog. */
+export const GITLAB_EXPORT_RECOVERY_REQUIRED =
+  "Recover the previous GitLab export before reviewing another push.";
+
+/** Content-bound summary of the exact atomic GitLab export batch. */
+export interface GitlabExportReview {
+  projectId: string;
+  repository: {
+    repositoryLinkId: string;
+    gitlabProjectId: number;
+    gitlabOrigin: string;
+  };
+  targetBranch: string;
+  branchExisted: boolean;
+  baseBranch: string | null;
+  actions: Array<{
+    action: "create" | "update" | "move" | "delete";
+    filePath: string;
+    previousPath?: string;
+  }>;
+  reviewToken: string;
+}
