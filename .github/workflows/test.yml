@@ -10,7 +10,7 @@ jobs:
   build-verification:
     name: Build Verification
     runs-on: ubuntu-latest
-    container: node:24-alpine
+    container: node:26-alpine
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
@@ -31,7 +31,7 @@ jobs:
     name: Backend Unit Tests
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
-    container: node:24-alpine
+    container: node:26-alpine
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
@@ -52,7 +52,7 @@ jobs:
     name: Backend Integration Tests
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
-    container: node:24-alpine
+    container: node:26-alpine
     services:
       postgres:
         image: postgres:18-alpine
@@ -91,7 +91,7 @@ jobs:
     name: Frontend Unit Tests
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
-    container: node:24-alpine
+    container: node:26-alpine
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
