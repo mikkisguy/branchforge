@@ -1,5 +1,5 @@
 # Build stage
-FROM node:24-alpine AS builder
+FROM node:26-alpine AS builder
 
 ARG VERSION=0.0.1
 ARG BUILD_DATE

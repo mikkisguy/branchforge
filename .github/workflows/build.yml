@@ -9,7 +9,7 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
-    container: node:24-alpine
+    container: node:26-alpine
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
